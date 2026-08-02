@@ -12,6 +12,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use client::{Client, ClientBuilder};
 use shared::protocol::Params;
+use std::ffi::OsString;
 use std::time::Duration;
 
 use config::SophonConfig;
@@ -27,7 +28,13 @@ struct Cli {
     #[arg(long)]
     board: Option<String>,
     /// 本地 daemon 的 Unix socket 路径（仅无远程地址时用）。
-    #[arg(short, long, default_value = "/run/probe-daemon/probe.sock", env = "PROBE_SOCK", global = true)]
+    #[arg(
+        short,
+        long,
+        default_value = "/run/probe-daemon/probe.sock",
+        env = "PROBE_SOCK",
+        global = true
+    )]
     socket: String,
     /// 响应超时（秒）。--board 配置里若有 timeout 会覆盖此默认。
     #[arg(long, default_value = "30", global = true)]
@@ -61,6 +68,12 @@ enum Cmd {
     /// 管理板子别名（~/.rdk-sophon/config.toml）。
     #[command(subcommand)]
     Config(ConfigCmd),
+    /// 管理并列出板端动态控制插件。
+    #[command(subcommand)]
+    Plugins(PluginsCmd),
+    /// 未被内置命令占用的一级子命令按动态插件转发给板端。
+    #[command(external_subcommand)]
+    Plugin(Vec<OsString>),
 }
 
 #[derive(Debug, Subcommand)]
@@ -89,6 +102,13 @@ enum ConfigCmd {
     Path,
 }
 
+/// 动态插件管理子命令。
+#[derive(Debug, Subcommand)]
+enum PluginsCmd {
+    /// 列出板端已安装、可调用的插件。
+    List,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -104,7 +124,10 @@ async fn main() -> Result<()> {
     let client = if let Some(h) = host {
         ClientBuilder::new().timeout(timeout).tcp(&h).await?
     } else {
-        ClientBuilder::new().timeout(timeout).unix(&cli.socket).await?
+        ClientBuilder::new()
+            .timeout(timeout)
+            .unix(&cli.socket)
+            .await?
     };
 
     match &cli.cmd {
@@ -137,9 +160,40 @@ async fn main() -> Result<()> {
             };
             print(&client, method, p, cli.raw).await?
         }
+        Cmd::Plugins(PluginsCmd::List) => print(&client, "plugin.list", None, cli.raw).await?,
+        Cmd::Plugin(parts) => {
+            let (plugin, args) = plugin_parts(parts)?;
+            let mut map = serde_json::Map::new();
+            map.insert("plugin".into(), serde_json::Value::String(plugin));
+            map.insert(
+                "args".into(),
+                serde_json::Value::Array(args.into_iter().map(serde_json::Value::String).collect()),
+            );
+            print(&client, "plugin.invoke", Some(Params::Named(map)), cli.raw).await?
+        }
         Cmd::Config(_) => unreachable!("config 子命令已在上方处理"),
     }
     Ok(())
+}
+
+/// 将 clap 捕获的未知子命令转为 JSON 可表达的插件名与参数。
+fn plugin_parts(parts: &[OsString]) -> Result<(String, Vec<String>)> {
+    let (name, args) = parts
+        .split_first()
+        .ok_or_else(|| anyhow!("缺少插件名；用 sophonctl plugins list 查看可用插件"))?;
+    let name = name
+        .to_str()
+        .ok_or_else(|| anyhow!("插件名必须是 UTF-8"))?
+        .to_string();
+    let args = args
+        .iter()
+        .map(|arg| {
+            arg.to_str()
+                .map(str::to_string)
+                .ok_or_else(|| anyhow!("插件参数必须是 UTF-8"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok((name, args))
 }
 
 /// 解析连接目标。返回 (Option<host>, timeout_secs)。
@@ -180,7 +234,11 @@ fn run_config(sub: &ConfigCmd) -> Result<()> {
             let cfg = SophonConfig::load()?;
             println!("配置文件: {}", config::expand_home(&path));
             if let Some(d) = &cfg.default {
-                println!("[default]  host={}  timeout={}", d.host, d.timeout.unwrap_or(30));
+                println!(
+                    "[default]  host={}  timeout={}",
+                    d.host,
+                    d.timeout.unwrap_or(30)
+                );
             } else {
                 println!("[default]  （未设）");
             }
@@ -205,7 +263,12 @@ fn run_config(sub: &ConfigCmd) -> Result<()> {
             }
             Ok(())
         }
-        ConfigCmd::Add { name, host, timeout, default } => {
+        ConfigCmd::Add {
+            name,
+            host,
+            timeout,
+            default,
+        } => {
             let mut cfg = SophonConfig::load()?;
             let board = config::BoardConfig {
                 host: host.clone(),
@@ -247,4 +310,24 @@ async fn print(client: &Client, method: &str, params: Option<Params>, raw: bool)
         println!("{}", serde_json::to_string_pretty(&v)?);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+
+    use super::plugin_parts;
+
+    #[test]
+    fn dynamic_plugin_parts_keep_each_argument_separate() {
+        let parts = vec![
+            OsString::from("servo"),
+            OsString::from("servo"),
+            OsString::from("0"),
+            OsString::from("-2.0"),
+        ];
+        let (plugin, args) = plugin_parts(&parts).unwrap();
+        assert_eq!(plugin, "servo");
+        assert_eq!(args, vec!["servo", "0", "-2.0"]);
+    }
 }
