@@ -1,0 +1,41 @@
+# rdk-sophon probe-daemon default configuration.
+# Drop into /etc/probe-daemon/config.toml on the board.
+
+[log]
+level = "info"
+# Empty = stderr (journald captures it under systemd). Set to a directory
+# path to also write rolling files there.
+dir = ""
+
+[tcp]
+enabled = true
+bind = "0.0.0.0:7777"
+
+[unix]
+enabled = true
+# 用 systemd RuntimeDirectory(probe-daemon)提供的可写子目录 /run/probe-daemon/。
+# 直接放 /run/ 根下会因 ProtectSystem=strict 只读而绑定失败。
+path = "/run/probe-daemon/probe.sock"
+
+# Uncomment on a board wired to a debug UART.
+# [serial]
+# path = "/dev/ttyS1"
+# baud = 115200
+
+[telemetry]
+# Push a snapshot every N seconds. 0 disables push (pull-only).
+interval_secs = 5
+
+[shell]
+# DANGER: enabling this lets any authorised client run arbitrary shell on
+# the board. Keep disabled unless you understand the blast radius.
+enabled = false
+timeout_secs = 30
+# Extra deny substrings on top of the built-in defaults.
+deny_patterns = []
+
+[alerts]
+# Thermal alert fires when any zone exceeds this °C.
+temp_c = 75.0
+# Disk alert fires when any real filesystem exceeds this %.
+disk_usage_pct = 90.0
