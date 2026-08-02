@@ -15,6 +15,8 @@ pub struct Config {
     #[serde(default)]
     pub shell: ShellConfig,
     #[serde(default)]
+    pub plugins: PluginsConfig,
+    #[serde(default)]
     pub alerts: AlertsConfig,
 }
 
@@ -128,6 +130,30 @@ impl Default for ShellConfig {
             enabled: false,
             timeout_secs: default_shell_timeout(),
             deny_patterns: Vec::new(),
+        }
+    }
+}
+
+/// 动态控制插件配置。插件默认关闭，避免未知目录中的程序获得 daemon 执行入口。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginsConfig {
+    /// 是否启用 `plugin.list` 与 `plugin.invoke` RPC。
+    #[serde(default)]
+    pub enabled: bool,
+    /// 仅从此 root 管理目录发现 `<id>/plugin.toml`。
+    #[serde(default = "default_plugins_dir")]
+    pub dir: String,
+}
+
+fn default_plugins_dir() -> String {
+    "/opt/sophon/plugins".to_string()
+}
+
+impl Default for PluginsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            dir: default_plugins_dir(),
         }
     }
 }

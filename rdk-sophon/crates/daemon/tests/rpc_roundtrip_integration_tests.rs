@@ -2,13 +2,14 @@
 //! 用 daemon::build_test_app + FakeReader 装配，StubTransport pair 驱动，
 //! 验证 ping/get_state/exec_shell 从 client 到 dispatcher 到 domain 的完整路径。
 
+use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
 use daemon::config::Config;
-use shared::protocol::Id;
 use infra::StubTransport;
+use shared::protocol::Id;
 use testkit::common::{make_fake_hrut, make_fake_proc, make_fake_sysfs, FakeShellRunner};
 
 /// 装配一个测试 App（假 infra）并返回 app。
@@ -104,5 +105,55 @@ async fn exec_shell_denied_when_disabled() -> Result<()> {
         }
         _ => panic!("应为 ShellDisabled"),
     }
+    Ok(())
+}
+
+#[tokio::test]
+async fn plugin_rpc_discovers_and_invokes_a_manifest() -> Result<()> {
+    let temp = tempfile::tempdir()?;
+    let servo_dir = temp.path().join("servo");
+    fs::create_dir(&servo_dir)?;
+    fs::write(
+        servo_dir.join("plugin.toml"),
+        r#"
+api_version = 1
+id = "servo"
+description = "servo test plugin"
+entrypoint = ["/usr/bin/printf", "%s"]
+"#,
+    )?;
+    let mut cfg = Config::default();
+    cfg.plugins.enabled = true;
+    cfg.plugins.dir = temp.path().display().to_string();
+    let sysfs = Arc::new(make_fake_sysfs());
+    let proc_r = Arc::new(make_fake_proc());
+    let hrut = Arc::new(make_fake_hrut());
+    let shell_runner: Arc<dyn shared::ports::ShellRunner> = Arc::new(FakeShellRunner::new());
+    let app = daemon::build_test_app(&cfg, sysfs, proc_r, hrut, shell_runner)?.app;
+    let (server_side, client_side) = StubTransport::pair();
+    let dispatcher = Arc::clone(&app.dispatcher);
+    let audit = app.audit.clone();
+    let rx = app.broadcaster.subscribe();
+    tokio::spawn(application::run_session(
+        "stub".into(),
+        Box::new(server_side),
+        dispatcher,
+        audit,
+        rx,
+    ));
+    let client = client::Client::new(Box::new(client_side)).with_timeout(Duration::from_secs(2));
+    let plugins = client.call("plugin.list", None).await?;
+    assert_eq!(plugins[0]["id"], "servo");
+    let mut params = serde_json::Map::new();
+    params.insert("plugin".into(), serde_json::json!("servo"));
+    params.insert("args".into(), serde_json::json!(["stand"]));
+    let output = client
+        .call(
+            "plugin.invoke",
+            Some(shared::protocol::Params::Named(params)),
+        )
+        .await?;
+    assert_eq!(output["exit"], 0);
+    assert_eq!(output["stdout"], "stand");
     Ok(())
 }

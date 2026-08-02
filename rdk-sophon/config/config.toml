@@ -51,6 +51,13 @@ timeout_secs = 30
 # 内置 deny（不可削弱）：rm -rf /、mkfs、dd if=/dev/zero of=/dev/、:(){ :|:&
 deny_patterns = []
 
+# ───────────────────────── 动态控制插件 ─────────────────────────
+# 插件目录内每个 <id>/plugin.toml 都是一项可由 sophonctl <id> ... 调用的能力。
+# 默认关闭；启用前确保目录、manifest 与入口程序都由 root 管理且普通用户不可写。
+[plugins]
+enabled = false
+dir = "/opt/sophon/plugins"
+
 # ───────────────────────── 阈值告警 ─────────────────────────
 [alerts]
 # 温度告警：任一 thermal zone 的温度（°C）超过此值即发 alert notification。

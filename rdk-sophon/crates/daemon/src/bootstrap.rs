@@ -5,17 +5,19 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use application::{
-    AuditEntry, AuditLog, Broadcaster, CollectionOrchestrator, RpcDispatcher, run_session,
+    run_session, AuditEntry, AuditLog, Broadcaster, CollectionOrchestrator, RpcDispatcher,
 };
-use domain::collectors::{BpuCollector, CpuCollector, DiskCollector, MemoryCollector, NetCollector, ThermalCollector};
-use domain::{AlertService, CommandPolicy, StateService, TelemetryService, AlertThresholds};
+use domain::collectors::{
+    BpuCollector, CpuCollector, DiskCollector, MemoryCollector, NetCollector, ThermalCollector,
+};
+use domain::{AlertService, AlertThresholds, CommandPolicy, StateService, TelemetryService};
+use infra::Transport;
 use infra::{RealHrutGateway, RealProcReader, RealShellRunner, RealSysfsReader};
-use shared::ports::{Collector, HrutGateway, ProcReader, ShellRunner, SysfsReader};
+use shared::ports::{Collector, HrutGateway, PluginRunner, ProcReader, ShellRunner, SysfsReader};
 use shared::protocol::{JsonRpcMessage, Params, StateSnapshot};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use infra::Transport;
 
 use crate::config::Config;
 
@@ -52,7 +54,8 @@ pub fn build_production_app(cfg: &Config) -> Result<AppHandles> {
         Box::new(BpuCollector::new(Arc::clone(&hrut))),
     ];
     let shell_runner: Arc<dyn ShellRunner> = Arc::new(RealShellRunner::new());
-    build_app(cfg, collectors, shell_runner)
+    let plugin_runner = plugin_runner_for_config(cfg);
+    build_app(cfg, collectors, shell_runner, plugin_runner)
 }
 
 /// 测试装配：用假 infra。E2E 测试调用，注入假 /proc /sys 数据。
@@ -71,7 +74,8 @@ pub fn build_test_app(
         Box::new(NetCollector::new(Arc::clone(&proc_r), Arc::clone(&sysfs))),
         Box::new(BpuCollector::new(Arc::clone(&hrut))),
     ];
-    build_app(cfg, collectors, shell_runner)
+    let plugin_runner = plugin_runner_for_config(cfg);
+    build_app(cfg, collectors, shell_runner, plugin_runner)
 }
 
 /// 测试装配：直接注入 Collector 列表（跳过 sysfs/proc/hrut 组装），用于 Orchestrator 单测。
@@ -80,13 +84,15 @@ pub fn build_test_app_with_collectors(
     collectors: Vec<Box<dyn Collector>>,
     shell_runner: Arc<dyn ShellRunner>,
 ) -> Result<AppHandles> {
-    build_app(cfg, collectors, shell_runner)
+    let plugin_runner = plugin_runner_for_config(cfg);
+    build_app(cfg, collectors, shell_runner, plugin_runner)
 }
 
 fn build_app(
     cfg: &Config,
     collectors: Vec<Box<dyn Collector>>,
     shell_runner: Arc<dyn ShellRunner>,
+    plugin_runner: Arc<dyn PluginRunner>,
 ) -> Result<AppHandles> {
     // 共享状态：StateSnapshot 读写锁。
     let snapshot: Arc<RwLock<StateSnapshot>> = Arc::new(RwLock::new(StateSnapshot::empty()));
@@ -108,6 +114,7 @@ fn build_app(
         Arc::clone(&state),
         policy,
         Arc::clone(&shell_runner),
+        plugin_runner,
     ));
 
     // 审计：mpsc sink + 后台写任务。
@@ -154,7 +161,20 @@ fn build_app(
         cancel.clone(),
     );
 
-    Ok(AppHandles { app, collect_handle, audit_handle })
+    Ok(AppHandles {
+        app,
+        collect_handle,
+        audit_handle,
+    })
+}
+
+/// 按配置选择真实目录扫描器或禁用实现，生产与测试装配使用完全相同的开关语义。
+fn plugin_runner_for_config(cfg: &Config) -> Arc<dyn PluginRunner> {
+    if cfg.plugins.enabled {
+        Arc::new(infra::RealPluginRunner::new(&cfg.plugins.dir))
+    } else {
+        Arc::new(infra::DisabledPluginRunner)
+    }
 }
 
 /// spawn 采集/告警/telemetry 循环。
@@ -212,18 +232,22 @@ fn alert_params(rule: &domain::AlertRule) -> serde_json::Map<String, serde_json:
     };
     let mut m = serde_json::Map::new();
     m.insert("kind".into(), serde_json::Value::String(kind.into()));
-    m.insert("target".into(), serde_json::Value::String(rule.target.clone()));
+    m.insert(
+        "target".into(),
+        serde_json::Value::String(rule.target.clone()),
+    );
     m.insert("current".into(), serde_json::json!(current));
     m.insert("threshold".into(), serde_json::json!(threshold));
     m
 }
 
 /// TCP accept 循环。监听器与 App 注入，每连接 spawn run_session。
-pub async fn accept_tcp_loop(
-    listener: tokio::net::TcpListener,
-    app: Arc<App>,
-) -> Result<()> {
-    let local = listener.local_addr().ok().map(|a| a.to_string()).unwrap_or_default();
+pub async fn accept_tcp_loop(listener: tokio::net::TcpListener, app: Arc<App>) -> Result<()> {
+    let local = listener
+        .local_addr()
+        .ok()
+        .map(|a| a.to_string())
+        .unwrap_or_default();
     tracing::info!(%local, "tcp listener up");
     loop {
         tokio::select! {
@@ -250,10 +274,7 @@ pub async fn accept_tcp_loop(
 }
 
 /// Unix socket accept 循环。
-pub async fn accept_unix_loop(
-    listener: tokio::net::UnixListener,
-    app: Arc<App>,
-) -> Result<()> {
+pub async fn accept_unix_loop(listener: tokio::net::UnixListener, app: Arc<App>) -> Result<()> {
     loop {
         tokio::select! {
             _ = app.cancel.cancelled() => break,
