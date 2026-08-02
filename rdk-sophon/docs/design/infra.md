@@ -27,7 +27,8 @@ infra/src/
 ├── proc.rs             # RealProcReader
 ├── hrut.rs             # RealHrutGateway
 ├── statvfs.rs          # statvfs FFI（仅 Linux）
-└── shell.rs            # RealShellRunner
+├── shell.rs            # RealShellRunner
+└── plugin.rs           # RealPluginRunner / DisabledPluginRunner
 ```
 
 ## 3.3 传输层（`transport/`）
@@ -80,6 +81,11 @@ serial 适配器**复用** NDJSON 帧逻辑（与 TCP 同），但因为是阻�
 - `with_max_output(bytes)` 自定义。
 
 **策略与执行分离**：deny/timeout 值的判定在 `domain::CommandPolicy`（纯逻辑），本结构只负责"按给定 timeout 执行给定 cmd"。
+
+### RealPluginRunner（`plugin.rs`）
+实现 `ports::PluginRunner`。每次 list/invoke 扫描配置的 `<dir>/<id>/plugin.toml`，所以增删插件无需重启。manifest 只接受 `api_version=1`、安全的 CLI id 与非空 `entrypoint`。执行时用 `Command::new(entrypoint[0]).args(entrypoint[1..]).args(user_args)`，不使用 shell；stdout/stderr 并发读取且每路截断 256 KiB。`timeout_secs=0` 不设超时，进程在调用连接关闭而任务被 abort 时由 `kill_on_drop` 回收。
+
+`DisabledPluginRunner` 在配置关闭时返回空清单/不存在，不能回退到 raw shell。
 
 ## 3.5 依赖
 

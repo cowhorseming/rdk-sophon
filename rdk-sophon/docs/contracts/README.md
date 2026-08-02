@@ -23,7 +23,8 @@ docs/contracts/
 │   └── examples.md        # curl 示例
 ├── cli/                   # 命令行契约
 │   ├── sophonctl.md        # sophonctl 子命令 + 参数
-│   └── config.md          # config.toml 配置契约
+│   ├── config.md          # config.toml 配置契约
+│   └── plugins.md         # 动态控制插件包与调用契约
 └── transport/             # 传输通道契约
     ├── ndjson.md          # NDJSON 帧格式
     ├── channels.md        # TCP/Unix/Serial 通道

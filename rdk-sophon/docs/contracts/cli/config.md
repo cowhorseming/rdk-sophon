@@ -95,7 +95,24 @@ deny_patterns = []
 
 **内置 deny 列表（不可削弱）**：`"rm -rf /"`、`"mkfs"`、`"dd if=/dev/zero of=/dev/"`、`":(){ :|:&"`。`deny_patterns` 只能追加。
 
-## 2.8 `[alerts]`
+## 2.8 `[plugins]`
+
+| 字段 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `enabled` | bool | `false` | 是否允许 `plugin.list` / `plugin.invoke`；默认关闭 |
+| `dir` | string | `"/opt/sophon/plugins"` | 仅扫描此目录下的 `<id>/plugin.toml` |
+
+```toml
+[plugins]
+enabled = true
+dir = "/opt/sophon/plugins"
+```
+
+目录不存在时 `plugin.list` 返回空列表，调用任意插件返回不存在。生产目录、清单和入口程序必须由 root 管理，普通用户不可写；详细包格式见 [`plugins.md`](plugins.md)。
+
+源码: `crates/daemon/src/config.rs:17-18, 137-159`、`crates/infra/src/plugin.rs:49-109`。
+
+## 2.9 `[alerts]`
 
 | 字段 | 类型 | 默认 | 说明 |
 |------|------|------|------|
@@ -108,11 +125,11 @@ temp_c = 75.0
 disk_usage_pct = 90.0
 ```
 
-## 2.9 完整示例
+## 2.10 完整示例
 
 见 [`config/config.toml`](../../../config/config.toml)。
 
-## 2.10 CLI 覆盖
+## 2.11 CLI 覆盖
 
 `probe-daemon` 接受：
 - `--config <path>`：配置文件路径（默认 `/etc/probe-daemon/config.toml`）。

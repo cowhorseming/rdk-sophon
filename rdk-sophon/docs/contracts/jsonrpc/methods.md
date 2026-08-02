@@ -20,6 +20,8 @@
 | [`get_bpu`](#29-get_bpu) | 无 | `BpuInfo` 或 `null` | BPU（仅 RDK 板） |
 | [`refresh_state`](#210-refresh_state) | 无 | `{"ok":true,"ts":<RFC3339>}` | 立即触发一次采集 |
 | [`exec_shell`](#211-exec_shell) | `{"cmd":<string>}` | `{"exit":<int?>,"stdout":<str>,"stderr":<str>}` | 执行 shell（受策略约束） |
+| [`plugin.list`](#212-pluginlist) | 无 | `[{"id":<str>,"description":<str>}]` | 列出动态控制插件 |
+| [`plugin.invoke`](#213-plugininvoke) | `{"plugin":<str>,"args":[<str>]}` | `{"exit":<int?>,"stdout":<str>,"stderr":<str>}` | 调用动态控制插件 |
 
 各片段的**完整字段定义**见 [`data-model.md`](data-model.md)。
 
@@ -170,3 +172,38 @@
 - 其它执行错误 → `ExecError`（-32000）。
 
 **审计**：每次 `exec_shell`（成功/失败/超时）都记审计日志（`source`、`args` 截前 200 字符、`outcome`、`duration_ms`）。
+
+---
+
+## 2.12 `plugin.list`
+
+返回当前 `[plugins]` 目录中可发现的动态控制插件。关闭插件功能或目录不存在时返回空数组。
+
+**请求**：`{"jsonrpc":"2.0","id":1,"method":"plugin.list"}`
+
+**响应**：
+```json
+{"jsonrpc":"2.0","id":1,"result":[{"id":"servo","description":"舵机姿态控制"}]}
+```
+
+源码: `crates/application/src/rpc_dispatcher.rs:176-180`、`crates/infra/src/plugin.rs:113-124`。
+
+---
+
+## 2.13 `plugin.invoke`
+
+以精确参数数组调用一个动态插件；服务端不会把参数拼成 shell 命令。
+
+**请求**：
+```json
+{"jsonrpc":"2.0","id":1,"method":"plugin.invoke","params":{"plugin":"servo","args":["servo","0","-2.0"]}}
+```
+
+**响应**：
+```json
+{"jsonrpc":"2.0","id":1,"result":{"exit":0,"stdout":"","stderr":""}}
+```
+
+`plugin` 必须是字符串，`args` 必须是字符串数组；参数错误或插件不存在返回 `InvalidParams`（-32602）。插件 manifest 设置的正数 `timeout_secs` 超时时返回 `Timeout`（-32003）。每次调用均审计为 `plugin.invoke`。
+
+源码: `crates/application/src/rpc_dispatcher.rs:182-255`、`crates/infra/src/plugin.rs:126-183`。

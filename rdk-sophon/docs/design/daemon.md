@@ -41,7 +41,7 @@ pub struct AppHandles {
 
 | 函数 | 注入 | 用途 |
 |------|------|------|
-| `build_production_app(cfg)` | 真实 `RealSysfsReader`/`RealProcReader`/`RealHrutGateway`/`RealShellRunner` | 生产（main） |
+| `build_production_app(cfg)` | 真实 `RealSysfsReader`/`RealProcReader`/`RealHrutGateway`/`RealShellRunner`/`RealPluginRunner` | 生产（main） |
 | `build_test_app(cfg, sysfs, proc_r, hrut, shell_runner)` | 假 infra（trait object） | E2E（Mac 上注入假 /proc /sys） |
 | `build_test_app_with_collectors(cfg, collectors, shell_runner)` | 直接注入 Collector 列表 | Orchestrator 单测 |
 
@@ -49,7 +49,7 @@ pub struct AppHandles {
 1. 建 `StateService`（`Arc<RwLock<StateSnapshot>>`）。
 2. 建 `CollectionOrchestrator`（注入 Collector 列表）。
 3. `CommandPolicy::from_config`（内置 deny 不可削弱）。
-4. 建 `RpcDispatcher`（注入 orchestrator/state/policy/shell_runner）。
+4. 按 `[plugins].enabled` 注入 `RealPluginRunner` 或 `DisabledPluginRunner`，再建 `RpcDispatcher`（注入 orchestrator/state/policy/shell_runner/plugin_runner）。
 5. 审计 mpsc sink + 后台写任务（`tracing target: "audit"`）。
 6. `Broadcaster::new(256)`。
 7. spawn 采集循环。

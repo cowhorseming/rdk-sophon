@@ -51,6 +51,7 @@
 | `get_state`/`get_thermal`/.../`get_bpu` | `MethodNotFound`(-32601) 仅当方法名拼错；正常无错 |
 | `refresh_state` | `MethodNotFound` 仅当拼错 |
 | `exec_shell` | `InvalidParams`(-32602) 缺 `cmd`；`ShellDisabled`(-32001) 未启用；`ShellDenied`(-32002) 命中 deny；`Timeout`(-32003) 超时；`ExecError`(-32000) 其它执行失败 |
+| `plugin.invoke` | `InvalidParams`(-32602) 参数错误或插件不存在；`Timeout`(-32003) manifest 超时；`ExecError`(-32000) manifest/启动/等待失败 |
 | 未知方法 | `MethodNotFound`(-32601) |
 
 ## 4.4 调用方重试建议

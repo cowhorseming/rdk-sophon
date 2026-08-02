@@ -30,10 +30,11 @@ pub struct RpcDispatcher {
     pub state: Arc<StateService>,
     pub command_policy: CommandPolicy,
     pub shell_runner: Arc<dyn ShellRunner>,
+    pub plugin_runner: Arc<dyn PluginRunner>,
 }
 
 impl RpcDispatcher {
-    pub fn new(orchestrator, state, command_policy, shell_runner) -> Self;
+    pub fn new(orchestrator, state, command_policy, shell_runner, plugin_runner) -> Self;
     pub async fn dispatch(&self, msg: JsonRpcMessage, source: &str, audit: &AuditLog) -> DispatchOutcome;
 }
 ```
@@ -47,6 +48,7 @@ impl RpcDispatcher {
 - 状态拉取：`get_state`/`get_thermal`/`get_cpu`/`get_memory`/`get_disk`/`get_net`/`get_bpu` → `serde_json::to_value(domain 返回的领域类型)`。
 - 控制：`refresh_state`（调 `orchestrator.refresh`，返回 `{ok, ts}`）、`ping`（返回 `{pong, ts}`）。
 - shell：`exec_shell`（见下）。
+- 动态插件：`plugin.list`/`plugin.invoke`（见下）。
 - 未知 → `MethodNotFound`（-32601）。
 
 ### exec_shell（`rpc_dispatcher.rs:91-137`）
@@ -55,6 +57,9 @@ impl RpcDispatcher {
 3. `shell_runner.run(cmdline, timeout)`：执行（infra）。
 4. 审计：记录 `source`、`method="exec_shell"`、`args`（截前 200 字符）、`outcome`（`ok exit=0`/`nonzero exit=N`/`error: ...`）、`duration_ms`。
 5. 成功 → `{exit, stdout, stderr}`；超时 → `Timeout`（-32003）；其它 shell 错误 → `ExecError`（-32000）。
+
+### 动态插件（`rpc_dispatcher.rs:165-244`）
+`plugin.list` 委托 `PluginRunner::list`；`plugin.invoke` 只接受 `plugin: String` 与 `args: [String]`，不将参数拼接成 shell。调用结果与 shell 输出一致为 `{exit, stdout, stderr}`，每次成功、非零退出或失败都写审计 `method="plugin.invoke"`。
 
 ## 5.4 CollectionOrchestrator（`collection_orchestrator.rs`）
 
@@ -74,12 +79,12 @@ pub struct CollectionOrchestrator {
 ### Broadcaster（`session_service.rs:14-33`）
 进程级 telemetry/alert 广播总线。`new(capacity)`（默认 256）、`subscribe() -> Receiver`、`publish(msg)`。
 
-### run_session（`session_service.rs:34-89`）
+### run_session（`session_service.rs`）
 驱动一条连接直到 EOF 或致命错误。`tokio::select!` 并发：
 - **广播分支**：`bcast_rx.recv()` 收到 notification → `transport.send` 转发给对端。`Lagged` 时重订阅不静默丢。`Closed` 时退出。
-- **读分支**：`transport.recv()` → `dispatcher.dispatch` → `DispatchOutcome::Response` 则 `transport.send` 回发；`NoReply` 静默；`None`/Err 退出。
+- **读分支**：请求被后台 dispatch；请求执行期间仍监听广播和 EOF。EOF/读错误会 abort 当前任务，从而 drop `kill_on_drop` 的插件进程；同连接的并行 request 返回 `InvalidRequest`。
 
-慢 shell 不会阻塞广播转发（dispatch 是 await，runtime 可调度其它分支）。
+慢 shell 或插件不会阻塞广播转发，且客户端 Ctrl-C 不会遗留长驻插件进程。
 
 ## 5.6 AuditLog（`audit.rs`）
 

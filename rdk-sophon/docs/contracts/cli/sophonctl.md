@@ -128,6 +128,8 @@ sophonctl --host 1.2.3.4:7777 state # 临时覆盖，不读配置
 | `refresh` | 无 | `refresh_state` | 立即刷新 |
 | `exec <CMD...>` | 剩余所有参数（`trailing_var_arg`） | `exec_shell` | 执行 shell（需 `[shell] enabled`） |
 | `raw <method> [params]` | `method` 位置参数；`params` 可选 JSON 对象字符串 | 任意 | 高级：发任意方法 |
+| `plugins list` | 无 | `plugin.list` | 列出板端动态控制插件 |
+| `<plugin> <ARGS...>` | 未被内置命令占用的一级命令 | `plugin.invoke` | 动态转发给板端插件 |
 
 ## 1.6 示例
 
@@ -156,6 +158,9 @@ sophonctl thermal
 ```sh
 sophonctl raw get_bpu
 sophonctl raw exec_shell '{"cmd":"echo hi"}'
+sophonctl plugins list
+sophonctl servo init
+sophonctl servo servo 0 -2.0
 ```
 
 ## 1.7 输出
