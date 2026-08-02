@@ -1,6 +1,6 @@
 //! Protocol crate: pure data structures + JSON-RPC 2.0 envelope.
 //!
-//! No tokio, no IO — daemon and `probectl` both depend on this so that local
+//! No tokio, no IO — daemon and `sophonctl` both depend on this so that local
 //! and remote invocations share one wire format.
 
 mod message;

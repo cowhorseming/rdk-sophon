@@ -11,13 +11,13 @@
 | 二进制 | 是否常驻进程 | 角色定位 | 必须起吗 |
 |--------|------------|---------|---------|
 | `probe-daemon` | **是，核心长驻** | 唯一服务端，持有状态/采集/命令执行 | **必须** |
-| `probectl` | **否，临时命令** | 客户端工具，敲一次连一次，用完即退 | 按需（工具） |
+| `sophonctl` | **否，临时命令** | 客户端工具，敲一次连一次，用完即退 | 按需（工具） |
 | `probe-http-gateway` | 看需要 | 协议适配器：REST ↔ JSON-RPC | 可选 |
 | `probe-ws-outbound` | 看需要 | 协议适配器：板子主动外连云端 WS | 可选 |
 
-- 最小部署：只 `probe-daemon` 一个进程（外部用 `nc`/`probectl` 直连它的 TCP）。
+- 最小部署：只 `probe-daemon` 一个进程（外部用 `nc`/`sophonctl` 直连它的 TCP）。
 - 全功能：`probe-daemon` + `probe-http-gateway` + `probe-ws-outbound` 共 3 个常驻进程。
-- `probectl` 不算进程——它是 fork 一次执行完就退的工具（像 `kubectl` 之于 kubelet）。
+- `sophonctl` 不算进程——它是 fork 一次执行完就退的工具（像 `kubectl` 之于 kubelet）。
 
 ## 2.2 四者关系图
 
@@ -25,7 +25,7 @@
                   开发机 / 外部
                        │
        ┌───────────────┼──────────────────┐
-       │ nc / probectl  │ curl / 浏览器     │ 云端 broker
+       │ nc / sophonctl  │ curl / 浏览器     │ 云端 broker
        │ (TCP 17777)    │ (HTTP 8080)       │ (WebSocket)
        ▼                ▼                   ▲
   ┌─────────┐    ┌──────────────┐    ┌──────────────┐
@@ -51,7 +51,7 @@
 
 它是**数据源和命令执行者**——HTTP 网关和 WS 出站自己不存状态、不采集，只翻译转发给它。
 
-### 2.3.2 probectl（CLI，工具，按需）
+### 2.3.2 sophonctl（CLI，工具，按需）
 
 **客户端工具，不是服务。** 每次敲命令 fork 一次：
 - 本地：`ClientBuilder::unix(socket)` 走 Unix socket 连 daemon。
@@ -84,7 +84,7 @@
 
 | 进程 | 连 daemon 的方式 | 协议 |
 |------|----------------|------|
-| probectl | Unix socket（本地）/ TCP（远程） | JSON-RPC over NDJSON |
+| sophonctl | Unix socket（本地）/ TCP（远程） | JSON-RPC over NDJSON |
 | probe-http-gateway | Unix socket（本地） | JSON-RPC over NDJSON |
 | probe-ws-outbound | Unix socket（本地） | JSON-RPC over NDJSON（收 notification） |
 
@@ -94,27 +94,27 @@ daemon 是**唯一的服务端**，其它都是它的 Unix 客户端。授权由
 
 | 场景 | 起哪些进程 | 说明 |
 |------|-----------|------|
-| 最小：开发机直连调试 | `probe-daemon` | probectl 在开发机当工具，连 daemon TCP |
+| 最小：开发机直连调试 | `probe-daemon` | sophonctl 在开发机当工具，连 daemon TCP |
 | 生产：内网监控 | `probe-daemon`（+ `probe-http-gateway` 若要 REST） | systemd 起 daemon；要 curl/Grafana 抓取就加网关 |
 | 云端管多板 | `probe-daemon` + `probe-ws-outbound` | 板子主动外连云端 broker 推 telemetry |
-| 全功能 | `probe-daemon` + `probe-http-gateway` + `probe-ws-outbound` | 3 个常驻进程，probectl 按需用 |
+| 全功能 | `probe-daemon` + `probe-http-gateway` + `probe-ws-outbound` | 3 个常驻进程，sophonctl 按需用 |
 
 ## 2.6 为什么这样设计（不把 HTTP/WS 塞进 daemon）
 
 1. **核心只一个**：daemon 是状态和逻辑的唯一来源，数据不分散，所有通道最终汇到它。
 2. **HTTP/WS 是可选适配器**：不是所有场景都要 REST 或云端。拆成独立进程，需要哪个起哪个，不占资源、不增加攻击面。塞进 daemon 会让核心臃肿、强依赖 axum/tungstenite。
-3. **CLI 是工具不是服务**：probectl 走同一套协议但是"用完即走"，不该常驻。
+3. **CLI 是工具不是服务**：sophonctl 走同一套协议但是"用完即走"，不该常驻。
 4. **故障隔离**：HTTP 网关挂了不影响 daemon 的 TCP/Unix 服务；WS 出站网络抖断不影响本地 CLI。各进程职责单一。
 
 ## 2.7 一句话总结
 
-`probe-daemon` 是**唯一必起的常驻服务端**；`probe-http-gateway` 和 `probe-ws-outbound` 是**按需起的协议适配器进程**（REST 和云端场景分别用）；`probectl` 是**一次性的客户端工具**（不常驻）。四个二进制，默认只有 daemon 一个进程在跑。
+`probe-daemon` 是**唯一必起的常驻服务端**；`probe-http-gateway` 和 `probe-ws-outbound` 是**按需起的协议适配器进程**（REST 和云端场景分别用）；`sophonctl` 是**一次性的客户端工具**（不常驻）。四个二进制，默认只有 daemon 一个进程在跑。
 
 ## 2.8 生命周期与启停
 
 - **daemon**：systemd 管理，`systemctl start/stop/restart/enable probe-daemon`，崩溃自动重启，日志 `journalctl -u probe-daemon`。详见 [`../../deploy/docs/deploy.md`](../../deploy/docs/deploy.md)。
 - **http-gateway / ws-outbound**：当前手动起（未提供独立 systemd unit，按需加），命令见 [`../../deploy/docs/deploy.md`](../../deploy/docs/deploy.md)「部署 HTTP 网关 / WS 出站」。
-- **probectl**：无生命周期，敲一次跑一次。
+- **sophonctl**：无生命周期，敲一次跑一次。
 
 ## 2.9 想深入了解
 

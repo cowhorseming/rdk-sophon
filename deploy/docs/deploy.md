@@ -19,7 +19,7 @@
 
 完成后再从 Mac 验证：
 ```sh
-probectl --host 192.168.128.10:17777 state
+sophonctl --host 192.168.128.10:17777 state
 ```
 
 ## 1.2 systemd 服务

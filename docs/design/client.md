@@ -75,6 +75,6 @@ HTTP 网关据此映射 HTTP 状态码（见 `../contracts/http/errors.md`）。
 
 | 入口 | 用法 |
 |------|------|
-| `api-cli`（probectl） | `ClientBuilder::tcp(host)` 或 `unix(socket)` |
+| `api-cli`（sophonctl） | `ClientBuilder::tcp(host)` 或 `unix(socket)` |
 | `api-http`（probe-http-gateway） | `ClientBuilder::unix(daemon_sock)`，handler 调 `client.call` |
 | `api-ws`（probe-ws-outbound） | 不用 Client（要收 notification 而非 request/response），直接用 `UnixTransport::recv` |

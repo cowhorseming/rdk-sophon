@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 2
 
 TARGET="aarch64-unknown-linux-gnu"
-BINS=("probe-daemon" "probectl" "probe-http-gateway" "probe-ws-outbound")
+BINS=("probe-daemon" "sophonctl" "probe-http-gateway" "probe-ws-outbound")
 RELEASE_DIR="target/$TARGET/release"
 
 BOARD_HOST="${1:?用法: $0 <board-host> [board-user]}"
@@ -71,5 +71,5 @@ ssh -o ConnectTimeout=10 "$SSH_TARGET" "
 "
 echo
 echo -e "${G}部署完成。板端 probe-daemon 已在 17777 监听。${N}"
-echo "本地验证：probectl --host $BOARD_HOST:17777 state"
+echo "本地验证：sophonctl --host $BOARD_HOST:17777 state"
 echo "（若 BOARD_HOST 是 ssh alias 而非 IP，请用板子 IP 替换）"

@@ -39,7 +39,7 @@ daemon（bootstrap：DI 装配 + 监听 + 优雅退出）
 | `application` | application | `RpcDispatcher`/`CollectionOrchestrator`/`SessionService`。 | [application.md](application.md) |
 | `client` | api 共享 | `Client` + `ClientBuilder`。 | [client.md](client.md) |
 | `daemon` | bootstrap | `build_*_app` DI + 监听 + 优雅退出。 | [daemon.md](daemon.md) |
-| `api-cli` | api | `probectl`（本地 + 远程 CLI）。 | [api.md](api.md) |
+| `api-cli` | api | `sophonctl`（本地 + 远程 CLI）。 | [api.md](api.md) |
 | `api-http` | api | `probe-http-gateway`（REST 网关）。 | [api.md](api.md) |
 | `api-ws` | api | `probe-ws-outbound`（WebSocket 出站）。 | [api.md](api.md) |
 | `testkit` | test | 假 infra + fixtures + E2E。 | [testkit.md](testkit.md) |

@@ -29,7 +29,7 @@ deploy/
 ./deploy/scripts/deploy-to-board.sh x5-root
 
 # 3. 验证（Mac 上）
-probectl --host 192.168.128.10:17777 state
+sophonctl --host 192.168.128.10:17777 state
 ```
 
 ## 1.3 何时用哪条路径

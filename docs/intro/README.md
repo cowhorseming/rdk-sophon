@@ -28,7 +28,7 @@ rdk-sophon 是跑在 **RDK 开发板**（地平线 X5 等，aarch64 Linux/Ubuntu
 ## 1.3 速记一句话
 
 - **功能上**：8 个功能模块（硬件采集 + RPC 协议 + RPC 分发 + 采集编排 + 会话驱动 + shell 执行 + 传输适配 + 对外入口）。
-- **进程上**：4 个二进制，但默认只 `probe-daemon` 一个常驻进程；`probe-http-gateway`/`probe-ws-outbound` 按需起（协议适配器）；`probectl` 是临时工具不常驻。
+- **进程上**：4 个二进制，但默认只 `probe-daemon` 一个常驻进程；`probe-http-gateway`/`probe-ws-outbound` 按需起（协议适配器）；`sophonctl` 是临时工具不常驻。
 
 ## 1.4 想深入了解
 

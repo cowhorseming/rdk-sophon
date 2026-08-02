@@ -113,7 +113,7 @@ rdk-sophon 是跑在 **RDK 开发板**（地平线 X5 等，aarch64 Linux/Ubuntu
 
 | 入口 | 协议 | 形态 |
 |------|------|------|
-| `probectl` | JSON-RPC | 命令行工具（本地 Unix 或远程 TCP `--host`） |
+| `sophonctl` | JSON-RPC | 命令行工具（本地 Unix 或远程 TCP `--host`） |
 | `probe-http-gateway` | HTTP/REST | 把 JSON-RPC 包成 HTTP（curl/浏览器） |
 | `probe-ws-outbound` | WebSocket | 板子主动外连云端 broker 推送 telemetry |
 

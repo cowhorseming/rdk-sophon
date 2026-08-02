@@ -3,12 +3,12 @@
 > api-cli / api-http / api-ws（DDD 层：api）+ testkit（test）。
 > 源码：`crates/api-cli/`、`crates/api-http/`、`crates/api-ws/`、`crates/testkit/`
 
-## 8.1 api-cli（probectl）
+## 8.1 api-cli（sophonctl）
 
 本地或远程 CLI，复用 `client::Client`，与 daemon 走同一套 NDJSON 协议。
 - 本地：`ClientBuilder::unix(socket)`。
 - 远程：`--host ip:port` → `ClientBuilder::tcp(host)`。
-- 完整子命令契约见 [`../contracts/cli/probectl.md`](../contracts/cli/probectl.md)。
+- 完整子命令契约见 [`../contracts/cli/sophonctl.md`](../contracts/cli/sophonctl.md)。
 
 ## 8.2 api-http（probe-http-gateway）
 

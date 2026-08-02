@@ -18,7 +18,7 @@
 | `application` | application | RpcDispatcher/CollectionOrchestrator/SessionService/AuditLog 用例编排。 |
 | `client` | api 共享 | `Client` + `ClientBuilder`（id 匹配 + 超时 + 重连），CLI/HTTP/WS 复用。 |
 | `daemon` | bootstrap | `build_production_app`/`build_test_app` DI 装配 + 监听 + 优雅退出。 |
-| `api-cli` | api | `probectl` bin（本地 Unix + 远程 TCP `--host`）。 |
+| `api-cli` | api | `sophonctl` bin（本地 Unix + 远程 TCP `--host`）。 |
 | `api-http` | api | `probe-http-gateway` bin（REST 网关）。 |
 | `api-ws` | api | `probe-ws-outbound` bin（WebSocket 出站）。 |
 | `testkit` | test | `common`（FakeReader/fixtures）+ E2E 测试。 |
@@ -32,8 +32,8 @@
 3. **全量自动化测试**：执行 `./scripts/full_test.sh`。该脚本一次性跑：`cargo check --workspace --all-targets` → `cargo clippy --workspace --all-targets -- -D warnings` → `cargo test --workspace --all-targets --no-fail-fast` → `cargo build --release --bins`，任一阶段失败即以非零退出码退出。脚本用 `--no-fail-fast`（单个失败也跑完所有测试，确保都跑一遍，不跳过）、`--all-targets`（含测试目标/bench/bin，无遗漏）、并行（crate 间并行、单 crate 内多线程并行；有 `cargo-nextest` 时自动切到 nextest 获得更细并行）。
 4. **所有任务完成后必须跑全量测试**：每完成一个功能/重构/修复任务，都要执行 `./scripts/full_test.sh`，必须全量测试全绿（退出码 0）才算任务完成；不允许跳过任何测试、不允许只跑部分 crate、不允许 `#[ignore]` 跳过（本项目不得引入 `#[ignore]`，除非有平台门控 `#[cfg(target_os=...)]` 并在脚本注释里说明）。
 5. **编译与部署**：脚本在 `deploy/scripts/`，文档在 `deploy/docs/`（`build.md` 编译、`deploy.md` 部署、`README.md` 总览）。
-   - **编译**（开发机交叉编译到 aarch64，推荐路径）：`./deploy/scripts/build-release.sh`。脚本流程：`rustup target add aarch64-unknown-linux-gnu` → 跑 `./scripts/full_test.sh` 确保全绿 → `cargo zigbuild --release --target aarch64-unknown-linux-gnu --bin ...`（Mac 用 zigbuild 免配交叉链接器，需 `cargo install cargo-zigbuild` + `brew install zig`；无则回退 `cargo build`）→ 产物在 `target/aarch64-unknown-linux-gnu/release/{probe-daemon,probectl,probe-http-gateway,probe-ws-outbound}`。板上直编见 `deploy/docs/build.md`「板上直接编译」（用 tuna 镜像加速 rustup/crates）。
-   - **部署**（开发机→板子一键）：`./deploy/scripts/deploy-to-board.sh <board-host>`（如 `x5-root`）。脚本流程：scp 二进制+`config/config.toml`+`systemd/probe-daemon.service`+`install-on-board.sh` 到板子 `/tmp/rdk-sophon-deploy/` → 远程 `sudo bash install-on-board.sh`（装二进制到 `/usr/local/bin/`、配置到 `/etc/probe-daemon/config.toml`、unit 到 `/etc/systemd/system/`、建 `probe` 用户、备 `/var/log/probe-daemon` 与 `/run/probe-daemon`）→ `systemctl daemon-reload` + `enable --now probe-daemon` → 验证 `ss -lnt | grep 17777`。Mac 验证：`probectl --host <board-ip>:17777 state`。
+   - **编译**（开发机交叉编译到 aarch64，推荐路径）：`./deploy/scripts/build-release.sh`。脚本流程：`rustup target add aarch64-unknown-linux-gnu` → 跑 `./scripts/full_test.sh` 确保全绿 → `cargo zigbuild --release --target aarch64-unknown-linux-gnu --bin ...`（Mac 用 zigbuild 免配交叉链接器，需 `cargo install cargo-zigbuild` + `brew install zig`；无则回退 `cargo build`）→ 产物在 `target/aarch64-unknown-linux-gnu/release/{probe-daemon,sophonctl,probe-http-gateway,probe-ws-outbound}`。板上直编见 `deploy/docs/build.md`「板上直接编译」（用 tuna 镜像加速 rustup/crates）。
+   - **部署**（开发机→板子一键）：`./deploy/scripts/deploy-to-board.sh <board-host>`（如 `x5-root`）。脚本流程：scp 二进制+`config/config.toml`+`systemd/probe-daemon.service`+`install-on-board.sh` 到板子 `/tmp/rdk-sophon-deploy/` → 远程 `sudo bash install-on-board.sh`（装二进制到 `/usr/local/bin/`、配置到 `/etc/probe-daemon/config.toml`、unit 到 `/etc/systemd/system/`、建 `probe` 用户、备 `/var/log/probe-daemon` 与 `/run/probe-daemon`）→ `systemctl daemon-reload` + `enable --now probe-daemon` → 验证 `ss -lnt | grep 17777`。Mac 验证：`sophonctl --host <board-ip>:17777 state`。
    - **systemd 服务**：unit 源 `systemd/probe-daemon.service`，`Type=simple`+`Restart=on-failure`+`User=probe`+`RuntimeDirectory=probe-daemon`+硬化（`ProtectSystem=strict`/`NoNewPrivileges`/无 capability）。控制：`systemctl start/stop/restart/enable/disable/status probe-daemon`，日志 `journalctl -u probe-daemon -f`，审计 `journalctl -u probe-daemon | grep audit`。
    - **升级**：重跑 `build-release.sh` + `deploy-to-board.sh`（覆盖二进制+配置+unit，`daemon-reload`+`restart`）。**回滚**：板子 `cp /usr/local/bin/probe-daemon.prev`（升级前备份），见 `deploy/docs/deploy.md`。
    - **安全**：生产 `[shell] enabled = false`（默认即 false，启用等于远端 root）；TCP 17777 当前明文，生产绑内网或前置 SSH 隧道/mTLS（待补）；Unix socket 权限 0600 由 systemd RuntimeDirectory 控制。
@@ -68,7 +68,7 @@
 - `application` — 应用层（分发/编排/会话/审计）
 - `client` — 共享 RPC 客户端
 - `daemon` — bootstrap DI 装配 + main
-- `api-cli` — probectl CLI
+- `api-cli` — sophonctl CLI
 - `api-http` — HTTP/REST 网关
 - `api-ws` — WebSocket 出站
 - `testkit` — 测试公共工具 + E2E

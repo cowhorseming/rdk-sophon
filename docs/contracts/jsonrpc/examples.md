@@ -136,11 +136,11 @@ $ nc board 17777
 ^C
 ```
 
-## 5.14 用 probectl 代替 nc（推荐）
+## 5.14 用 sophonctl 代替 nc（推荐）
 
-手敲 JSON 易错，推荐用 `probectl`（底层走同一协议）：
+手敲 JSON 易错，推荐用 `sophonctl`（底层走同一协议）：
 ```sh
-probectl --host board:17777 state
-probectl --host board:17777 exec uname -a
+sophonctl --host board:17777 state
+sophonctl --host board:17777 exec uname -a
 ```
-CLI 契约见 [`../cli/probectl.md`](../cli/probectl.md)。
+CLI 契约见 [`../cli/sophonctl.md`](../cli/sophonctl.md)。

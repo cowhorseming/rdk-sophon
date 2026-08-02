@@ -1,6 +1,6 @@
 # 1. 编译说明
 
-> rdk-sophon 是 Rust workspace，4 个二进制：`probe-daemon`（守护进程）、`probectl`（CLI）、`probe-http-gateway`（REST 网关）、`probe-ws-outbound`（WS 出站）。
+> rdk-sophon 是 Rust workspace，4 个二进制：`probe-daemon`（守护进程）、`sophonctl`（CLI）、`probe-http-gateway`（REST 网关）、`probe-ws-outbound`（WS 出站）。
 > 板端目标是 aarch64 Linux（Ubuntu）。本文档说明三种编译方式。
 
 ## 1.1 方式一：开发机交叉编译（推荐，最常用）
@@ -19,7 +19,7 @@
 3. 用 `cargo zigbuild` 交叉编译 4 个 bin（Mac 上免配交叉链接器；若无 zigbuild 则回退 `cargo build`，需系统有 aarch64-linux-gnu 链接器）。
 4. 打印产物清单（路径 + 大小）。
 
-产物：`target/aarch64-unknown-linux-gnu/release/{probe-daemon,probectl,probe-http-gateway,probe-ws-outbound}`。
+产物：`target/aarch64-unknown-linux-gnu/release/{probe-daemon,sophonctl,probe-http-gateway,probe-ws-outbound}`。
 
 ### 一次性装交叉编译环境（Mac）
 
@@ -35,7 +35,7 @@ brew install zig
 
 ```sh
 rustup target add aarch64-unknown-linux-gnu
-cargo zigbuild --release --target aarch64-unknown-linux-gnu --bin probe-daemon --bin probectl
+cargo zigbuild --release --target aarch64-unknown-linux-gnu --bin probe-daemon --bin sophonctl
 ```
 
 ## 1.2 方式二：板上直接编译
@@ -71,8 +71,8 @@ EOF
 rsync -az --exclude='target' --exclude='.git' ./ x5-root:/root/rdk-sophon/
 
 # 板上编译
-ssh x5-root 'cd /root/rdk-sophon && cargo build --release --bin probe-daemon --bin probectl'
-# 产物：/root/rdk-sophon/target/release/{probe-daemon,probectl}
+ssh x5-root 'cd /root/rdk-sophon && cargo build --release --bin probe-daemon --bin sophonctl'
+# 产物：/root/rdk-sophon/target/release/{probe-daemon,sophonctl}
 ```
 
 板上编译产物在 `target/release/`（板子原生 aarch64，无需 target 指定）。
@@ -96,7 +96,7 @@ cargo build --release --bin probe-daemon   # 单个
 | 二进制 | 用途 | 默认监听 |
 |--------|------|---------|
 | `probe-daemon` | 板端守护进程 | TCP `0.0.0.0:17777`、Unix `/run/probe-daemon/probe.sock` |
-| `probectl` | CLI（本地/远程） | — |
+| `sophonctl` | CLI（本地/远程） | — |
 | `probe-http-gateway` | REST 网关 | `0.0.0.0:8080` |
 | `probe-ws-outbound` | WebSocket 出站 | —（主动外连云端） |
 

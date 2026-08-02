@@ -1,4 +1,4 @@
-//! Unix domain socket transport — for the local CLI (`probectl`) and any
+//! Unix domain socket transport — for the local CLI (`sophonctl`) and any
 //! board-local consumer. Authorised by filesystem permissions on the socket
 //! path (0600, owned by the daemon's user).
 

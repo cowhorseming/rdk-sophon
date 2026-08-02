@@ -22,7 +22,7 @@ docs/contracts/
 │   ├── errors.md          # HTTP 状态码 + 错误映射
 │   └── examples.md        # curl 示例
 ├── cli/                   # 命令行契约
-│   ├── probectl.md        # probectl 子命令 + 参数
+│   ├── sophonctl.md        # sophonctl 子命令 + 参数
 │   └── config.md          # config.toml 配置契约
 └── transport/             # 传输通道契约
     ├── ndjson.md          # NDJSON 帧格式
@@ -34,7 +34,7 @@ docs/contracts/
 
 - **JSON-RPC over NDJSON** 是底层协议（TCP/Unix/Serial 共用）。
 - **HTTP/REST** 网关在 JSON-RPC 之上包了一层同步请求/响应（不推送 notification）。
-- **CLI**（probectl）是 JSON-RPC 的命令行封装（本地或远程）。
+- **CLI**（sophonctl）是 JSON-RPC 的命令行封装（本地或远程）。
 - **WebSocket 出站** 把 JSON-RPC notification 转成 WS 帧发云端。
 
 外部调用方按场景选协议：

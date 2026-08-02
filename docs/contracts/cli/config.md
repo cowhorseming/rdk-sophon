@@ -127,6 +127,6 @@ disk_usage_pct = 90.0
 > # 临时开 shell（systemd 服务需改 ExecStart 或临时 systemctl 用参数；或直接前台跑）
 > probe-daemon --config /etc/probe-daemon/config.toml --shell-enabled --shell-timeout 60
 > # 之后从开发机
-> probectl --host <板子IP>:7777 exec uname -a
+> sophonctl --host <板子IP>:7777 exec uname -a
 > ```
 > 用完**重启服务不带 `--shell-enabled`** 即恢复关闭（`sudo systemctl restart probe-daemon`，前提是 systemd unit 的 ExecStart 不含该参数）。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 编译 release 二进制到 aarch64（板端目标平台）。
 # 本脚本在开发机（Mac）上运行，交叉编译产出可在 RDK 板端直接运行的静态/动态二进制。
-# 产物：target/aarch64-unknown-linux-gnu/release/{probe-daemon,probectl,probe-http-gateway,probe-ws-outbound}
+# 产物：target/aarch64-unknown-linux-gnu/release/{probe-daemon,sophonctl,probe-http-gateway,probe-ws-outbound}
 # 用法：./deploy/scripts/build-release.sh [--skip-checks]
 set -euo pipefail
 
@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 2
 
 TARGET="aarch64-unknown-linux-gnu"
-BINS=("probe-daemon" "probectl" "probe-http-gateway" "probe-ws-outbound")
+BINS=("probe-daemon" "sophonctl" "probe-http-gateway" "probe-ws-outbound")
 SKIP_CHECKS=0
 
 # 解析参数

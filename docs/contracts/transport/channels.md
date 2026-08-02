@@ -26,7 +26,7 @@
 ```sh
 ssh -L 7777:localhost:7777 x5-root
 # 然后本地连
-probectl --host 127.0.0.1:17777 state
+sophonctl --host 127.0.0.1:17777 state
 ```
 
 ## 2.3 Unix socket
@@ -34,7 +34,7 @@ probectl --host 127.0.0.1:17777 state
 - 路径 `[unix].path`，默认 `/run/probe-daemon/probe.sock`，可被 `--unix-path` 覆盖。
 - 绑定前 `remove_file` 清理旧 socket，绑定后 `set_permissions(0o600)`。
 - **授权**：由 socket 路径的文件系统权限控制（0600，daemon 用户所有）。无网络层鉴权。
-- 适合板端本地 CLI（`probectl`）、板端进程间通信。
+- 适合板端本地 CLI（`sophonctl`）、板端进程间通信。
 - 多连接，同 TCP。
 
 ## 2.4 Serial / UART

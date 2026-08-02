@@ -22,7 +22,7 @@ UNIT_DIR="/etc/systemd/system"
 LOG_DIR="/var/log/probe-daemon"
 RUN_USER="probe"
 
-BINS=("probe-daemon" "probectl" "probe-http-gateway" "probe-ws-outbound")
+BINS=("probe-daemon" "sophonctl" "probe-http-gateway" "probe-ws-outbound")
 
 echo -e "${B}========== [1/6] 校验源文件 ==========${N}"
 for bin in "${BINS[@]}"; do

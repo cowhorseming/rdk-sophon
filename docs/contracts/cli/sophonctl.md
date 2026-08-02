@@ -1,4 +1,4 @@
-# 1. probectl CLI 契约
+# 1. sophonctl CLI 契约
 
 > 命令行客户端，本地（Unix socket）或远程（TCP）操作守护进程。
 > 复用 `client::Client`，与 daemon 走同一套 NDJSON 协议。
@@ -6,35 +6,35 @@
 
 ## 1.1 在哪能跑 + 安装
 
-`probectl` 是**纯客户端工具**（不存状态、不采集硬件，只发请求/收响应/打印），所以**不限于板子**——只要满足两点，任何机器都能用：
-1. 该机器能跑 `probectl` 二进制（架构/系统对得上，见下表）。
+`sophonctl` 是**纯客户端工具**（不存状态、不采集硬件，只发请求/收响应/打印），所以**不限于板子**——只要满足两点，任何机器都能用：
+1. 该机器能跑 `sophonctl` 二进制（架构/系统对得上，见下表）。
 2. 该机器能连到板子的 `probe-daemon`（TCP `7777` 可达，或本地 Unix socket）。
 
 | 在哪跑 | 怎么编译 | 怎么连 daemon | 备注 |
 |--------|---------|--------------|------|
-| 板子上 | 板上 `cargo build --release --bin probectl`，产物 aarch64-linux | Unix socket（本地）或 TCP 回环 | 板端本地调试 |
-| Mac | `cargo build --release --bin probectl`，产物 aarch64-apple-darwin | `--host <板子IP>:7777`（TCP） | 开发机远程操作板子 |
+| 板子上 | 板上 `cargo build --release --bin sophonctl`，产物 aarch64-linux | Unix socket（本地）或 TCP 回环 | 板端本地调试 |
+| Mac | `cargo build --release --bin sophonctl`，产物 aarch64-apple-darwin | `--host <板子IP>:7777`（TCP） | 开发机远程操作板子 |
 | 云端 Linux 服务器 | 服务器原生 `cargo build`（x86_64 或 aarch64） | `--host <板子IP>:7777`（TCP） | 云端运维/自动化 |
 
-**关键**：`probectl` 能否用，不取决于在哪编译，而取决于**它所在机器到板子 7777 的网络通不通**。板子在 NAT 后、云端连不进板子时，`probectl` 没用——那种场景用 `probe-ws-outbound`（板子主动外连云端，见 [`../transport/ws-outbound.md`](../transport/ws-outbound.md)）。
+**关键**：`sophonctl` 能否用，不取决于在哪编译，而取决于**它所在机器到板子 7777 的网络通不通**。板子在 NAT 后、云端连不进板子时，`sophonctl` 没用——那种场景用 `probe-ws-outbound`（板子主动外连云端，见 [`../transport/ws-outbound.md`](../transport/ws-outbound.md)）。
 
 ### 各平台编译与安装到 PATH
 
-`probectl` 二进制是单文件、无运行时依赖，编完拷到 PATH 即可全局敲 `probectl`（不用写完整路径）。
+`sophonctl` 二进制是单文件、无运行时依赖，编完拷到 PATH 即可全局敲 `sophonctl`（不用写完整路径）。
 
 ```sh
 # Mac（开发机）
-cargo build --release --bin probectl
-cp target/release/probectl /usr/local/bin/        # 或 ~/.local/bin/，确保在 PATH 里
-probectl --host <板子IP>:7777 state                 # 现在能直接敲 probectl 了
+cargo build --release --bin sophonctl
+cp target/release/sophonctl /usr/local/bin/        # 或 ~/.local/bin/，确保在 PATH 里
+sophonctl --host <板子IP>:7777 state                 # 现在能直接敲 sophonctl 了
 
-# 板子（已随部署装到 /usr/local/bin/probectl，见 deploy/install-on-board.sh）
-probectl state                                      # 走本地 Unix socket
+# 板子（已随部署装到 /usr/local/bin/sophonctl，见 deploy/install-on-board.sh）
+sophonctl state                                      # 走本地 Unix socket
 
 # 云端 Linux 服务器
-cargo build --release --bin probectl                # 服务器原生编
-sudo cp target/release/probectl /usr/local/bin/
-probectl --host <板子IP>:7777 state
+cargo build --release --bin sophonctl                # 服务器原生编
+sudo cp target/release/sophonctl /usr/local/bin/
+sophonctl --host <板子IP>:7777 state
 ```
 
 > 注意：Mac 编的二进制（apple-darwin）**不能**拿去 Linux 跑，反之亦然——每台机器编自己平台的。交叉编译到别的平台见 [`../../deploy/docs/build.md`](../../deploy/docs/build.md)。
@@ -42,7 +42,7 @@ probectl --host <板子IP>:7777 state
 ## 1.2 调用
 
 ```sh
-probectl [全局参数] <子命令> [子命令参数]
+sophonctl [全局参数] <子命令> [子命令参数]
 ```
 
 ## 1.3 全局参数
@@ -76,29 +76,29 @@ probectl [全局参数] <子命令> [子命令参数]
 
 **本地**：
 ```sh
-probectl state
-probectl thermal
-probectl exec uname -a          # 需服务端启用 shell
-probectl exec "ls /tmp | head"
+sophonctl state
+sophonctl thermal
+sophonctl exec uname -a          # 需服务端启用 shell
+sophonctl exec "ls /tmp | head"
 ```
 
 **远程**（开发机连板子）：
 ```sh
-probectl --host 192.168.128.10:17777 state
-probectl --host 192.168.128.10:17777 exec uname -a
+sophonctl --host 192.168.128.10:17777 state
+sophonctl --host 192.168.128.10:17777 exec uname -a
 ```
 
 **环境变量**（避免每次敲 `--host`）：
 ```sh
 export PROBE_HOST=192.168.128.10:17777
-probectl state
-probectl thermal
+sophonctl state
+sophonctl thermal
 ```
 
 **raw**（发任意方法）：
 ```sh
-probectl raw get_bpu
-probectl raw exec_shell '{"cmd":"echo hi"}'
+sophonctl raw get_bpu
+sophonctl raw exec_shell '{"cmd":"echo hi"}'
 ```
 
 ## 1.6 输出
@@ -112,8 +112,8 @@ probectl raw exec_shell '{"cmd":"echo hi"}'
 `exec` 用 `trailing_var_arg`，**剩余所有参数**用空格 join 成单字符串作为 `cmd`。
 含 flag 的命令需用 `--` 分隔或引号：
 ```sh
-probectl exec -- ls -la          # -- 后的 -la 不被 probectl 解析
-probectl exec "echo hello world" # 引号整体作为一个参数
+sophonctl exec -- ls -la          # -- 后的 -la 不被 sophonctl 解析
+sophonctl exec "echo hello world" # 引号整体作为一个参数
 ```
 
 ## 1.8 退出码

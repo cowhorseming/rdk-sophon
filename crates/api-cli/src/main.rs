@@ -1,4 +1,4 @@
-//! probectl：本地 CLI 或远程客户端。本地走 Unix socket，远程走 TCP（--host）。
+//! sophonctl：本地 CLI 或远程客户端。本地走 Unix socket，远程走 TCP（--host）。
 //! 复用 client::Client（与 HTTP 网关、WS 出站同源），与 daemon 走同一套 NDJSON 协议。
 
 use anyhow::{anyhow, Result};
@@ -8,7 +8,7 @@ use shared::protocol::Params;
 use std::time::Duration;
 
 #[derive(Debug, Parser)]
-#[command(name = "probectl", about = "操作 rdk-sophon 探针守护进程")]
+#[command(name = "sophonctl", about = "操作 rdk-sophon 探针守护进程")]
 struct Cli {
     /// 远程板子地址（ip:port）。不指定则走本地 Unix socket。
     #[arg(long, env = "PROBE_HOST")]

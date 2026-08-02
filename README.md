@@ -22,7 +22,7 @@ RDK 开发板的长驻硬件探针服务。它将板端硬件状态上报给开�
 | `application` | application | rpc_dispatcher/orchestrator/session/audit | 用例编排：分发、采集编排、会话驱动、审计。 |
 | `client` | api 共享 | Client + builder | `Client`（id 匹配 + 超时 + 重连），CLI/HTTP/WS 共用。 |
 | `daemon` | bootstrap | lib（`build_*_app`）+ bin（main） | 依赖注入装配 + 监听 + 优雅退出。 |
-| `api-cli` | api | probectl bin | CLI，本地 Unix + 远程 TCP（`--host`）。 |
+| `api-cli` | api | sophonctl bin | CLI，本地 Unix + 远程 TCP（`--host`）。 |
 | `api-http` | api | probe-http-gateway bin | REST 网关：`/state`、`/thermal`、`/exec` 等。 |
 | `api-ws` | api | probe-ws-outbound bin | WebSocket 出站：板子主动外连云端 broker。 |
 | `testkit` | test | `common` 子模块 + tests/ | FakeReader/fixtures + E2E 测试。 |
@@ -34,7 +34,7 @@ RDK 开发板的长驻硬件探针服务。它将板端硬件状态上报给开�
 
 ```sh
 cargo build --release
-# 产物位于 target/release/{probe-daemon,probectl,probe-http-gateway,probe-ws-outbound}
+# 产物位于 target/release/{probe-daemon,sophonctl,probe-http-gateway,probe-ws-outbound}
 ```
 
 交叉编译到板端（aarch64），需先配置目标：
@@ -51,13 +51,13 @@ cargo build --release --target aarch64-unknown-linux-gnu
 sudo ./target/release/probe-daemon --config config/config.toml
 
 # 本地 CLI
-./target/release/probectl state
-./target/release/probectl thermal
-./target/release/probectl exec uname -a      # 需启用 [shell]
+./target/release/sophonctl state
+./target/release/sophonctl thermal
+./target/release/sophonctl exec uname -a      # 需启用 [shell]
 
 # 远程 CLI（开发机直连板子）
-./target/release/probectl --host <board-ip>:7777 state
-./target/release/probectl --host <board-ip>:7777 exec uname -a
+./target/release/sophonctl --host <board-ip>:7777 state
+./target/release/sophonctl --host <board-ip>:7777 exec uname -a
 
 # HTTP/REST 网关（板端起，开发机 curl）
 ./target/release/probe-http-gateway --listen 0.0.0.0:8080 --daemon-sock /run/probe-daemon/probe.sock
@@ -136,7 +136,7 @@ cargo clippy --workspace --all-targets -- -D warnings   # 零警告
 - [x] 温度/CPU/内存/磁盘/网络/BPU 采集器（Linux sysfs/proc 路径，trait 注入可测）。
 - [x] RPC 方法表 + 可审计、受黑名单约束的 shell 应急通道（策略与执行分离）。
 - [x] 周期性遥测推送 + 阈值告警。
-- [x] 四种 API 形式：`probectl`（本地+远程）、Rust `client` 库、HTTP/REST 网关、WebSocket 出站。
+- [x] 四种 API 形式：`sophonctl`（本地+远程）、Rust `client` 库、HTTP/REST 网关、WebSocket 出站。
 - [x] 三层测试（单元 + 集成 + E2E），52 个测试全过，clippy 零警告。
 - [ ] TLS（mTLS）— trait 已就绪，待补适配器。
 - [ ] MQTT 适配器（可选）。
