@@ -22,3 +22,20 @@ pub enum ShellError {
     #[error("等待进程失败: {0}")]
     Wait(String),
 }
+
+/// 插件执行错误：插件目录/清单不合法、插件不存在或子进程无法完成时返回。
+#[derive(Debug, Error)]
+pub enum PluginError {
+    #[error("插件功能未启用")]
+    Disabled,
+    #[error("插件 '{0}' 不存在")]
+    NotFound(String),
+    #[error("插件清单无效: {0}")]
+    InvalidManifest(String),
+    #[error("插件进程启动失败: {0}")]
+    Spawn(String),
+    #[error("插件进程等待失败: {0}")]
+    Wait(String),
+    #[error("插件执行超时（{secs} 秒）")]
+    Timeout { secs: u64 },
+}

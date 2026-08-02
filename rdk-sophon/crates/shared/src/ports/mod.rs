@@ -4,8 +4,11 @@
 //! 依赖方向：protocol → ports，下游（infra/collectors/domain/application）依赖 ports。
 //! 采集器、读硬件、shell 执行都从这里抽象，便于在测试中注入假实现。
 
-mod traits;
 mod error;
+mod traits;
 
-pub use traits::{Collector, SysfsReader, ProcReader, HrutGateway, ShellRunner, ShellOutput};
-pub use error::{PortError, ShellError};
+pub use error::{PluginError, PortError, ShellError};
+pub use traits::{
+    Collector, HrutGateway, PluginInfo, PluginOutput, PluginRunner, ProcReader, ShellOutput,
+    ShellRunner, SysfsReader,
+};

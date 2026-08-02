@@ -4,8 +4,8 @@
 //! tests-common crate 提供假实现。Collector 在构造期注入 SysfsReader/ProcReader/HrutGateway，
 //! ShellRunner 由 application 层注入到 shell 执行用例。
 
-use std::time::Duration;
 use async_trait::async_trait;
+use std::time::Duration;
 
 use crate::protocol::StateSnapshotFragment;
 
@@ -63,4 +63,37 @@ pub struct ShellOutput {
 pub trait ShellRunner: Send + Sync {
     /// 用 sh -c 执行 cmd，超时由 timeout 控制。超时返回 ShellError::Timeout。
     async fn run(&self, cmd: &str, timeout: Duration) -> Result<ShellOutput, super::ShellError>;
+}
+
+/// 已发现插件的公开元数据。仅包含可安全展示给 CLI/调用方的信息。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PluginInfo {
+    /// 插件唯一标识，同时也是 CLI 的一级子命令名。
+    pub id: String,
+    /// 插件的人类可读说明。
+    pub description: String,
+}
+
+/// 一次插件调用的返回结果。
+#[derive(Debug, Clone)]
+pub struct PluginOutput {
+    /// 插件进程退出码；被信号终止时为 None。
+    pub exit: Option<i32>,
+    /// 标准输出，已按服务端上限截断。
+    pub stdout: String,
+    /// 标准错误，已按服务端上限截断。
+    pub stderr: String,
+}
+
+/// 动态控制插件端口。实现必须以精确 argv 启动入口，禁止经 shell 解释用户参数。
+#[async_trait]
+pub trait PluginRunner: Send + Sync {
+    /// 列出当前目录中可用的插件。
+    async fn list(&self) -> Result<Vec<PluginInfo>, super::PluginError>;
+    /// 调用指定插件，args 不含插件名本身。
+    async fn invoke(
+        &self,
+        plugin: &str,
+        args: &[String],
+    ) -> Result<PluginOutput, super::PluginError>;
 }
