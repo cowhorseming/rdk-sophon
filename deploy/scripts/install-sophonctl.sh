@@ -17,8 +17,9 @@
 #   --default        把登记的别名设为默认（配合 --board 用）
 #   -h, --help       帮助
 # 示例：
-#   ./deploy/scripts/install-sophonctl.sh
-#   ./deploy/scripts/install-sophonctl.sh --release --board x5 192.168.128.10:7777 --default
+#   ./deploy/scripts/install-sophonctl.sh                                          # 最简：只装客户端，不登记别名
+#   ./deploy/scripts/install-sophonctl.sh --release                                # 装 release 版（更小更快）
+#   ./deploy/scripts/install-sophonctl.sh --board x5 192.168.128.10:7777 --default # 装的时候顺手登记别名 x5 并设默认（可选）
 set -euo pipefail
 
 cd "$(dirname "$0")/../.." || exit 2
