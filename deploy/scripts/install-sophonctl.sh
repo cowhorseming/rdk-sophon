@@ -23,6 +23,20 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.." || exit 2
 
+# 探测 cargo 环境：非交互 shell 可能没有 source ~/.cargo/env，手动加上。
+if ! command -v cargo >/dev/null 2>&1; then
+  if [ -f "$HOME/.cargo/env" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.cargo/env"
+  elif [ -d "$HOME/.cargo/bin" ]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+  fi
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "错误：找不到 cargo。请先装 Rust（https://rustup.rs）。" >&2
+  exit 1
+fi
+
 # 颜色
 if [ -t 1 ]; then G='\033[0;32m'; R='\033[0;31m'; B='\033[0;34m'; Y='\033[0;33m'; N='\033[0m'; else G=''; R=''; B=''; Y=''; N=''; fi
 
@@ -61,11 +75,12 @@ echo -e "${G}✓ 编译完成: $ART${N}"
 echo
 
 echo -e "${B}========== [2/4] 装到 PATH ==========${N}"
-# 默认装 ~/.local/bin（用户级，无需 sudo）。若不在 PATH 则 fallback /usr/local/bin（需 sudo）。
+# 默认装 ~/.local/bin（用户级，无需 sudo，跨平台标准位置）。
+# 不管它当前在不在 PATH——装完若不在，提示用户加进 PATH。
+# 仅当 ~/.local/bin 创建不了（如家目录只读）才 fallback /usr/local/bin（需 sudo）。
 if [ -z "$BIN_DIR" ]; then
-  if case ":$PATH:" in *":$HOME/.local/bin:"*) true ;; *) false ;; esac; then
-    BIN_DIR="$HOME/.local/bin"
-  else
+  BIN_DIR="$HOME/.local/bin"
+  if ! mkdir -p "$BIN_DIR" 2>/dev/null; then
     BIN_DIR="/usr/local/bin"
   fi
 fi
@@ -79,9 +94,15 @@ $INSTALL_CMD "$ART" "$BIN_DIR/sophonctl"
 chmod +x "$BIN_DIR/sophonctl" 2>/dev/null || sudo chmod +x "$BIN_DIR/sophonctl"
 echo -e "${G}✓ 已装到 $BIN_DIR/sophonctl${N}"
 
-# 刷新当前 shell 的命令缓存（zsh 用 hash -r，bash 用 hash -r）
-hash -r 2>/dev/null || true
-echo -e "${Y}提示：当前 shell 可能需 hash -r 或新开终端才能直接敲 sophonctl${N}"
+# 若 ~/.local/bin 不在 PATH，提示用户加进 ~/.zshrc / ~/.bashrc。
+if [ "$BIN_DIR" = "$HOME/.local/bin" ] && ! case ":$PATH:" in *":$HOME/.local/bin:"*) true ;; *) false ;; esac; then
+  echo -e "${Y}提示：$BIN_DIR 不在 PATH。请加进 shell 配置：${N}"
+  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc   # macOS 默认 zsh"
+  echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc  # Linux bash"
+  echo "  然后 source 一下或新开终端，即可直接敲 sophonctl"
+else
+  echo -e "${Y}提示：当前 shell 可能需 hash -r 或新开终端才能直接敲 sophonctl${N}"
+fi
 echo
 
 echo -e "${B}========== [3/4] 验证 ==========${N}"

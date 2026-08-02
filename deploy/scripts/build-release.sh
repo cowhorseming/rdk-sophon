@@ -8,6 +8,20 @@ set -euo pipefail
 # 切到仓库根
 cd "$(dirname "$0")/../.." || exit 2
 
+# 探测 cargo 环境：非交互 shell 可能没 source ~/.cargo/env。
+if ! command -v cargo >/dev/null 2>&1; then
+  if [ -f "$HOME/.cargo/env" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.cargo/env"
+  elif [ -d "$HOME/.cargo/bin" ]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+  fi
+fi
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "错误：找不到 cargo。请先装 Rust（https://rustup.rs）。" >&2
+  exit 1
+fi
+
 TARGET="aarch64-unknown-linux-gnu"
 BINS=("probe-daemon" "sophonctl" "probe-http-gateway" "probe-ws-outbound")
 SKIP_CHECKS=0
