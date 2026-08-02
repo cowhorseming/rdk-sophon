@@ -28,7 +28,7 @@ UTF-8。`serde_json` 默认 UTF-8，不处理 BOM。
 
 ```sh
 # 用 nc 连守护进程，每行发一条请求
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | nc board 17777
+echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | nc board 7777
 # → {"jsonrpc":"2.0","id":1,"result":{"pong":true,"ts":"..."}}
 ```
 
@@ -36,7 +36,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | nc board 17777
 
 一行一条，可连续发：
 ```sh
-printf '{"jsonrpc":"2.0","id":1,"method":"ping"}\n{"jsonrpc":"2.0","id":2,"method":"get_thermal"}\n' | nc board 17777
+printf '{"jsonrpc":"2.0","id":1,"method":"ping"}\n{"jsonrpc":"2.0","id":2,"method":"get_thermal"}\n' | nc board 7777
 ```
 守护进程逐行返回两条响应。
 

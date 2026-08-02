@@ -6,9 +6,9 @@
 
 ## 5.1 准备：连接守护进程
 
-守护进程默认监听 `0.0.0.0:17777`（TCP）。从开发机：
+守护进程默认监听 `0.0.0.0:7777`（TCP）。从开发机：
 ```sh
-nc <board-ip> 17777
+nc <board-ip> 7777
 ```
 连接后，逐行发 JSON-RPC 请求（每行一个 `\n` 结尾），守护进程逐行返回响应。
 连接保持期间，还会收到 `telemetry`/`alert` notification（无 `id`）。
@@ -126,7 +126,7 @@ nc <board-ip> 17777
 
 ```sh
 # 开发机
-$ nc board 17777
+$ nc board 7777
 {"jsonrpc":"2.0","id":1,"method":"ping"}              # 请求
 {"jsonrpc":"2.0","id":1,"result":{"pong":true,"ts":"...Z"}}   # 响应
 {"jsonrpc":"2.0","method":"telemetry","params":{...}}          # 被动 telemetry（无 id）
@@ -140,7 +140,7 @@ $ nc board 17777
 
 手敲 JSON 易错，推荐用 `sophonctl`（底层走同一协议）：
 ```sh
-sophonctl --host board:17777 state
-sophonctl --host board:17777 exec uname -a
+sophonctl --host board:7777 state
+sophonctl --host board:7777 exec uname -a
 ```
 CLI 契约见 [`../cli/sophonctl.md`](../cli/sophonctl.md)。

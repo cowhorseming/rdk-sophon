@@ -84,9 +84,11 @@ dependencies = [
  "clap",
  "client",
  "infra",
+ "serde",
  "serde_json",
  "shared",
  "tokio",
+ "toml",
 ]
 
 [[package]]

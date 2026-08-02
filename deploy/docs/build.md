@@ -95,7 +95,7 @@ cargo build --release --bin probe-daemon   # 单个
 
 | 二进制 | 用途 | 默认监听 |
 |--------|------|---------|
-| `probe-daemon` | 板端守护进程 | TCP `0.0.0.0:17777`、Unix `/run/probe-daemon/probe.sock` |
+| `probe-daemon` | 板端守护进程 | TCP `0.0.0.0:7777`、Unix `/run/probe-daemon/probe.sock` |
 | `sophonctl` | CLI（本地/远程） | — |
 | `probe-http-gateway` | REST 网关 | `0.0.0.0:8080` |
 | `probe-ws-outbound` | WebSocket 出站 | —（主动外连云端） |

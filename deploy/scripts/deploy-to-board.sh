@@ -67,9 +67,9 @@ ssh -o ConnectTimeout=10 "$SSH_TARGET" "
   echo '--- 服务状态 ---'
   sudo systemctl --no-pager --full status probe-daemon | head -n 12 || true
   echo '--- 监听端口 ---'
-  ss -lnt 2>/dev/null | grep 17777 || netstat -lnt 2>/dev/null | grep 17777
+  ss -lnt 2>/dev/null | grep 7777 || netstat -lnt 2>/dev/null | grep 7777
 "
 echo
-echo -e "${G}部署完成。板端 probe-daemon 已在 17777 监听。${N}"
-echo "本地验证：sophonctl --host $BOARD_HOST:17777 state"
+echo -e "${G}部署完成。板端 probe-daemon 已在 7777 监听。${N}"
+echo "本地验证：sophonctl --host $BOARD_HOST:7777 state"
 echo "（若 BOARD_HOST 是 ssh alias 而非 IP，请用板子 IP 替换）"

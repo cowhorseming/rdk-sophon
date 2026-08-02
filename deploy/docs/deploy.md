@@ -15,11 +15,11 @@
 2. scp 4 个二进制 + config.toml + probe-daemon.service + install-on-board.sh 到板子 `/tmp/rdk-sophon-deploy/`。
 3. 远程 `sudo bash install-on-board.sh`：装二进制到 `/usr/local/bin`、配置到 `/etc/probe-daemon/`、unit 到 `/etc/systemd/system/`、建 `probe` 用户、备 `/var/log/probe-daemon` 与 `/run/probe-daemon`。
 4. `systemctl daemon-reload` + `systemctl enable --now probe-daemon`。
-5. 验证：`systemctl status` + `ss -lnt | grep 17777`。
+5. 验证：`systemctl status` + `ss -lnt | grep 7777`。
 
 完成后再从 Mac 验证：
 ```sh
-sophonctl --host 192.168.128.10:17777 state
+sophonctl --host 192.168.128.10:7777 state
 ```
 
 ## 1.2 systemd 服务
@@ -43,7 +43,7 @@ unit 文件：`systemd/probe-daemon.service`，部署时复制到 `/etc/systemd/
 
 生产要点：
 - `[shell] enabled = false`：**生产必须关闭** raw shell（默认就是 false）。启用等于给远端 root，仅限可信内网调试。
-- `[tcp] bind = "0.0.0.0:17777"`：监听所有网卡。若只内网用，可绑具体 IP。
+- `[tcp] bind = "0.0.0.0:7777"`：监听所有网卡。若只内网用，可绑具体 IP。
 - `[telemetry] interval_secs`：推送周期；0 关推送（仅拉取）。
 - `[alerts]`：温度/磁盘阈值。
 
@@ -129,7 +129,7 @@ probe-ws-outbound --broker-url ws://broker.example.com/board-001 \
 
 ## 1.8 安全注意事项
 
-1. **TCP 17777 当前是明文**：生产建议绑内网 IP，或前置 SSH 隧道/反代 + mTLS（mTLS 待补，见 README 进度）。
+1. **TCP 7777 当前是明文**：生产建议绑内网 IP，或前置 SSH 隧道/反代 + mTLS（mTLS 待补，见 README 进度）。
 2. **shell 默认关闭**：生产绝不开启 `[shell] enabled = true`，除非可信内网且需调试。
 3. **Unix socket 权限 0600**：由 systemd `RuntimeDirectory` + 文件权限控制，仅 probe 用户与 root 可访问。
 4. **硬化 unit**：`ProtectSystem=strict` + 无 capability，限制被入侵后的影响面。
@@ -139,7 +139,7 @@ probe-ws-outbound --broker-url ws://broker.example.com/board-001 \
 | 现象 | 排查 |
 |------|------|
 | 服务起不来 | `journalctl -u probe-daemon -n 50`，常见：config 语法错（回退默认）/ 端口占用 / socket 路径无权限 |
-| 17777 没监听 | `ss -lnt \| grep 17777`；`[tcp].enabled=false`？bind 被占？ |
+| 7777 没监听 | `ss -lnt \| grep 7777`；`[tcp].enabled=false`？bind 被占？ |
 | 板上 rustup 报 manifest 缺失 | 换 tuna 镜像重装（见 build.md「故障排查」） |
 | 交叉编译链接失败 | Mac 用 zigbuild（见 build.md「方式一：开发机交叉编译」） |
 | 采集器返回 null（非板子） | 正常：Mac 上无 `/proc`/`/sys`；板子上看 `/sys/class/thermal` 等是否存在 |

@@ -26,7 +26,7 @@
                        │
        ┌───────────────┼──────────────────┐
        │ nc / sophonctl  │ curl / 浏览器     │ 云端 broker
-       │ (TCP 17777)    │ (HTTP 8080)       │ (WebSocket)
+       │ (TCP 7777)    │ (HTTP 8080)       │ (WebSocket)
        ▼                ▼                   ▲
   ┌─────────┐    ┌──────────────┐    ┌──────────────┐
   │ probe-  │    │ probe-http-  │    │ probe-ws-   │
@@ -44,7 +44,7 @@
 ### 2.3.1 probe-daemon（守护进程，核心，必须）
 
 **唯一真正"服务端"。** 职责：
-- 监听 TCP `0.0.0.0:17777`、Unix socket `/run/probe-daemon/probe.sock`、可选 Serial（`crates/daemon/src/main.rs:49-86`）。
+- 监听 TCP `0.0.0.0:7777`、Unix socket `/run/probe-daemon/probe.sock`、可选 Serial（`crates/daemon/src/main.rs:49-86`）。
 - 持有共享的 `StateSnapshot`，跑采集循环周期刷新（`crates/daemon/src/bootstrap.rs:spawn_collect_loop`）。
 - 处理所有 RPC：拉状态、`exec_shell`、推送 telemetry/alert。
 - systemd 常驻，崩溃自动重启（`Restart=on-failure`）。

@@ -8,7 +8,7 @@
 
 | 通道 | 默认 | 启用配置 | 帧格式 | 典型场景 |
 |------|------|---------|--------|---------|
-| TCP | `0.0.0.0:17777` | `[tcp].enabled` | NDJSON | 局域网/USB 网卡/SSH 隧道/云端 |
+| TCP | `0.0.0.0:7777` | `[tcp].enabled` | NDJSON | 局域网/USB 网卡/SSH 隧道/云端 |
 | Unix socket | `/run/probe-daemon/probe.sock` | `[unix].enabled` | NDJSON | 本地 CLI、板端进程间 |
 | Serial | 不启用 | `[serial]` section 存在 | NDJSON | 调试 UART |
 | WebSocket 出站 | — | 独立二进制 `probe-ws-outbound` | WS 帧文本 | 板子主动外连云端 broker |
@@ -17,7 +17,7 @@
 
 ## 2.2 TCP
 
-- 绑定 `[tcp].bind`，默认 `0.0.0.0:17777`，可被 `--tcp-bind` 覆盖。
+- 绑定 `[tcp].bind`，默认 `0.0.0.0:7777`，可被 `--tcp-bind` 覆盖。
 - 覆盖场景：网络（笔记本→板子）、USB 网络共享（RNDIS/CDC-ECM，板子多出网卡即 TCP）、SSH 隧道（`ssh -L 7777:localhost:7777 board` 转发到本地 TCP）。
 - 多连接，每连接 spawn 一个 `run_session`，共用同一 dispatcher/broadcaster。
 - accept 失败退避 200ms。
@@ -26,7 +26,7 @@
 ```sh
 ssh -L 7777:localhost:7777 x5-root
 # 然后本地连
-sophonctl --host 127.0.0.1:17777 state
+sophonctl --host 127.0.0.1:7777 state
 ```
 
 ## 2.3 Unix socket
