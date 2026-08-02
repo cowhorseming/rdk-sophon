@@ -12,7 +12,12 @@ async-trait.workspace = true
 thiserror.workspace = true
 serde_json.workspace = true
 serialport = { workspace = true }
+serde.workspace = true
+toml.workspace = true
 
 # statvfs FFI 仅 Linux 需要；非 Linux 平台编译为空实现。
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

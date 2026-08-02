@@ -8,18 +8,22 @@
 
 pub mod transport;
 
-mod sysfs;
-mod proc;
 mod hrut;
-mod statvfs;
+mod plugin;
+mod proc;
 mod shell;
+mod statvfs;
+mod sysfs;
 
-pub use sysfs::RealSysfsReader;
-pub use proc::RealProcReader;
 pub use hrut::RealHrutGateway;
-pub use statvfs::{StatvfsResult, statvfs_of};
+pub use plugin::{DisabledPluginRunner, RealPluginRunner};
+pub use proc::RealProcReader;
 pub use shell::RealShellRunner;
+pub use statvfs::{statvfs_of, StatvfsResult};
+pub use sysfs::RealSysfsReader;
 
 // 传输层便捷重导出，让下游可直接 `use infra::Transport` 等。
-pub use transport::{Transport, TransportError, FramedReader, FramedWriter, FrameError,
-                    TcpTransport, UnixTransport, SerialTransport, StubTransport};
+pub use transport::{
+    FrameError, FramedReader, FramedWriter, SerialTransport, StubTransport, TcpTransport,
+    Transport, TransportError, UnixTransport,
+};
