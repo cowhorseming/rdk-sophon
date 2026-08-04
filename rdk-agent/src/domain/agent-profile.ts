@@ -8,17 +8,16 @@ export interface PodmanSandboxPlan {
 	network: "none";
 }
 
+/**
+ * Optional board-side sandbox retained for configurations that run tests on
+ * the development board. It uses a disposable, hardware-free bwrap process.
+ */
 export interface SshBwrapSandboxPlan {
 	kind: "ssh-bwrap";
-	/** SSH config host for the target development board. */
 	host: string;
-	/** Absolute board directory used only for disposable workspace snapshots. */
 	remoteRoot: string;
-	/** Board development sandboxes are deliberately offline. */
 	network: "none";
-	/** Development tests must never receive GPIO/PWM/SPI device access. */
 	hardwareAccess: false;
-	/** Hard ceiling for one Bash invocation, independent of the whole Agent stage. */
 	commandTimeoutSeconds: number;
 }
 
@@ -28,6 +27,8 @@ export interface SshDeploymentArtifact {
 	source: string;
 	target: string;
 	mode: string;
+	/** Deploy a directory atomically instead of a single file. */
+	recursive?: boolean;
 }
 
 export interface SshDeploymentPlan {
@@ -61,11 +62,7 @@ export interface SkillContractValidationPlan {
 	baselineSkillName: string;
 }
 
-export interface ServoPythonTestValidationPlan {
-	kind: "servo-python-test";
-}
-
-export type DeliveryValidationPlan = SkillContractValidationPlan | ServoPythonTestValidationPlan;
+export type DeliveryValidationPlan = SkillContractValidationPlan;
 
 export interface AgentProfile {
 	id: StageId;

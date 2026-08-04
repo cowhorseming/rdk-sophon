@@ -17,6 +17,7 @@ interface InstalledRemoteArtifact {
 	target: string;
 	staged: string;
 	backup: string;
+	recursive: boolean;
 }
 
 const deployParameters = Type.Object({});
@@ -88,7 +89,9 @@ export function validateSkillPackage(contents: string, expectedName: string): vo
 
 async function rollbackRemote(installed: readonly InstalledRemoteArtifact[], signal?: AbortSignal): Promise<void> {
 	for (const artifact of [...installed].reverse()) {
-		const command = `set -eu; if [ -f ${artifact.backup} ]; then mv -f ${artifact.backup} ${artifact.target}; else rm -f ${artifact.target}; fi; rm -f ${artifact.staged}`;
+		const command = artifact.recursive
+			? `set -eu; rm -rf ${artifact.target}; if [ -e ${artifact.backup} ]; then mv -f ${artifact.backup} ${artifact.target}; fi; rm -rf ${artifact.staged}`
+			: `set -eu; if [ -f ${artifact.backup} ]; then mv -f ${artifact.backup} ${artifact.target}; else rm -f ${artifact.target}; fi; rm -f ${artifact.staged}`;
 		await runProcess("ssh", [artifact.host, command], signal).catch(() => undefined);
 	}
 }
@@ -100,30 +103,41 @@ async function deploySsh(workspaceRoot: string, plan: SshDeploymentPlan, signal?
 	try {
 		for (const artifact of plan.artifacts) {
 			const source = workspaceFile(workspaceRoot, artifact.source);
-			if (!(await stat(source)).isFile()) throw new Error(`部署源不是文件：${artifact.source}`);
+			const sourceStat = await stat(source);
+			if (artifact.recursive ? !sourceStat.isDirectory() : !sourceStat.isFile()) {
+				throw new Error(`部署源不是${artifact.recursive ? "目录" : "文件"}：${artifact.source}`);
+			}
 			const targetDirectory = dirname(artifact.target);
 			const staged = `${artifact.target}.rdk-agent-${stamp}.tmp`;
 			const backup = `${artifact.target}.rdk-agent-${stamp}.bak`;
-			const state = { host: plan.host, target: artifact.target, staged, backup };
+			const state = { host: plan.host, target: artifact.target, staged, backup, recursive: Boolean(artifact.recursive) };
 			installed.push(state);
 
 			await runProcess("ssh", [plan.host, `mkdir -p ${targetDirectory}`], signal);
-			await runProcess("scp", ["-q", "--", source, `${plan.host}:${staged}`], signal);
+			await runProcess("scp", artifact.recursive ? ["-q", "-r", "--", source, `${plan.host}:${staged}`] : ["-q", "--", source, `${plan.host}:${staged}`], signal);
 			await runProcess(
 				"ssh",
 				[
 					plan.host,
-					`set -eu; if [ -f ${artifact.target} ]; then cp -p ${artifact.target} ${backup}; fi; chmod ${artifact.mode} ${staged}; mv -f ${staged} ${artifact.target}`,
+					artifact.recursive
+						? `set -eu; if [ -e ${artifact.target} ]; then mv ${artifact.target} ${backup}; fi; chmod -R ${artifact.mode} ${staged}; mv ${staged} ${artifact.target}`
+						: `set -eu; if [ -f ${artifact.target} ]; then cp -p ${artifact.target} ${backup}; fi; chmod ${artifact.mode} ${staged}; mv -f ${staged} ${artifact.target}`,
 				],
 				signal,
 			);
-			if (artifact.target.endsWith(".py")) {
+			if (artifact.recursive) {
+				await runProcess("ssh", [plan.host, `find ${artifact.target} -type f -name '*.py' -exec python3 -m py_compile {} +`], signal);
+			} else if (artifact.target.endsWith(".py")) {
 				await runProcess("ssh", [plan.host, `python3 -m py_compile ${artifact.target}`], signal);
 			}
-			const localHash = await sha256(source);
-			const remoteHash = (await runProcess("ssh", [plan.host, `sha256sum ${artifact.target}`], signal)).stdout.trim().split(/\s+/)[0];
-			if (localHash !== remoteHash) throw new Error(`部署校验和不一致：${artifact.target}`);
-			receipt.push(`${artifact.source} -> ${plan.host}:${artifact.target} sha256=${localHash} backup=${backup}`);
+			if (artifact.recursive) {
+				receipt.push(`${artifact.source}/ -> ${plan.host}:${artifact.target}/ backup=${backup}`);
+			} else {
+				const localHash = await sha256(source);
+				const remoteHash = (await runProcess("ssh", [plan.host, `sha256sum ${artifact.target}`], signal)).stdout.trim().split(/\s+/)[0];
+				if (localHash !== remoteHash) throw new Error(`部署校验和不一致：${artifact.target}`);
+				receipt.push(`${artifact.source} -> ${plan.host}:${artifact.target} sha256=${localHash} backup=${backup}`);
+			}
 		}
 		return receipt.join("\n");
 	} catch (error) {

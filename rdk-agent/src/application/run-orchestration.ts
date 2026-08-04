@@ -22,14 +22,6 @@ export interface RunOrchestrationResult {
 
 class HumanAbortedError extends Error {}
 
-function visibleToolResult(result: string): string {
-	const limit = 2_000;
-	if (result.length <= limit) return result;
-	const firstLine = result.slice(0, result.indexOf("\n") < 0 ? result.length : result.indexOf("\n"));
-	const marker = firstLine.startsWith("[rdk-agent 沙箱]") ? `${firstLine}\n...\n` : "";
-	return `${marker}${result.slice(-limit)}`;
-}
-
 export class RunOrchestration {
 	private readonly agentRunner: AgentRunner;
 	private readonly profilesById: ReadonlyMap<string, AgentProfile>;
@@ -96,7 +88,7 @@ export class RunOrchestration {
 			}
 		}
 
-		input.onEvent({ type: "workflow-finished", succeeded: true, detail: "Python、CLI、Skill 的 TDD、部署与真机命令链路验收均已通过；没有位置反馈时不代表物理位移已被测量。" });
+		input.onEvent({ type: "workflow-finished", succeeded: true, detail: "Python、CLI、Skill 的 TDD、部署与真机验收均已通过。" });
 		return { modeId: mode.id, stages: workflow.snapshot(), succeeded: true };
 	}
 
@@ -108,19 +100,9 @@ export class RunOrchestration {
 
 			const testResult = await this.runAgent(input, loop.testAgentId, "test", deliveries, iteration);
 			deliveries.push({ stageId: loop.testAgentId, summary: testResult.summary });
-			if (testResult.outcome === "revision") {
-				input.onEvent({ type: "stage-status", stageId: loop.testAgentId, status: "failed", detail: testResult.feedback });
-				if (iteration < loop.maxIterations) continue;
-				throw new Error(`${loop.name} 测试设计达到 ${loop.maxIterations} 次自动返工上限：${testResult.feedback ?? testResult.summary}`);
-			}
 
 			const codingResult = await this.runAgent(input, loop.codingAgentId, "coding", deliveries, iteration);
 			deliveries.push({ stageId: loop.codingAgentId, summary: codingResult.summary });
-			if (codingResult.outcome === "revision") {
-				input.onEvent({ type: "stage-status", stageId: loop.codingAgentId, status: "failed", detail: codingResult.feedback });
-				if (iteration < loop.maxIterations) continue;
-				throw new Error(`${loop.name} Coding 达到 ${loop.maxIterations} 次自动返工上限：${codingResult.feedback ?? codingResult.summary}`);
-			}
 
 			const verification = await this.runAgent(input, loop.verificationAgentId, "verification", deliveries, iteration);
 			deliveries.push({ stageId: loop.verificationAgentId, summary: verification.summary });
@@ -134,9 +116,15 @@ export class RunOrchestration {
 			});
 			if (iteration < loop.maxIterations) continue;
 
-			throw new Error(
-				`${loop.name} 已达到 ${loop.maxIterations} 次自动返工上限：${verification.feedback ?? verification.summary}`,
+			const response = await this.requestHuman(
+				input,
+				loop.verificationAgentId,
+				this.profile(loop.verificationAgentId).name,
+				`${loop.name} 已达到 ${loop.maxIterations} 次自动返工上限，请提供继续方向，或输入 /abort 终止。`,
+				verification.feedback ?? verification.summary,
 			);
+			deliveries.push({ stageId: "human", summary: response.message });
+			iteration = 0;
 		}
 	}
 
@@ -165,16 +153,6 @@ export class RunOrchestration {
 		iteration?: number,
 	): Promise<AgentRunResult> {
 		const profile = this.profile(agentId);
-		let automaticRecoveries = 0;
-		const canRetryWithoutSideEffects = expectation === "test" || expectation === "coding" || expectation === "verification";
-		const recordAutomaticRecovery = (detail: string): boolean => {
-			if (input.mode.type !== "robot-development" || !canRetryWithoutSideEffects || automaticRecoveries >= 2) return false;
-			automaticRecoveries++;
-			const summary = `${profile.name} 第 ${automaticRecoveries} 次自动恢复：${detail}。请基于现有文件和上游交付自行定位并继续，不要请求人类提供可从工作区获得的信息。`;
-			deliveries.push({ stageId: `${agentId}-auto-recovery`, summary });
-			input.onEvent({ type: "stage-status", stageId: agentId, status: "running", detail: summary });
-			return true;
-		};
 		while (true) {
 			input.onEvent({ type: "stage-status", stageId: agentId, status: "running" });
 			let result: AgentRunResult;
@@ -190,17 +168,12 @@ export class RunOrchestration {
 					onEvent: (event) => {
 						if (event.type === "text") input.onEvent({ type: "agent-event", stageId: agentId, text: event.text });
 						else if (event.type === "status") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[状态] ${event.message}\n` });
-							else if (event.type === "tool-start") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具] ${event.displayName ?? event.toolName}${event.summary ? `：${event.summary}` : ""}\n` });
+							else if (event.type === "tool-start") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具] ${event.toolName}${event.summary ? `：${event.summary}` : ""}\n` });
 							else if (event.type === "tool-end") {
 								const visibleResult = event.isError || event.toolName === "bash" || event.toolName === "deploy"
-									? `\n${visibleToolResult(event.result)}\n`
+									? `\n${event.result.slice(-2_000)}\n`
 									: "\n";
-								const outcome = event.isError
-									? expectation === "test" && event.toolName === "bash"
-										? "（退出码非 0，等待测试 Agent 判定是否为有效红测）"
-										: "（失败）"
-									: "";
-								input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具完成] ${event.displayName ?? event.toolName}${outcome}${visibleResult}` });
+								input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具完成] ${event.toolName}${event.isError ? "（失败）" : ""}${visibleResult}` });
 							}
 						else if (event.type === "skills-loaded") input.onEvent({ type: "skills-loaded", stageId: agentId, skills: event.skills });
 						else input.onEvent({ type: "skill-selected", stageId: agentId, skill: event.skill });
@@ -208,20 +181,12 @@ export class RunOrchestration {
 				});
 			} catch (error) {
 				const detail = error instanceof Error ? error.message : String(error);
-				if (recordAutomaticRecovery(detail)) continue;
-				if (input.mode.type === "robot-development") {
-					throw new Error(`${profile.name} 自动恢复失败：${detail}`);
-				}
 				const response = await this.requestHuman(input, agentId, profile.name, `${profile.name} 无法继续，请补充信息后重试，或输入 /abort 终止。`, detail);
 				deliveries.push({ stageId: "human", summary: response.message });
 				continue;
 			}
 
 			if (result.outcome === "needs-human") {
-				if (recordAutomaticRecovery(result.summary)) continue;
-				if (input.mode.type === "robot-development") {
-					throw new Error(`${profile.name} 返回 needs-human，但研发模式不允许交互阻塞：${result.summary}`);
-				}
 				const response = await this.requestHuman(
 					input,
 					agentId,
@@ -231,10 +196,6 @@ export class RunOrchestration {
 				);
 				deliveries.push({ stageId: "human", summary: response.message });
 				continue;
-			}
-			if (result.outcome === "failed") {
-				if (recordAutomaticRecovery(result.feedback ?? result.summary)) continue;
-				throw new Error(`${profile.name} 失败：${result.feedback ?? result.summary}`);
 			}
 
 			input.onEvent({ type: "stage-status", stageId: agentId, status: result.outcome === "completed" ? "succeeded" : "failed", detail: result.feedback });

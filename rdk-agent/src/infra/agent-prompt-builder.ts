@@ -62,9 +62,7 @@ export class AgentPromptBuilder {
 			: `工具调用上限为 ${request.profile.maxToolCalls} 次`;
 		const sandboxBoundary = request.profile.sandbox?.kind === "podman"
 			? `Bash 命令在离线 Podman 容器 ${request.profile.sandbox.image} 中执行；工作区以只读方式挂载，HOME 和 /tmp 位于临时容器内。容器只保证 Python 3.12 标准库，不提供 pytest 或板端 Hobot.GPIO；Python 测试必须使用 unittest 并在导入生产模块前 mock 板端模块，不得安装依赖。read/edit/write 仍由宿主进程执行并受 writePaths 白名单约束；write 可递归创建白名单内的父目录，Bash 保持只读，所以不要在 Bash 中运行 mkdir。不要探测或依赖开发机 Python、HOME、SSH 凭据或全局包。`
-			: request.profile.sandbox?.kind === "ssh-bwrap"
-				? `每次 Bash 执行前，运行时会把当前工作区快照同步到开发板 ${request.profile.sandbox.host}，再在板端离线 bwrap 沙箱的 /workspace 内执行。沙箱使用目标板 Python 3.10，工作区和系统依赖只读，仅 /tmp 可写，以 nobody 身份运行，无网络，不挂载 /sys 或任何 GPIO/PWM/SPI 设备。不提供 pytest；Python 测试必须使用 unittest 并在导入生产模块前 mock Hobot.GPIO。Python 3.10 解析 TOML 时使用板端已安装的 tomli 作为 tomllib 兼容回退。read/edit/write 仍在开发机上按 writePaths 白名单执行；write 会创建父目录，Bash 保持只读，不要在 Bash 中运行 mkdir 或安装依赖。`
-				: "Bash 命令在宿主环境执行。";
+			: "Bash 命令在宿主环境执行。";
 		return `## 当前阶段\nAgent ID：${request.profile.id}\nAgent 名称：${request.profile.name}\n工作区绝对根目录：${request.workspaceRoot}\n后文所有 writePaths 均为相对于该根目录的路径；调用 read/edit/write 时优先原样使用工作区相对路径，禁止自行删减路径前缀。\n必须完成该 Agent 外置 systemPrompt 指定的专属交付，不能用其他阶段已有文件替代。\n\n## 用户需求\n${request.userRequest}\n\n## 上游交付\n${history}${iteration}\n\n${roleContracts[request.expectation]}${retryRule}\n\n${executionBoundary}\n\n## 执行环境\n${sandboxBoundary}\n\n## Skill 白名单\n${skillWhitelist}\n${skillRule}\n可读取的 Skill 文件：\n${skillFiles}\n\n${toolCallBudget}，阶段超时为 ${request.profile.timeoutSeconds} 秒。先定位最小文件集合，避免扫描或改动无关目录。\n\n## 当前 Agent 的唯一任务（优先级最高）\n${request.profile.systemPrompt}\n\n工具层允许写入的唯一路径范围：${writable}\n即使完整用户需求提到了下游 CLI、Skill 或部署，你也只能完成上面的当前任务。不要尝试写入白名单外路径；路径被拒绝时先按这里列出的相对路径纠正，不能把自己的路径错误升级为人类授权问题。下游 Agent 会接手其他交付。\n\n在工作目录内完成本阶段。最后用简洁中文列出：交付文件、调用方式、验证结果和未解决风险。\n\n${this.resultContract(request.expectation)}`;
 	}
 
@@ -82,9 +80,8 @@ RDK_AGENT_RESULT: {"status":"passed"}
 RDK_AGENT_RESULT: {"status":"revision","feedback":"需要返工的具体问题"}
 RDK_AGENT_RESULT: {"status":"needs-human","question":"需要人类回答的问题"}`;
 		}
-		return `回复的最后一行必须是以下三种之一，JSON 必须保持单行：
+		return `回复的最后一行必须是以下两种之一，JSON 必须保持单行：
 RDK_AGENT_RESULT: {"status":"completed"}
-RDK_AGENT_RESULT: {"status":"failed","feedback":"自动流程无法继续的具体原因"}
 RDK_AGENT_RESULT: {"status":"needs-human","question":"需要人类回答的问题"}`;
 	}
 }

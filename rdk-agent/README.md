@@ -22,14 +22,15 @@ src/
 1. **机器人开发模式**：依次完成 Python、sophonctl CLI、Skill 三个 TDD 小循环。每个循环由测试设计、Coding、独立验证三个 Agent 组成；验证要求返工时自动进入下一轮。各循环通过后由专用 Agent 部署 Python、CLI、Skill，最后分别执行 CLI 和 Skill 自然语言真机验收。
 2. **机器人应用模式**：单 Agent 根据自然语言选择一个或多个已交付 Skill；动作式请求会在前置检查后直接执行一次对应的真实机器人动作，查询式请求保持只读。
 
-机器人研发流程不请求人类输入：测试、Coding、验证阶段发生瞬时异常时自动恢复，达到返工上限或具有副作用的部署/真机阶段失败时明确结束并保留日志。机器人应用模式缺少无法推导的必填参数时仍可请求人类输入；输入 `/abort` 可以终止。当前不设置人工审批门，正常交付步骤自动继续。
+任意 Agent 无法继续或自动返工达到上限时，工作流暂停并请求人类输入；输入 `/abort` 可以终止。当前不设置人工审批门，正常交付步骤自动继续。
 
-每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。Python、CLI、Skill 的开发测试命令默认在 X5 的离线 bwrap 沙箱中执行：每次 Bash 前同步一份当前工作区快照，以目标板 Python 3.10 验证；快照和系统依赖只读，断网，以 nobody 身份运行，不暴露 GPIO/PWM/SPI 设备。代码修改仍由受 `writePaths` 约束的 Pi 文件工具在开发机完成；正式部署和真机验收保持独立边界。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
+每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。Python、CLI、Skill 的开发测试命令默认在离线 Podman Python 3.12 容器中执行，托管工作区只读挂载，代码修改仍由受 `writePaths` 约束的 Pi 文件工具完成。部署和真机验收留在宿主机执行。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
 
-Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口。rdk-agent 通过该接口把开发阶段 Bash 路由到板端 `bwrap`。使用研发模式前，开发机的 SSH 配置需能无交互连接 `x5-root`，X5 需提供 `bwrap`、`systemd-run`、Python 3.10 和 `tomli`：
+Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口和容器/VM 示例。rdk-agent 通过该接口把开发阶段 Bash 路由到 Podman。首次使用研发模式前准备固定镜像：
 
 ```sh
-ssh x5-root 'command -v bwrap && command -v systemd-run && python3 -c "import tomli"'
+podman machine start
+podman pull docker.io/library/python:3.12-slim
 ```
 
 ```sh
@@ -47,16 +48,9 @@ npm run deploy
 rdk-agent
 ```
 
-自动运行研发案例（不启动 TUI，可用于回归测试或 CI）：
-
-```sh
-rdk-agent --mode robot-development --request "开发一个挥动右手的功能"
-```
-
 默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v2`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。`/workspace` 可查看当前工程和来源。模板升级通过提高 `workspace.version` 创建新版本目录，避免覆盖旧工程。
 
-开发阶段的 Python/CLI/Skill 测试在板端离线 bwrap 沙箱中执行。测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。Python 3.10 解析 TOML 时使用系统 `tomli` 兼容包。模板自带 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。原有 `sandbox.kind: podman` 仍可作为自定义配置的本地后备，但不再是 MagicBox 默认环境。
-工具日志显示最终执行位置：文件工具标记为“开发机工作区”，Bash 标记为“板端 x5-root / bwrap”并展示改写后的 `/workspace` 命令；沙箱输出的首行还会报告 target、cwd、uid、网络和硬件权限。
+开发阶段的 Python/CLI/Skill 测试在离线 Podman 容器中执行。运行时只依赖 Python 3.12 标准库，测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。模板自带 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。
 
 只有参与 rdk-sophon 仓库开发时才需要显式指定外部源码：
 

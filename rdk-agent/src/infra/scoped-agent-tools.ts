@@ -12,7 +12,6 @@ import type { AgentProfile } from "../domain/agent-profile.ts";
 import type { AgentExpectation } from "../shared/agent-runner.ts";
 import { createDeploymentToolDefinition } from "./deployment-agent-tool.ts";
 import { createPodmanSandboxOperations } from "./podman-sandbox.ts";
-import { createSshBwrapSandboxOperations } from "./ssh-bwrap-sandbox.ts";
 
 type AnyToolDefinition = ToolDefinition<any, any, any>;
 
@@ -22,11 +21,9 @@ export class WorkspaceWritePolicy {
 	private readonly patterns: readonly RegExp[];
 	private readonly deniedPatterns: readonly RegExp[];
 	private readonly directoryPrefixes: readonly string[];
-	private readonly denialHint?: string;
 
-	constructor(workspaceRoot: string, writePaths: readonly string[], denialHint?: string) {
+	constructor(workspaceRoot: string, writePaths: readonly string[]) {
 		this.root = resolve(workspaceRoot);
-		this.denialHint = denialHint;
 		this.patterns = writePaths.filter((pattern) => !pattern.startsWith("!")).map((pattern) => this.glob(pattern));
 		this.deniedPatterns = writePaths.filter((pattern) => pattern.startsWith("!")).map((pattern) => this.glob(pattern.slice(1)));
 		this.directoryPrefixes = writePaths.filter((pattern) => !pattern.startsWith("!")).map((pattern) => {
@@ -39,7 +36,7 @@ export class WorkspaceWritePolicy {
 	assertFileAllowed(path: string): void {
 		const workspacePath = this.workspacePath(path);
 		if (!this.patterns.some((pattern) => pattern.test(workspacePath)) || this.deniedPatterns.some((pattern) => pattern.test(workspacePath))) {
-			throw new Error(`写入被拒绝：${workspacePath} 不在 Agent 的 writePaths 白名单中${this.denialHint ? `。${this.denialHint}` : ""}`);
+			throw new Error(`写入被拒绝：${workspacePath} 不在 Agent 的 writePaths 白名单中`);
 		}
 	}
 
@@ -112,19 +109,13 @@ export function scopedAgentTools(
 	profile: AgentProfile,
 	runContext?: { expectation: AgentExpectation; userRequest: string },
 ): AnyToolDefinition[] {
-	const denialHint = profile.id.endsWith("-test")
-		? "当前是测试设计 Agent，生产代码必须由下一个 Coding Agent 修改；不要重试该写入。请运行当前测试，若仅因目标功能未实现而失败，将其作为有效红测交付"
-		: undefined;
-	const policy = new WorkspaceWritePolicy(workspaceRoot, profile.writePaths, denialHint);
-	const sandboxOperations = profile.sandbox?.kind === "podman"
-		? createPodmanSandboxOperations(workspaceRoot, profile.sandbox)
-		: profile.sandbox?.kind === "ssh-bwrap"
-			? createSshBwrapSandboxOperations(workspaceRoot, profile.sandbox)
-			: undefined;
+	const policy = new WorkspaceWritePolicy(workspaceRoot, profile.writePaths);
 	const definitions: Record<string, AnyToolDefinition | undefined> = {
 		read: createReadToolDefinition(workspaceRoot),
 		bash: createBashToolDefinition(workspaceRoot, {
-			operations: sandboxOperations,
+			operations: profile.sandbox?.kind === "podman"
+				? createPodmanSandboxOperations(workspaceRoot, profile.sandbox)
+				: undefined,
 			spawnHook: (spawnContext) => {
 				assertReadOnlyShell(spawnContext.command);
 				if (runContext) {

@@ -97,33 +97,6 @@ test("rejects a development sandbox with host networking", (context) => {
 	assert.throws(() => new YamlAgentConfigurationLoader().load(directory), /network 当前必须为 none/);
 });
 
-test("loads a hardware-free SSH bwrap board sandbox", (context) => {
-	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
-	context.after(() => rmSync(directory, { recursive: true, force: true }));
-	writeFileSync(
-		join(directory, "agents.yaml"),
-		"version: 2\ndefaultMode: application\nagents:\n  - id: author\n    name: Author\n    description: Test\n    tools: [bash]\n    skills: []\n    sandbox:\n      kind: ssh-bwrap\n      host: x5-root\n      remoteRoot: /userdata/rdk-agent/runs\n      network: none\n      hardwareAccess: false\n    systemPrompt: Test\nmodes:\n  - id: application\n    name: Application\n    type: robot-application\n    agent: author\n",
-	);
-	assert.deepEqual(new YamlAgentConfigurationLoader().load(directory).profiles[0]?.sandbox, {
-		kind: "ssh-bwrap",
-		host: "x5-root",
-		remoteRoot: "/userdata/rdk-agent/runs",
-		network: "none",
-		hardwareAccess: false,
-		commandTimeoutSeconds: 30,
-	});
-});
-
-test("rejects SSH bwrap sandboxes that expose hardware", (context) => {
-	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
-	context.after(() => rmSync(directory, { recursive: true, force: true }));
-	writeFileSync(
-		join(directory, "agents.yaml"),
-		"version: 2\ndefaultMode: application\nagents:\n  - id: author\n    name: Author\n    description: Test\n    tools: [bash]\n    skills: []\n    sandbox:\n      kind: ssh-bwrap\n      host: x5-root\n      remoteRoot: /userdata/rdk-agent/runs\n      network: none\n      hardwareAccess: true\n    systemPrompt: Test\nmodes:\n  - id: application\n    name: Application\n    type: robot-application\n    agent: author\n",
-	);
-	assert.throws(() => new YamlAgentConfigurationLoader().load(directory), /hardwareAccess 当前必须显式为 false/);
-});
-
 test("bundled robot application mode loads the servo control skill", () => {
 	const configuration = new YamlAgentConfigurationLoader().load(join(import.meta.dirname, "../../config"));
 	const application = configuration.profiles.find((profile) => profile.id === "robot-application");
@@ -141,11 +114,11 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 	assert.deepEqual(configuration.workspace.requiredPaths, [
 		"examples/plugins/servo/servo_ctrl.py",
 		"examples/plugins/servo/plugin.toml",
-		"examples/plugins/servo/tests/test_wave_hands.py",
+		"examples/plugins/servo/servo_actions/actions.json",
 	]);
 	if (configuration.workspace.kind === "managed-template") {
 		assert.equal(configuration.workspace.id, "magicbox-servo");
-		assert.equal(configuration.workspace.version, 2);
+		assert.equal(configuration.workspace.version, 3);
 		assert.match(configuration.workspace.templateDirectory, /config\/templates\/magicbox-servo$/);
 	}
 	for (const profile of configuration.profiles) assert.equal(profile.maxToolCalls, undefined);
@@ -164,12 +137,9 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 	}
 	for (const id of ["python-test", "python-coding", "python-verification", "cli-test", "cli-coding", "cli-verification", "skill-verification"]) {
 		assert.deepEqual(byId.get(id)?.sandbox, {
-			kind: "ssh-bwrap",
-			host: "x5-root",
-			remoteRoot: "/userdata/rdk-agent/runs",
+			kind: "podman",
+			image: "docker.io/library/python:3.12-slim",
 			network: "none",
-			hardwareAccess: false,
-			commandTimeoutSeconds: 30,
 		});
 	}
 	for (const id of ["python-deploy", "cli-deploy", "skill-deploy", "cli-live-acceptance", "skill-live-acceptance", "robot-application"]) {
@@ -179,16 +149,6 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 	assert.match(byId.get("python-test")?.systemPrompt ?? "", /禁止自创 `ServoController\.SINGLE_SIDE_ACTIONS`/);
 	assert.match(byId.get("python-test")?.systemPrompt ?? "", /不安装 pytest/);
 	assert.match(byId.get("python-test")?.systemPrompt ?? "", /sys\.modules\["Hobot\.GPIO"\]/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /立即以 completed 交付/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /进入 Python Coding Agent/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /右手需求绝不能创建、修改、运行或交付左手测试/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /call\.hold\(WAVE_POSITION_HOLD_SECONDS\)/);
-	assert.match(byId.get("python-coding")?.systemPrompt ?? "", /50ms.*不足以作为肉眼可见/);
-	assert.deepEqual(byId.get("python-test")?.validation, { kind: "servo-python-test" });
-	assert.match(byId.get("cli-test")?.systemPrompt ?? "", /import tomli as tomllib/);
-	assert.match(byId.get("cli-test")?.systemPrompt ?? "", /绝不能 patch sleep 后直接调用带该参数的 main/);
-	assert.match(byId.get("skill-test")?.systemPrompt ?? "", /右手需求写成左手验收/);
-	assert.match(byId.get("skill-live-acceptance")?.systemPrompt ?? "", /本次用户原始自然语言/);
 	assert.match(byId.get("python-coding")?.systemPrompt ?? "", /禁止对同一个失败重复 edit\/bash 直至超时/);
 	assert.match(byId.get("skill-coding")?.systemPrompt ?? "", /同一处第二次 edit 仍失败时禁止继续 edit/);
 	assert.match(byId.get("skill-coding")?.systemPrompt ?? "", /已有交付 Skill 已包含本次动作及准确映射时允许零修改完成/);
@@ -201,7 +161,6 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 		manifest: "examples/plugins/servo/plugin.toml",
 		entrypointSource: "examples/plugins/servo/servo_ctrl.py",
 		evidenceFiles: [
-			"examples/plugins/servo/tests/test_wave_*_hand.py",
 			"examples/plugins/servo/tests/test_cli_contract.py",
 		],
 		baselineSkillName: "servo-control",
@@ -211,6 +170,24 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 		assert.ok(profile?.tools.includes("deploy"), `${id} should expose deploy`);
 		assert.ok(profile?.deployment, `${id} should have a deterministic deployment plan`);
 	}
+	assert.deepEqual(byId.get("python-deploy")?.deployment, {
+		kind: "ssh",
+		host: "x5-root",
+		artifacts: [
+			{
+				source: "examples/plugins/servo/servo_ctrl.py",
+				target: "/userdata/magicbox/scripts/servo_ctrl.py",
+				mode: "0755",
+				recursive: false,
+			},
+			{
+				source: "examples/plugins/servo/servo_actions",
+				target: "/userdata/magicbox/scripts/servo_actions",
+				mode: "0755",
+				recursive: true,
+			},
+		],
+	});
 	assert.deepEqual(byId.get("skill-deploy")?.deployment, {
 		kind: "skill",
 		source: ".rdk-agent/deliveries/skills/servo-control",

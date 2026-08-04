@@ -25,18 +25,6 @@ test("Python test allowlist excludes files owned by the CLI loop", () => {
 	assert.throws(() => policy.assertFileAllowed("rdk-sophon/examples/plugins/servo/tests/test_cli_contract.py"), /写入被拒绝/);
 });
 
-test("test-agent write rejection explains the TDD handoff instead of inviting retries", () => {
-	const policy = new WorkspaceWritePolicy(
-		"/tmp/workspace",
-		["examples/plugins/*/tests/test_*.py"],
-		"当前是测试设计 Agent，生产代码必须由下一个 Coding Agent 修改；不要重试该写入",
-	);
-	assert.throws(
-		() => policy.assertFileAllowed("examples/plugins/servo/servo_ctrl.py"),
-		/下一个 Coding Agent.*不要重试/,
-	);
-});
-
 test("agent bash policy allows tests but blocks shell file mutation", () => {
 	assert.doesNotThrow(() => assertReadOnlyShell("python3 -m unittest discover -s tests"));
 	assert.doesNotThrow(() => assertReadOnlyShell("rg wave-hands examples/plugins/servo | head"));

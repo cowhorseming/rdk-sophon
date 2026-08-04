@@ -45,7 +45,6 @@ test("test-agent prompt treats one expected red run as a completed delivery", ()
 	assert.match(prompt, /导入、测试收集、fixture、路径或 mock 配置失败永远不是有效红测/);
 	assert.match(prompt, /工具调用上限为 6 次/);
 	assert.match(prompt, /RDK_AGENT_RESULT: \{"status":"completed"\}/);
-	assert.match(prompt, /RDK_AGENT_RESULT: \{"status":"failed"/);
 });
 
 test("test-agent retry prompt must resolve verifier feedback instead of accepting the same red failure", () => {
@@ -78,27 +77,6 @@ test("prompt makes the Podman test boundary explicit", () => {
 	assert.match(prompt, /不提供 pytest 或板端 Hobot\.GPIO/);
 	assert.match(prompt, /write 可递归创建白名单内的父目录/);
 	assert.match(prompt, /不要探测或依赖开发机 Python/);
-});
-
-test("prompt makes the remote board sandbox and hardware boundary explicit", () => {
-	const prompt = new AgentPromptBuilder().build({
-		...request("test"),
-		profile: {
-			...profile,
-			sandbox: {
-				kind: "ssh-bwrap",
-				host: "x5-root",
-				remoteRoot: "/userdata/rdk-agent/runs",
-				network: "none",
-				hardwareAccess: false,
-				commandTimeoutSeconds: 30,
-			},
-		},
-	});
-	assert.match(prompt, /同步到开发板 x5-root/);
-	assert.match(prompt, /板端离线 bwrap 沙箱的 \/workspace/);
-	assert.match(prompt, /不挂载 \/sys 或任何 GPIO\/PWM\/SPI 设备/);
-	assert.match(prompt, /tomli 作为 tomllib 兼容回退/);
 });
 
 test("coding-agent prompt protects upstream tests", () => {

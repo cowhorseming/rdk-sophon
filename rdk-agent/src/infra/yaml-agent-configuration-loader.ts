@@ -154,36 +154,17 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 	private sandbox(value: unknown, label: string): SandboxExecutionPlan {
 		const raw = this.record(value, label);
 		const kind = this.string(raw.kind, `${label}.kind`);
+		if (kind !== "podman") throw new Error(`${label}.kind 不支持：${kind}`);
+		const image = this.string(raw.image, `${label}.image`);
+		if (!/^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/.test(image)) throw new Error(`${label}.image 格式不安全`);
 		const network = this.string(raw.network, `${label}.network`);
 		if (network !== "none") throw new Error(`${label}.network 当前必须为 none`);
-		if (kind === "podman") {
-			const image = this.string(raw.image, `${label}.image`);
-			if (!/^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/.test(image)) throw new Error(`${label}.image 格式不安全`);
-			return { kind, image, network };
-		}
-		if (kind !== "ssh-bwrap") throw new Error(`${label}.kind 不支持：${kind}`);
-		const host = this.string(raw.host, `${label}.host`);
-		if (!/^[A-Za-z0-9._-]+$/.test(host)) throw new Error(`${label}.host 包含不安全字符`);
-		const remoteRoot = this.string(raw.remoteRoot, `${label}.remoteRoot`).replace(/\/$/, "");
-		if (!/^\/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/.test(remoteRoot)
-			|| remoteRoot.split("/").some((part) => part === "." || part === "..")) {
-			throw new Error(`${label}.remoteRoot 必须是安全的板端绝对路径`);
-		}
-		if (raw.hardwareAccess !== false) throw new Error(`${label}.hardwareAccess 当前必须显式为 false`);
-		return {
-			kind,
-			host,
-			remoteRoot,
-			network,
-			hardwareAccess: false,
-			commandTimeoutSeconds: this.optionalPositiveInteger(raw.commandTimeoutSeconds, `${label}.commandTimeoutSeconds`, 30),
-		};
+		return { kind, image, network };
 	}
 
 	private validation(value: unknown, label: string): DeliveryValidationPlan {
 		const raw = this.record(value, label);
 		const kind = this.string(raw.kind, `${label}.kind`);
-		if (kind === "servo-python-test") return { kind };
 		if (kind !== "skill-contract") throw new Error(`${label}.kind 不支持：${kind}`);
 		const evidenceFiles = this.stringArray(raw.evidenceFiles, `${label}.evidenceFiles`).map((path, index) =>
 			this.relativePath(path, `${label}.evidenceFiles[${index}]`),
@@ -236,10 +217,12 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			}
 			const mode = artifact.mode === undefined ? "0644" : this.string(artifact.mode, `${label}.artifacts[${index}].mode`);
 			if (!/^0[0-7]{3}$/.test(mode)) throw new Error(`${label}.artifacts[${index}].mode 必须是四位八进制权限`);
+			const recursive = artifact.recursive === undefined ? false : this.boolean(artifact.recursive, `${label}.artifacts[${index}].recursive`);
 			return {
 				source: this.relativePath(artifact.source, `${label}.artifacts[${index}].source`),
 				target,
 				mode,
+				recursive,
 			};
 		});
 		return { kind, host, artifacts };
@@ -257,6 +240,11 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		const id = this.string(value, label);
 		if (!/^[a-z][a-z0-9-]*$/.test(id)) throw new Error(`${label} 只能使用小写字母、数字和连字符`);
 		return id;
+	}
+
+	private boolean(value: unknown, label: string): boolean {
+		if (typeof value !== "boolean") throw new Error(`${label} 必须是布尔值`);
+		return value;
 	}
 
 	private requireAgent(agentId: string, label: string, profileIds: ReadonlySet<string>): void {

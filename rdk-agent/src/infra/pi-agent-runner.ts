@@ -1,4 +1,4 @@
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
 	createAgentSession,
 	DefaultResourceLoader,
@@ -18,12 +18,6 @@ import {
 	testExecutionEvidenceRetryPrompt,
 	verificationEvidenceRetryPrompt,
 } from "./verification-evidence.ts";
-
-function executionEnvironment(profile: AgentRunRequest["profile"]): string {
-	if (profile.sandbox?.kind === "podman") return `Podman ${profile.sandbox.image}（离线、工作区只读）`;
-	if (profile.sandbox?.kind === "ssh-bwrap") return `板端 ${profile.sandbox.host} / bwrap（快照、离线、无硬件权限）`;
-	return "宿主机";
-}
 
 export function createAgentResourceLoader(request: AgentRunRequest): DefaultResourceLoader {
 	const skillPaths = request.profile.skills.map((name) => join(request.skillDirectory, name));
@@ -58,27 +52,10 @@ function skillInfo(skill: Skill): AgentSkillInfo {
 	return { name: skill.name, description: skill.description, filePath: skill.filePath };
 }
 
-export function toolExecutionName(toolName: string, profile: AgentRunRequest["profile"]): string {
-	if (toolName === "bash" && profile.sandbox?.kind === "ssh-bwrap") {
-		return `bash（板端 ${profile.sandbox.host} / bwrap）`;
-	}
-	if (toolName === "bash" && profile.sandbox?.kind === "podman") return "bash（本地 Podman）";
-	if (["read", "edit", "write"].includes(toolName)) return `${toolName}（开发机工作区）`;
-	return toolName;
-}
-
-export function toolCallSummary(
-	toolName: string,
-	args: unknown,
-	workspaceRoot?: string,
-	profile?: AgentRunRequest["profile"],
-): string | undefined {
+function toolCallSummary(toolName: string, args: unknown): string | undefined {
 	if (typeof args !== "object" || args === null) return undefined;
 	const values = args as Record<string, unknown>;
-	if (toolName === "bash" && typeof values.command === "string") {
-		if (workspaceRoot && profile?.sandbox) return values.command.split(workspaceRoot).join("/workspace");
-		return values.command;
-	}
+	if (toolName === "bash" && typeof values.command === "string") return values.command;
 	if (["read", "edit", "write"].includes(toolName) && typeof values.path === "string") return values.path;
 	return undefined;
 }
@@ -160,7 +137,6 @@ export class PiAgentRunner implements AgentRunner {
 		let sawBash = false;
 		let bashHadError = false;
 		const selectedSkills = new Set<string>();
-		const writtenPaths = new Set<string>();
 		let limitError: string | undefined;
 		const abortForLimit = (message: string): void => {
 			if (limitError) return;
@@ -175,17 +151,8 @@ export class PiAgentRunner implements AgentRunner {
 			}
 			if (event.type === "tool_execution_start") {
 				toolCalls++;
-					request.onEvent({
-						type: "tool-start",
-						toolName: event.toolName,
-						displayName: toolExecutionName(event.toolName, request.profile),
-						summary: toolCallSummary(event.toolName, event.args, request.workspaceRoot, request.profile),
-					});
+					request.onEvent({ type: "tool-start", toolName: event.toolName, summary: toolCallSummary(event.toolName, event.args) });
 				const selectedSkill = selectedSkillFromRead(event.toolName, event.args, request.workspaceRoot, loadedSkills);
-				if ((event.toolName === "edit" || event.toolName === "write") && typeof event.args === "object" && event.args !== null && "path" in event.args) {
-					const path = (event.args as { path?: unknown }).path;
-					if (typeof path === "string") writtenPaths.add(relative(request.workspaceRoot, resolve(request.workspaceRoot, path)));
-				}
 				if (selectedSkill && !selectedSkills.has(selectedSkill.name)) {
 					selectedSkills.add(selectedSkill.name);
 					request.onEvent({ type: "skill-selected", skill: skillInfo(selectedSkill) });
@@ -199,13 +166,7 @@ export class PiAgentRunner implements AgentRunner {
 					sawBash = true;
 						bashHadError = event.isError;
 					}
-					request.onEvent({
-						type: "tool-end",
-						toolName: event.toolName,
-						displayName: toolExecutionName(event.toolName, request.profile),
-						result: toolResultText(event.result),
-						isError: event.isError,
-					});
+					request.onEvent({ type: "tool-end", toolName: event.toolName, result: toolResultText(event.result), isError: event.isError });
 			}
 		});
 
@@ -217,7 +178,7 @@ export class PiAgentRunner implements AgentRunner {
 			const model = session.model ? `${session.model.provider}/${session.model.id}` : "未配置";
 			request.onEvent({
 				type: "status",
-				message: `已创建 Pi session；模型：${model}；推理级别：${session.thinkingLevel}；模型回退：${modelFallbackMessage ?? "无"}；工具：${request.profile.tools.join(", ")}；执行环境：${executionEnvironment(request.profile)}；Skill 白名单：${loadedSkills.map((skill) => skill.name).join(", ") || "无"}`,
+				message: `已创建 Pi session；模型：${model}；推理级别：${session.thinkingLevel}；模型回退：${modelFallbackMessage ?? "无"}；工具：${request.profile.tools.join(", ")}；执行环境：${request.profile.sandbox?.kind === "podman" ? `Podman ${request.profile.sandbox.image}（离线、工作区只读）` : "宿主机"}；Skill 白名单：${loadedSkills.map((skill) => skill.name).join(", ") || "无"}`,
 			});
 			try {
 				await session.prompt(this.promptBuilder.build(request));
@@ -270,7 +231,6 @@ export class PiAgentRunner implements AgentRunner {
 				request.workspaceRoot,
 				request.skillDirectory,
 				request.profile.validation,
-				{ userRequest: request.userRequest, writtenPaths },
 			);
 			if (validated.outcome === "revision" && result.outcome === "completed") {
 				request.onEvent({ type: "status", message: `确定性交付校验要求返工：${validated.feedback}` });
@@ -309,7 +269,6 @@ export class PiAgentRunner implements AgentRunner {
 		const feedback = typeof result.feedback === "string" ? result.feedback : undefined;
 		const question = typeof result.question === "string" ? result.question : undefined;
 		if (status === "needs-human") return { summary: summary || text, outcome: "needs-human", question };
-		if (status === "failed") return { summary: summary || feedback || text, outcome: "failed", feedback };
 		if (expectation === "verification" && status === "passed") return { summary: summary || "验证通过", outcome: "completed" };
 		if (expectation === "verification" && status === "revision") {
 			return { summary: summary || feedback || "验证要求返工", outcome: "revision", feedback };

@@ -9,8 +9,6 @@ import {
 	createAgentResourceLoader,
 	enforceApplicationSkillSelection,
 	exceedsToolCallLimit,
-	toolCallSummary,
-	toolExecutionName,
 	needsConfiguredSkillSelectionRetry,
 	selectedSkillFromRead,
 } from "../../src/infra/pi-agent-runner.ts";
@@ -84,30 +82,4 @@ test("omitting maxToolCalls keeps tool calls unlimited", () => {
 	assert.equal(exceedsToolCallLimit(10_000, undefined), false);
 	assert.equal(exceedsToolCallLimit(10, 10), false);
 	assert.equal(exceedsToolCallLimit(11, 10), true);
-});
-
-test("tool log presents the effective board backend and rewritten sandbox path", () => {
-	const boardProfile: AgentProfile = {
-		...profile,
-		tools: ["read", "bash", "write"],
-		sandbox: {
-			kind: "ssh-bwrap",
-			host: "x5-root",
-			remoteRoot: "/userdata/rdk-agent/runs",
-			network: "none",
-			hardwareAccess: false,
-			commandTimeoutSeconds: 30,
-		},
-	};
-	assert.equal(toolExecutionName("read", boardProfile), "read（开发机工作区）");
-	assert.equal(toolExecutionName("bash", boardProfile), "bash（板端 x5-root / bwrap）");
-	assert.equal(
-		toolCallSummary(
-			"bash",
-			{ command: "cd /tmp/workspace/examples && python3 -m unittest" },
-			"/tmp/workspace",
-			boardProfile,
-		),
-		"cd /workspace/examples && python3 -m unittest",
-	);
 });

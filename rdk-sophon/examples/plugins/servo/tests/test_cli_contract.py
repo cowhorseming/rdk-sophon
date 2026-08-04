@@ -1,12 +1,8 @@
 import unittest
+import tomllib
 import sys
 import os
 from unittest.mock import patch, MagicMock
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10 on RDK X5
-    import tomli as tomllib
 
 # 1. 静态解析 plugin.toml
 plugin_path = os.path.join(os.path.dirname(__file__), '..', 'plugin.toml')
@@ -76,54 +72,6 @@ class TestCLIServiceContract(unittest.TestCase):
         self.assertEqual(PLUGIN_ID, "servo")
         self.assertEqual(ENTRYPOINT, ["/usr/bin/python3", "/userdata/magicbox/scripts/servo_ctrl.py"])
 
-    def test_actions_contain_wave_hands(self):
-        self.assertIn('wave-hands', ACTIONS)
-
-    def test_actions_contain_wave_left_hand(self):
-        self.assertIn('wave-left-hand', ACTIONS)
-
-    @patch('sys.argv', ['servo_ctrl.py', 'wave-hands', '--hold', '0'])
-    @patch('servo_ctrl.ServoController')
-    @patch('signal.signal')
-    @patch('atexit.register')
-    @patch('servo_ctrl.time.sleep')
-    def test_main_dispatches_wave_hands(self, mock_sleep, mock_atexit, mock_signal, mock_servo_controller):
-        # 导入 main 时才 patch sys.argv
-        from servo_ctrl import main
-
-        # 调用 main
-        main()
-
-        # 验证 ServoController 被实例化
-        mock_servo_controller.assert_called_once()
-        controller = mock_servo_controller.return_value
-
-        # 验证 _start 和 wave_hands 被调用
-        controller._start.assert_called_once()
-        controller.wave_hands.assert_called_once()
-
-    @patch('sys.argv', ['servo_ctrl.py', 'wave-left-hand', '--hold', '0'])
-    @patch('servo_ctrl.ServoController')
-    @patch('signal.signal')
-    @patch('atexit.register')
-    @patch('servo_ctrl.time.sleep')
-    def test_main_dispatches_wave_left_hand(self, mock_sleep, mock_atexit, mock_signal, mock_servo_controller):
-        # 导入 main 时才 patch sys.argv
-        from servo_ctrl import main
-
-        # 调用 main
-        main()
-
-        # 验证 ServoController 被实例化
-        mock_servo_controller.assert_called_once()
-        controller = mock_servo_controller.return_value
-
-        # 验证 _start_left 和 wave_left_hand 被调用，且 _start 未被调用
-        controller._start.assert_not_called()
-        controller._start_left.assert_called_once_with(LEFT_INITIAL_DUTY)
-        controller.wave_left_hand.assert_called_once()
-        controller._start_right.assert_not_called()
-
     def assert_single_side_lowering(self, action, start_method, untouched_start_method, initial_duty, action_method):
         with patch('sys.argv', ['servo_ctrl.py', action, '--hold', '0']), \
                 patch('servo_ctrl.ServoController') as mock_servo_controller, \
@@ -147,6 +95,11 @@ class TestCLIServiceContract(unittest.TestCase):
     def test_lower_right_starts_only_right_pwm(self):
         self.assert_single_side_lowering(
             'lower-right', '_start_right', '_start_left', RIGHT_INITIAL_DUTY, 'lower_right'
+        )
+
+    def test_wave_right_hand_starts_only_right_pwm(self):
+        self.assert_single_side_lowering(
+            'wave-right-hand', '_start_right', '_start_left', RIGHT_INITIAL_DUTY, 'wave_right_hand'
         )
 
 

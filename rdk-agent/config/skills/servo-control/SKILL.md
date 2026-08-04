@@ -1,6 +1,6 @@
 ---
 name: servo-control
-description: 通过 sophonctl 安全地测试和控制 MagicBox 舵机动作，包括单手与双手动作。
+description: 通过 sophonctl 安全地测试和控制 MagicBox 舵机动作。
 ---
 
 # MagicBox 舵机控制
@@ -18,9 +18,9 @@ description: 通过 sophonctl 安全地测试和控制 MagicBox 舵机动作，�
 - `relax`
 - `shake-ears`
 - `flash`
+- `wave-right-hand`
 - `servo <index> <duty>`
-- `wave-hands`
-- `wave-left-hand`
+- `remove <动作名>`（管理 rdk-agent 已交付的动作，不驱动舵机）
 
 ## 安全规则
 
@@ -28,8 +28,9 @@ description: 通过 sophonctl 安全地测试和控制 MagicBox 舵机动作，�
 2. 如果用户明确报告机器人不稳、运动路径有障碍物或其他危险，则停止动作并报告原因。
 3. 先只读执行 `sophonctl plugins list`，确认存在 `id: servo`。
 4. 不把 `--hold inf` 用作默认值；只有用户明确要求持续保持并知道可用 Ctrl-C 中止时才能使用。
-5. `servo <index> <duty>` 缺少 index 或 duty 时停止并报告必填参数缺失，不能猜测；应用模式可等待用户补充，研发流程不得因此阻塞。
+5. `servo <index> <duty>` 缺少 index 或 duty 时必须请求人类输入，不能猜测。
 6. 一次只执行一个动作，不并行发送舵机命令；失败后不重复原动作。
+7. `remove <动作名>` 是破坏性维护操作：仅在用户明确指定要删除的动作名时执行；它只接受 rdk-agent 托管动作，内置动作和不存在的动作会被拒绝。成功后必须回传备份路径。
 
 ## 前置检查
 
@@ -49,16 +50,16 @@ sophonctl --board x5 servo --help
 
 ## 应用模式执行流程
 
-动作式请求且前置检查通过后，直接执行唯一映射命令一次，不得停在列表或帮助检查。例如“挥动左手”：
+动作式请求且前置检查通过后，直接执行唯一映射命令一次，不得停在列表或帮助检查。例如“摇一下耳朵”：
 
 ```bash
-sophonctl servo wave-left-hand
+sophonctl servo shake-ears
 ```
 
 指定 X5 时执行：
 
 ```bash
-sophonctl --board x5 servo wave-left-hand
+sophonctl --board x5 servo shake-ears
 ```
 
 每一步等待命令结束并检查响应：`exit` 必须为 `0`，`stderr` 应为空，非空 `stdout` 应回传给用户。命令失败时停止并报告真实输出。
@@ -77,10 +78,10 @@ sophonctl --board x5 servo wave-left-hand
 | 摇耳朵 | `sophonctl servo shake-ears` |
 | 灯光动作 | `sophonctl servo flash` |
 | 灯光动作但不操作灯带 | `sophonctl servo flash --no-lamp` |
-| 左右手协调摆动 | `sophonctl servo wave-hands` |
-| 挥动左手、摆动左手、摇摇左手 | `sophonctl servo wave-left-hand` |
+| 挥动右手、摆动右手、摇摇右手 | `sophonctl servo wave-right-hand` |
+| 删除已交付的二级动作 `<name>` | `sophonctl servo remove <name>` |
 
-动作完成后的默认保持时间由插件决定。需要有限保持时使用 `--hold <秒数>`；只有用户需求或设备配置明确要求交换引脚时才使用 `--exchange`。
+动作完成后的默认保持时间由插件决定。需要有限保持时使用 `--hold <秒数>`；镜像机器人只有在人类确认需交换引脚时才使用 `--exchange`。
 
 ## 单舵机操作
 
@@ -94,4 +95,4 @@ sophonctl servo servo <index> <duty>
 
 ## 结果报告
 
-报告实际板子、执行命令以及每步的 exit/stdout/stderr。没有位置反馈时写“命令链路验收通过，未采集舵机位置反馈”，不能自行声称物理位移已被测量，也不能因此请求人类接入。
+报告实际板子、执行命令以及每步的 exit/stdout/stderr。命令输出无法证明物理位移时，必须写“命令执行成功，物理效果待人类确认”，不能自行声称舵机动作正确。

@@ -8,7 +8,7 @@
 
 - 以 TDD 小循环交付 Python 指令、sophonctl CLI 和 Skill；
 - 测试设计、Coding、验证由不同 Agent 承担；
-- 验证失败时自动返工，研发流程不以 Human-in-the-loop 阻塞；
+- 验证失败时自动返工，无法继续时请求人类接入；
 - 支持机器人开发、机器人应用两种模式；
 - 提示词、工具、Skill、循环和模式全部由文件配置；
 - 开发测试进程运行在可配置的隔离环境，不依赖开发机 Python 包；
@@ -40,6 +40,11 @@ flowchart LR
     CV -- passed --> CD["CLI 板端部署"] --> ST
     SV -- passed --> SD["Skill 安装"]
     SD --> CA["CLI 真机验收"] --> SA["Skill 自然语言真机验收"] --> Done["开发交付完成"]
+    PT -. needs-human .-> Human["Human-in-the-loop"]
+    PC -. needs-human .-> Human
+    PV -. needs-human .-> Human
+    CV -. needs-human .-> Human
+    SV -. needs-human .-> Human
 ```
 
 三个小循环及其部署严格串行：
@@ -57,14 +62,11 @@ flowchart LR
                 revision ─────┘
 ```
 
-验证 Agent 是静态验收边界：CLI 循环验证插件契约和调用链，Skill 循环验证自然语言映射与交付合同。部署 Agent 只负责固定目标的原子交付，不修改实现；真实动作集中在最后两个 acceptance Agent，避免测试、Coding 和部署阶段误驱动舵机。当前无位置反馈，命令 `exit=0` 是自动验收标准，只证明调用链成功，不等价于舵机物理位移已被测量。
+验证 Agent 是静态验收边界：CLI 循环验证插件契约和调用链，Skill 循环验证自然语言映射与交付合同。部署 Agent 只负责固定目标的原子交付，不修改实现；真实动作集中在最后两个 acceptance Agent，避免测试、Coding 和部署阶段误驱动舵机。命令 `exit=0` 只能证明调用链成功，实际舵机位移仍由现场人类观察。
 
-开发阶段的 Bash 工具通过 Pi SDK 的可替换 `BashOperations` 路由到 X5 板端。每次 Bash 前，运行时把当前工作区打包到 `/userdata/rdk-agent/runs/<run-id>` 的一次性快照，然后使用 `systemd-run` 限制 CPU/内存/PID/时间，并在 `bwrap` 中执行命令。沙箱映射目标板 `/usr`、`/bin`、`/lib` 和工作区为只读，仅 `/tmp` 可写；使用 nobody 身份、独立网络/PID/IPC/UTS/user namespace，不映射 `/sys`、真实 `/dev` 或 GPIO/PWM/SPI 设备。命令中开发机工作区的绝对路径在运行前改写为 `/workspace`。命令结束后删除该 run-id 快照。Profile 的 `commandTimeoutSeconds` 另行限制单次 Bash（默认 30 秒），防止一个死循环耗尽整个 Agent 阶段预算。
+开发阶段的 Bash 工具通过 Pi SDK 的可替换 `BashOperations` 路由到 Podman。容器固定使用 Python 3.12、关闭网络、删除 capabilities、限制 CPU/内存/PID，根文件系统和业务工作区均只读，仅容器内 `/tmp` 可写。宿主工作区统一映射到容器的 `/workspace`，运行时会将 Agent 命令中的工作区绝对路径改写为该路径，避免依赖 macOS 与 Podman VM 拥有相同的目录树。测试 Agent 和 Coding Agent 的文件修改不经过容器 shell，而由宿主 Pi `edit/write` 工具按 `writePaths` 精确授权，因此测试进程既不能污染开发机 Python 环境，也不能绕过文件白名单修改代码。部署、CLI 真机验收、Skill 真机验收和机器人应用模式不进入该容器，它们仍需访问宿主的 `ssh`、`sophonctl` 与设备连接。
 
-测试 Agent 和 Coding Agent 的文件修改不经过板端 shell，而由开发机 Pi `edit/write` 工具按 `writePaths` 精确授权；下一次 Bash 会自动同步修改后的快照。这使测试使用目标板 Python 3.10 和系统兼容包，同时无法误操作真实硬件。部署、CLI 真机验收、Skill 真机验收和机器人应用模式不进入该沙箱。
-为避免原始 Agent 命令中的开发机路径误导用户，TUI 的 tool-start 日志必须显示最终后端名称和改写后的 `/workspace` 命令。bwrap 内部在用户命令前输出一行运行标识，包含 target、cwd、uid、network 和 hardware 边界，作为日志级执行证据。
-
-Pi Coding Agent 自身不提供内置安全沙箱。rdk-agent 在 SDK 适配层实现上述 SSH+bwrap 边界，而不是依赖提示词充当隔离；原有 Podman 适配器保留作为可配置后备。
+Pi Coding Agent 自身不提供内置安全沙箱；官方提供的是 Gondolin、容器、OpenShell 和 sandbox-runtime 示例。rdk-agent 在 SDK 适配层实现上述 Podman 边界，而不是依赖 Project Trust 或提示词充当隔离。
 
 ### 2.1.1 开发者工作区获取
 
@@ -154,10 +156,9 @@ workspace:
   id: magicbox-servo
   version: 2
   template: templates/magicbox-servo
-    requiredPaths:
-      - examples/plugins/servo/servo_ctrl.py
-      - examples/plugins/servo/plugin.toml
-      - examples/plugins/servo/tests/test_wave_hands.py
+  requiredPaths:
+    - examples/plugins/servo/servo_ctrl.py
+    - examples/plugins/servo/plugin.toml
 
 agents:
   - id: python-coding
@@ -167,12 +168,6 @@ agents:
     writePaths: [examples/plugins/*/*.py]
     skills: [magicbox-command-authoring]
     timeoutSeconds: 300
-    sandbox:
-      kind: ssh-bwrap
-      host: x5-root
-      remoteRoot: /userdata/rdk-agent/runs
-      network: none
-      hardwareAccess: false
     systemPrompt: |
       你负责实现 Python 指令……
 
@@ -209,7 +204,7 @@ modes:
 - `writePaths` 是工作区相对 glob，可用前缀 `!` 排除更窄的路径；
 - `workspace.kind: managed-template` 必须配置安全 ID、正整数版本、配置目录相对模板路径和必需文件；模板自身缺文件时启动失败；
 - `workspace.requiredPaths` 定义研发模式必需业务文件；托管工程初始化和外部工程预检都使用同一清单；
-- `sandbox.kind: ssh-bwrap` 必须提供安全 SSH host、板端绝对 `remoteRoot`、`network: none` 和显式 `hardwareAccess: false`；`podman` 仍可配置为本地后备，未配置 sandbox 的 Agent 继续在宿主机执行 Bash；
+- `sandbox.kind: podman` 必须提供安全的镜像引用且 `network` 当前只能为 `none`；未配置 sandbox 的 Agent 继续在宿主机执行 Bash；
 - `timeoutSeconds` 必须为正整数；可选的 `maxToolCalls` 配置后也必须为正整数，省略表示不限制工具调用次数；
 - 模式引用的 Agent 必须存在；
 - `maxIterations` 必须为正整数；
@@ -237,17 +232,16 @@ modes:
 
 ### 5.2 自动返工上限
 
-每个循环通过 `maxIterations` 配置自动返工次数。达到上限仍未通过时以带验证反馈的失败结果结束，不暂停请求人类输入：
+每个循环通过 `maxIterations` 配置自动返工次数。达到上限仍未通过时不会直接失败，而是请求人类输入：
 
 ```text
 达到自动返工上限
     ↓
-输出确定性失败原因
+暂停工作流
     ↓
-结束本次运行，保留工作区和日志供下一次自动回归
+人类补充方向 ──→ 重新获得一组自动返工预算
+    └─ /abort ──→ 终止工作流
 ```
-
-测试、Coding、验证这三类无外部副作用的 Agent 若遇到 Session 异常或误报 `needs-human`，编排器会携带错误上下文自动重试两次。部署和真机验收不自动重试，避免重复安装或重复物理动作；它们失败时直接结束工作流并报告原因。
 
 ### 5.3 串行交付
 
@@ -269,13 +263,12 @@ Skill 验证还可通过 Profile 的 `validation: { kind: skill-contract, ... }`
 
 ## 6. Agent 结构化结果
 
-自由文本不足以可靠控制返工。Runner 会在每次提示末尾加入结果契约，要求 Agent 最后一行输出单行 JSON。
+自由文本不足以可靠控制返工和人类接入。Runner 会在每次提示末尾加入结果契约，要求 Agent 最后一行输出单行 JSON。
 
 工作或应用 Agent：
 
 ```text
 RDK_AGENT_RESULT: {"status":"completed"}
-RDK_AGENT_RESULT: {"status":"failed","feedback":"自动流程无法继续的具体原因"}
 RDK_AGENT_RESULT: {"status":"needs-human","question":"需要人类回答的问题"}
 ```
 
@@ -293,14 +286,18 @@ RDK_AGENT_RESULT: {"status":"needs-human","question":"需要人类回答的问�
 |---|---|---|
 | `completed` / `passed` | `completed` | 进入下一步骤 |
 | `revision` | `revision` | 重新开始当前 TDD 循环 |
-| `failed` | `failed` | 不请求人类；无副作用阶段可自动恢复，副作用阶段直接失败结束 |
-| `needs-human` | `needs-human` | 研发的安全阶段自动恢复；部署/真机阶段失败结束；应用模式可请求人类输入 |
+| `needs-human` | `needs-human` | 暂停并请求人类输入 |
 
-工作 Agent 缺少结果标记时暂按 `completed` 处理，以兼容普通 Pi 输出；验证 Agent 缺少或返回无效标记时不能默认为通过，由验证证据规则触发补跑或返工。
+工作 Agent 缺少结果标记时暂按 `completed` 处理，以兼容普通 Pi 输出；验证 Agent 缺少或返回无效标记时进入 Human-in-the-loop，不能默认为通过。
 
-## 7. Human-in-the-loop 边界
+## 7. Human-in-the-loop
 
-机器人研发模式不触发 Human-in-the-loop。可安全阶段自动恢复，具有部署或硬件副作用的阶段失败即结束。`HumanInLoop` 端口仅保留给机器人应用模式中真正缺失且无法从 Skill、工作区或设备状态得到的信息，例如动作必填参数缺失。
+### 7.1 触发条件
+
+- Agent 主动返回 `needs-human`；
+- Pi Session 或工具执行抛出异常；
+- 验证返工达到 `maxIterations`；
+- 结构化验证结论无法解析。
 
 ### 7.2 应用端口
 
@@ -316,14 +313,14 @@ TUI 是当前端口实现。未来 WebUI 可以用 WebSocket 或持久化待处�
 
 ### 7.3 TUI 交互
 
-机器人应用模式进入 Human-in-the-loop 时：
+进入 Human-in-the-loop 时：
 
 1. 日志显示 Agent、问题和阻塞上下文；
 2. Editor 从禁用状态恢复；
 3. 人类输入普通文本后，内容作为新的上游交付传给重试 Agent；
 4. 输入 `/abort` 终止当前工作流。
 
-Human-in-the-loop 不是人工审批，也不是研发失败的默认兜底。
+Human-in-the-loop 不是人工审批。正常测试、Coding 和验证步骤默认自动执行。
 
 ## 8. Pi Session 与交接
 
@@ -438,11 +435,10 @@ TUI 默认进入机器人应用模式。模式只能在空闲时切换；工作�
 
 - 领域阶段顺序和失败状态；
 - 验证失败后的完整 TDD 重跑；
-- 研发阶段异常和误报 `needs-human` 的有界自动恢复，以及部署阶段不重复副作用；
-- 应用模式 `needs-human` 暂停和人类 `/abort` 语义；
+- `needs-human` 暂停、补充信息传递和 Agent 重试；
+- 人类 `/abort` 语义；
 - 开发与应用模式配置解析；
-- 板端 SSH+bwrap 沙箱的快照同步、离线/只读/无硬件边界、资源限制、路径改写和越界目录拒绝；
-- Podman 后备适配器的离线、只读挂载和越界工作目录拒绝；
+- Podman 沙箱的离线、只读挂载、资源限制和越界工作目录拒绝；
 - 研发 workspace 必需文件检查与正确项目目录建议；
 - 内置模板的首次原子初始化、版本化路径、来源标记、重复启动复用和显式外部工程覆盖；
 - 配置引用和 Skill 文件校验。
@@ -460,47 +456,13 @@ npm test
 
 PTY 冒烟测试还应验证模式切换、Editor 输入、Human-in-the-loop 恢复输入以及 Ctrl-C 终端恢复。
 
-### 13.1 `wave-hands` 端到端样例
+### 13.1 可移除的托管二级动作
 
-本轮用“先动左手再动右手”验证了完整机器人开发模式：
+rdk-agent 交付的二级动作以独立 Python 模块和 `servo_actions/actions.json` registry 保存，入口脚本按 registry 加载。用户明确执行 `sophonctl servo remove <动作名>` 后，脚本不会初始化 GPIO/PWM，而是先备份 registry 和模块，再从活动配置及实现目录中删除该动作。内置原子动作和非法动作名会被拒绝。
 
-1. Python 测试 Agent 交付共享 Mock 的严格调用顺序测试；
-2. Python Coding Agent 复用原子能力实现 `lift_left → lower_left → lift_right → lower_right`；
-3. Python 验证 Agent 实际运行 mock 测试；
-4. CLI 测试 Agent 验证 `plugin.toml`、`ACTIONS` 和 `main()` 分发；
-5. CLI Coding/验证 Agent 完成并运行合同测试；
-6. Skill 测试/Coding Agent 交付自然语言映射与安全规则；
-7. Skill 验证 Agent 重新运行 Python 和 CLI 测试后通过。
-
-旧版外部独立回归中，CLI 测试 Agent 和 Skill Coding Agent 曾达到当时配置的工具调用上限，并暂停到 Human-in-the-loop。当前版本已按使用反馈取消所有 Agent 的工具次数上限，仅保留阶段超时；这一历史样例不再代表当前运行行为。
-
-### 13.2 `wave-left-hand` 端到端样例
-
-以“开发一个挥动左手的功能”运行完整 TUI 研发模式，实际经过 Python TDD、Python 板端部署、CLI TDD、CLI 板端部署、Skill TDD、Skill 安装、CLI 真机验收和 Skill 自然语言真机验收。Python 专项测试 2 项、CLI 合同测试 9 项均通过；脚本和 manifest 部署返回板端校验和，插件列表包含 `servo`；最后两条 `sophonctl --board x5 servo wave-left-hand` 均返回 `exit=0`。软件链路据此通过；该设备链路未采集舵机位置反馈，因此不把 exit=0 扩大解释为物理位移测量。
-
-该样例也覆盖了两个曾导致流程停滞的问题：Skill 验收文档的过度推断会被确定性合同改写为 `revision`；Coding Agent 对同一处精确 edit 连续失败时必须停止重试，文件已满足需求可零修改完成，确需修改则重新读取后最多整文件 write 一次。
+该样例覆盖了两个曾导致流程停滞的问题：Skill 验收文档的过度推断会被确定性合同改写为 `revision`；Coding Agent 对同一处精确 edit 连续失败时必须停止重试，文件已满足需求可零修改完成，确需修改则重新读取后最多整文件 write 一次。
 
 Skill 安装只覆盖配置声明的运行时文件 `SKILL.md`，不会再用研发交付目录整体替换已安装 Skill，因此配置仓库中的标准 `acceptance.md` 会被保留。
-
-### 13.3 `wave-right-hand` 全自动端到端回归
-
-2026-08-04 使用无交互入口运行：
-
-```sh
-rdk-agent --mode robot-development --request "帮我实现一个挥动右手的功能"
-```
-
-首轮暴露出模型把右手需求写入左手测试的问题，因此新增 `servo-python-test` 确定性校验，绑定用户侧别、测试文件、方法、动作名和单侧集合。正式回归中，校验先后拦截了缺少独立 `test_wave_right_hand_is_right_only_action` 和缺少左侧零调用证据的两份不完整测试，第三轮形成 3 个测试后才进入 Coding。
-
-最终 Python 3 项与 CLI 3 项测试都在 X5 离线 bwrap 沙箱通过；Python 和 manifest 原子部署成功，插件列表包含 `servo`，Skill 静态合同和安装通过。CLI 真机 Agent 与 Skill 自然语言真机 Agent 各执行一次 `sophonctl --board x5 servo wave-right-hand`，均返回 exit=0，整个运行没有 Human-in-the-loop。此结果证明自动研发、部署和命令链路完整；由于未采集舵机位置反馈，不把它表述为对实际角度的闭环测量。
-
-### 13.4 复合舵机动作的可见停留契约
-
-一次左手回归曾出现命令 exit=0、调用耗时正常，但舵机肉眼无动作。根因是生成的 `wave_left_hand()` 在 `lift_left()` 后仅继承原子方法内部 50ms 等待，随即调用 `lower_left()`；主程序默认 `--hold 1.0` 保持的是已经放下的位置。50Hz 下 50ms 只有约 2–3 个 PWM 周期，不能作为肉眼可见动作的充分条件。
-
-复合动作现在必须满足 `lift → visible hold → lower`，默认可见停留为 0.8 秒。v2 静态入口直接使用 `WAVE_POSITION_HOLD_SECONDS`；v3 托管动作调用入口统一提供的 `hold_visible_position()`，并由 `servo_actions/actions.json` 的 `start` 表达左右侧，不能再要求新动作进入静态 `ACTIONS` 或单侧集合。Python 测试将 visible hold 纳入共享 Mock 的严格调用顺序，`servo-python-test` 确定性校验同时兼容这两种架构。真机 Agent 的 exit=0 仅作为插件命令链路证据，禁止再声称物理响应由硬件自动保证。
-
-提示词之外，`magicbox-command-authoring/references/servo-atomic-contract.md` 固化了 50Hz/50ms、当前左右引脚映射、`--hold` 的发生位置及无位置反馈时的验收边界。测试 Agent 的交付还会经过确定性合同检查，因此模型漏读或误解这些规则时会进入返工，而不会继续部署。
 
 ## 14. 当前限制
 
@@ -511,7 +473,7 @@ rdk-agent --mode robot-development --request "帮我实现一个挥动右手的�
 - 没有在普通 Agent 运行期间取消 Pi Session 的 UI 操作；
 - 机器人应用 Agent 通过文件发现已交付 Skill，尚无结构化 Skill 注册表；
 - 配置只在启动时加载。
-- 开发 Bash 已使用操作系统级 SSH+bwrap 沙箱；部署、真机验收和应用模式仍依赖命令白名单、Profile 工具边界与板端权限。
+- Bash 安全策略当前基于命令文本拦截，不是操作系统级沙箱；Agent 仍应运行在受控工作目录中。
 - 验证证据当前只记录 Bash 是否执行及工具级错误，尚未形成可持久化、可复核的结构化测试报告。
 - `skill-contract` 当前是 MagicBox servo 的确定性适配器，不是任意 Skill 的通用语义证明器；新增硬件域需要新增对应合同规则。
 

@@ -6,7 +6,7 @@ export interface Delivery {
 }
 
 export type AgentExpectation = "test" | "coding" | "verification" | "deployment" | "application";
-export type AgentOutcome = "completed" | "revision" | "failed" | "needs-human";
+export type AgentOutcome = "completed" | "revision" | "needs-human";
 
 export interface AgentSkillInfo {
 	name: string;
@@ -16,8 +16,8 @@ export interface AgentSkillInfo {
 
 export type AgentRuntimeEvent =
 	| { type: "text"; text: string }
-	| { type: "tool-start"; toolName: string; displayName?: string; summary?: string }
-	| { type: "tool-end"; toolName: string; displayName?: string; result: string; isError: boolean }
+	| { type: "tool-start"; toolName: string; summary?: string }
+	| { type: "tool-end"; toolName: string; result: string; isError: boolean }
 	| { type: "skills-loaded"; skills: readonly AgentSkillInfo[] }
 	| { type: "skill-selected"; skill: AgentSkillInfo }
 	| { type: "status"; message: string };

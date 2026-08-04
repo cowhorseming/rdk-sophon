@@ -23,8 +23,7 @@ export RDK_AGENT_CONFIG_DIR="${RDK_AGENT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
 case "${1:-}" in
   -h|--help)
     echo "用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace]"
-    echo "自动运行: rdk-agent --mode robot-development --request \"开发一个挥动右手的功能\""
-    echo "不带 --request 时启动 TUI；默认从内置模板创建托管工作区。"
+    echo "启动 RDK 多 Agent 编排 TUI；默认从内置模板创建托管工作区。"
     exit 0
     ;;
 esac
