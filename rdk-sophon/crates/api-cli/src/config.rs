@@ -62,10 +62,10 @@ impl SophonConfig {
         if !p.exists() {
             return Ok(Self::default());
         }
-        let s = std::fs::read_to_string(&p)
-            .with_context(|| format!("读配置失败: {}", p.display()))?;
-        let cfg: SophonConfig = toml::from_str(&s)
-            .with_context(|| format!("解析配置失败: {}", p.display()))?;
+        let s =
+            std::fs::read_to_string(&p).with_context(|| format!("读配置失败: {}", p.display()))?;
+        let cfg: SophonConfig =
+            toml::from_str(&s).with_context(|| format!("解析配置失败: {}", p.display()))?;
         Ok(cfg)
     }
 

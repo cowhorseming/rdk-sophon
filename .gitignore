@@ -12,3 +12,12 @@
 *.swp
 *.swo
 *~
+
+# Python 运行时缓存
+**/__pycache__/
+*.py[cod]
+
+# rdk-agent 运行时交付与原子替换备份
+**/.rdk-agent/deliveries/
+**/.rdk-agent-*.bak/
+**/.*.rdk-agent-*.bak/
