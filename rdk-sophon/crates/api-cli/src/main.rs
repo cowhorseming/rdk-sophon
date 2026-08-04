@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 use client::{Client, ClientBuilder};
 use shared::protocol::Params;
 use std::ffi::OsString;
+use std::io::Write;
 use std::time::Duration;
 
 use config::SophonConfig;
@@ -39,7 +40,7 @@ struct Cli {
     /// 响应超时（秒）。--board 配置里若有 timeout 会覆盖此默认。
     #[arg(long, default_value = "30", global = true)]
     timeout: u64,
-    /// 原始 JSON 输出（不 pretty）。
+    /// 以紧凑 JSON 输出（适合脚本解析）。
     #[arg(long, global = true)]
     raw: bool,
     #[command(subcommand)]
@@ -130,7 +131,7 @@ async fn main() -> Result<()> {
             .await?
     };
 
-    match &cli.cmd {
+    let exit = match &cli.cmd {
         Cmd::Ping => print(&client, "ping", None, cli.raw).await?,
         Cmd::State => print(&client, "get_state", None, cli.raw).await?,
         Cmd::Thermal => print(&client, "get_thermal", None, cli.raw).await?,
@@ -172,6 +173,11 @@ async fn main() -> Result<()> {
             print(&client, "plugin.invoke", Some(Params::Named(map)), cli.raw).await?
         }
         Cmd::Config(_) => unreachable!("config 子命令已在上方处理"),
+    };
+
+    // exec 与插件调用返回的退出码应成为 sophonctl 自身的退出码，方便脚本判断结果。
+    if let Some(code) = exit.filter(|code| *code != 0) {
+        std::process::exit(code);
     }
     Ok(())
 }
@@ -302,21 +308,63 @@ fn display_path() -> String {
     config::expand_home(&SophonConfig::path().unwrap_or_default())
 }
 
-async fn print(client: &Client, method: &str, params: Option<Params>, raw: bool) -> Result<()> {
+async fn print(
+    client: &Client,
+    method: &str,
+    params: Option<Params>,
+    raw: bool,
+) -> Result<Option<i32>> {
     let v = client.call(method, params).await?;
+    let stdout = std::io::stdout();
+    let stderr = std::io::stderr();
+    write_response(&v, raw, &mut stdout.lock(), &mut stderr.lock())
+}
+
+/// 输出 RPC 响应。
+///
+/// 命令和插件执行结果统一是 `{exit, stdout, stderr}`。默认把它们还原为普通
+/// 命令行输出；其余 RPC 响应仍使用易读的 JSON。`--raw` 始终保留紧凑 JSON，
+/// 以便脚本按原协议消费。
+fn write_response(
+    value: &serde_json::Value,
+    raw: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> Result<Option<i32>> {
     if raw {
-        println!("{}", v);
-    } else {
-        println!("{}", serde_json::to_string_pretty(&v)?);
+        writeln!(stdout, "{value}")?;
+        return Ok(command_result(value).and_then(|(exit, _, _)| exit));
     }
-    Ok(())
+
+    if let Some((exit, command_stdout, command_stderr)) = command_result(value) {
+        stdout.write_all(command_stdout.as_bytes())?;
+        stderr.write_all(command_stderr.as_bytes())?;
+        return Ok(exit);
+    }
+
+    writeln!(stdout, "{}", serde_json::to_string_pretty(value)?)?;
+    Ok(None)
+}
+
+/// 仅识别执行器约定的完整结果对象，避免把恰好带有同名字段的普通查询误当成命令输出。
+fn command_result(value: &serde_json::Value) -> Option<(Option<i32>, &str, &str)> {
+    let object = value.as_object()?;
+    let exit = object
+        .get("exit")?
+        .as_i64()
+        .and_then(|code| i32::try_from(code).ok());
+    let stdout = object.get("stdout")?.as_str()?;
+    let stderr = object.get("stderr")?.as_str()?;
+    Some((exit, stdout, stderr))
 }
 
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
 
-    use super::plugin_parts;
+    use serde_json::json;
+
+    use super::{plugin_parts, write_response};
 
     #[test]
     fn dynamic_plugin_parts_keep_each_argument_separate() {
@@ -329,5 +377,54 @@ mod tests {
         let (plugin, args) = plugin_parts(&parts).unwrap();
         assert_eq!(plugin, "servo");
         assert_eq!(args, vec!["servo", "0", "-2.0"]);
+    }
+
+    #[test]
+    fn command_result_is_rendered_like_a_normal_command() {
+        let response = json!({
+            "exit": 0,
+            "stdout": "usage: servo_ctrl.py [-h]\n\noptions:\n  -h, --help\n",
+            "stderr": "",
+        });
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit = write_response(&response, false, &mut stdout, &mut stderr).unwrap();
+
+        assert_eq!(exit, Some(0));
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "usage: servo_ctrl.py [-h]\n\noptions:\n  -h, --help\n"
+        );
+        assert!(stderr.is_empty());
+    }
+
+    #[test]
+    fn command_stderr_and_exit_code_are_preserved() {
+        let response = json!({"exit": 3, "stdout": "", "stderr": "invalid action\n"});
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit = write_response(&response, false, &mut stdout, &mut stderr).unwrap();
+
+        assert_eq!(exit, Some(3));
+        assert!(stdout.is_empty());
+        assert_eq!(String::from_utf8(stderr).unwrap(), "invalid action\n");
+    }
+
+    #[test]
+    fn raw_mode_keeps_compact_json() {
+        let response = json!({"exit": 0, "stdout": "ok\n", "stderr": ""});
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit = write_response(&response, true, &mut stdout, &mut stderr).unwrap();
+
+        assert_eq!(exit, Some(0));
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "{\"exit\":0,\"stderr\":\"\",\"stdout\":\"ok\\n\"}\n"
+        );
+        assert!(stderr.is_empty());
     }
 }
