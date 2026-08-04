@@ -15,8 +15,101 @@ src/
 
 依赖方向为 `api → application → domain/shared`；`infra` 实现 `shared` 中定义的端口。领域和应用层不得直接调用 `child_process` 或依赖 `sophonctl` 的参数格式。
 
-## 2. 实现状态
+## 2. 当前实现：TUI 编排器
 
-当前目录只保留架构边界与分层约定，尚未创建 TypeScript 代码、Node.js 依赖或运行入口。
+本目录提供一个基于 [Pi SDK](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 和 `@earendil-works/pi-tui` 的终端编排器，当前包含两种模式：
 
-实现时，`infra` 应作为唯一可调用 `sophonctl` 的层；`application` 只依赖定义在 `shared` 中的探针端口接口。`exec` 等受控命令最终仍须受板端 `probe-daemon` 的 shell 策略约束。
+1. **机器人开发模式**：依次完成 Python、sophonctl CLI、Skill 三个 TDD 小循环。每个循环由测试设计、Coding、独立验证三个 Agent 组成；验证要求返工时自动进入下一轮。各循环通过后由专用 Agent 部署 Python、CLI、Skill，最后分别执行 CLI 和 Skill 自然语言真机验收。
+2. **机器人应用模式**：单 Agent 根据自然语言选择一个或多个已交付 Skill；动作式请求会在前置检查后直接执行一次对应的真实机器人动作，查询式请求保持只读。
+
+机器人研发流程不请求人类输入：测试、Coding、验证阶段发生瞬时异常时自动恢复，达到返工上限或具有副作用的部署/真机阶段失败时明确结束并保留日志。机器人应用模式缺少无法推导的必填参数时仍可请求人类输入；输入 `/abort` 可以终止。当前不设置人工审批门，正常交付步骤自动继续。
+
+每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。Python、CLI、Skill 的开发测试命令默认在 X5 的离线 bwrap 沙箱中执行：每次 Bash 前同步一份当前工作区快照，以目标板 Python 3.10 验证；快照和系统依赖只读，断网，以 nobody 身份运行，不暴露 GPIO/PWM/SPI 设备。代码修改仍由受 `writePaths` 约束的 Pi 文件工具在开发机完成；正式部署和真机验收保持独立边界。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
+
+Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口。rdk-agent 通过该接口把开发阶段 Bash 路由到板端 `bwrap`。使用研发模式前，开发机的 SSH 配置需能无交互连接 `x5-root`，X5 需提供 `bwrap`、`systemd-run`、Python 3.10 和 `tomli`：
+
+```sh
+ssh x5-root 'command -v bwrap && command -v systemd-run && python3 -c "import tomli"'
+```
+
+```sh
+cd /Users/d-robotics/Documents/project/rdk-sophon/rdk-agent
+# Pi SDK 要求 Node.js >= 22.19.0
+node --version
+npm install --ignore-scripts
+npm run start
+```
+
+部署到用户目录并注册全局命令：
+
+```sh
+npm run deploy
+rdk-agent
+```
+
+自动运行研发案例（不启动 TUI，可用于回归测试或 CI）：
+
+```sh
+rdk-agent --mode robot-development --request "开发一个挥动右手的功能"
+```
+
+默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v2`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。`/workspace` 可查看当前工程和来源。模板升级通过提高 `workspace.version` 创建新版本目录，避免覆盖旧工程。
+
+开发阶段的 Python/CLI/Skill 测试在板端离线 bwrap 沙箱中执行。测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。Python 3.10 解析 TOML 时使用系统 `tomli` 兼容包。模板自带 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。原有 `sandbox.kind: podman` 仍可作为自定义配置的本地后备，但不再是 MagicBox 默认环境。
+工具日志显示最终执行位置：文件工具标记为“开发机工作区”，Bash 标记为“板端 x5-root / bwrap”并展示改写后的 `/workspace` 命令；沙箱输出的首行还会报告 target、cwd、uid、网络和硬件权限。
+
+只有参与 rdk-sophon 仓库开发时才需要显式指定外部源码：
+
+```sh
+rdk-agent --workspace /path/to/rdk-sophon
+```
+
+外部工程模式会检查 `workspace.requiredPaths`；传错目录时在创建 Agent 前中止并提示候选项目。
+
+默认安装到 `~/.local/share/rdk-agent`，命令链接安装到 `~/.local/bin/rdk-agent`。部署脚本首次运行时还会初始化 `~/.config/rdk-agent`；未修改的默认配置会随程序升级，检测到用户自定义后则保留原配置并生成新版示例供手动合并。
+
+直接编辑下面这些位置，下次启动 TUI 即可生效，不需要修改、编译或重新部署代码：
+
+```text
+~/.config/rdk-agent/
+├── agents.yaml                 # 模式、循环、Agent 提示词、工具和 Skill
+├── skills/<name>/SKILL.md      # Skill 正文
+└── templates/magicbox-servo/   # 普通开发者的初始指令工程
+```
+
+也可以临时加载另一套配置：
+
+```sh
+rdk-agent --config-dir /path/to/config
+```
+
+部署目录可通过 `npm run deploy -- --install-dir <dir> --bin-dir <dir> --config-dir <dir>` 覆盖；脚本会先在临时目录安装生产依赖，成功后再替换旧版本。
+
+TUI 命令：
+
+```text
+Shift+Tab                    同时按下，循环切换模式
+/workspace                   查看托管/外部工作区及其来源
+/skills                      查看当前 Agent 配置、实际加载和本次选择的 Skill
+/modes                       查看模式
+/mode robot-development      切换机器人开发模式
+/mode robot-application      切换机器人应用模式
+/clear                       清空日志
+/abort                       在等待人类接入时终止工作流
+/quit                        退出
+```
+
+TUI 默认进入机器人应用模式。模式只能在工作流空闲时切换。
+
+页面和运行日志会实时输出 Skill 白名单、实际加载列表和本次选择，同时展示实际模型、推理级别、循环次数、Agent 状态、工具调用和人类接入请求。Pi 使用其已配置的模型和认证（通常来自 `~/.pi/agent`）。
+
+```text
+src/
+├── shared/       # AgentRunner 端口、跨层事件
+├── domain/       # Agent 配置模型与不可跳过的交付工作流状态机
+├── application/  # 双模式编排、TDD 循环和 Human-in-the-loop
+├── infra/        # Pi SDK 适配器（唯一知道 Pi session 的层）
+└── api/tui/      # Pi TUI 的交互入口和可视化
+```
+
+`infra` 仍是未来唯一可调用 `sophonctl` 的层；当前 TUI 中的 Agent 通过 Pi 的受限工具集在目标工作目录中完成交付。`exec` 等受控命令最终仍须受板端 `probe-daemon` 的 shell 策略约束。
