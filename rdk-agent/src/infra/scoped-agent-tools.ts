@@ -11,6 +11,7 @@ import { isReadOnlyApplicationRequest } from "../domain/application-intent.ts";
 import type { AgentProfile } from "../domain/agent-profile.ts";
 import type { AgentExpectation } from "../shared/agent-runner.ts";
 import { createDeploymentToolDefinition } from "./deployment-agent-tool.ts";
+import { createActionPackageToolDefinition } from "./action-package-tool.ts";
 import { createPodmanSandboxOperations } from "./podman-sandbox.ts";
 
 type AnyToolDefinition = ToolDefinition<any, any, any>;
@@ -150,6 +151,7 @@ export function scopedAgentTools(
 			},
 		}),
 		deploy: profile.deployment ? createDeploymentToolDefinition(workspaceRoot, skillDirectory, profile) : undefined,
+		"action-package": profile.actionPackage ? createActionPackageToolDefinition(workspaceRoot, profile) : undefined,
 	};
 	return profile.tools.map((name) => {
 		const definition = definitions[name];

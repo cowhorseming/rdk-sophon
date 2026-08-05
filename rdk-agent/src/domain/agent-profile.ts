@@ -29,12 +29,16 @@ export interface SshDeploymentArtifact {
 	mode: string;
 	/** Deploy a directory atomically instead of a single file. */
 	recursive?: boolean;
+	/** Optional board user/group that must retain runtime write access after atomic deployment. */
+	owner?: string;
 }
 
 export interface SshDeploymentPlan {
 	kind: "ssh";
 	host: string;
 	artifacts: readonly SshDeploymentArtifact[];
+	/** Restart the fixed service after deployment when systemd sandboxes cache writable paths. */
+	restartService?: string;
 }
 
 export interface SkillDeploymentPlan {
@@ -46,6 +50,13 @@ export interface SkillDeploymentPlan {
 }
 
 export type DeploymentPlan = SshDeploymentPlan | SkillDeploymentPlan;
+
+export type ActionPackageOperation = "scaffold" | "validate" | "build";
+
+/** Fixed action-package automation exposed to a narrowly scoped Agent stage. */
+export interface ActionPackagePlan {
+	operations: readonly ActionPackageOperation[];
+}
 
 export interface SkillContractValidationPlan {
 	kind: "skill-contract";
@@ -80,6 +91,8 @@ export interface AgentProfile {
 	sandbox?: SandboxExecutionPlan;
 	/** Deterministic delivery plan exposed through the deploy tool. */
 	deployment?: DeploymentPlan;
+	/** Deterministic scaffold/validation/release automation for action packages. */
+	actionPackage?: ActionPackagePlan;
 	/** Deterministic postcondition checked after an Agent reports success. */
 	validation?: DeliveryValidationPlan;
 }

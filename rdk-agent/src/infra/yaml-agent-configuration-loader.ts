@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { parse } from "yaml";
 import type {
 	AgentProfile,
+	ActionPackagePlan,
 	DeliveryValidationPlan,
 	DeploymentPlan,
 	SandboxExecutionPlan,
@@ -93,7 +94,20 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			this.requireAgent(normalized, `${label}.acceptanceAgents[${agentIndex}]`, profileIds);
 			return normalized;
 		});
-		return { id, name, type, loops, acceptanceAgentIds };
+		const deliveryAgentIds = this.optionalStringArray(raw.deliveryAgents, `${label}.deliveryAgents`).map((agentId, agentIndex) => {
+			const normalized = this.identifier(agentId, `${label}.deliveryAgents[${agentIndex}]`);
+			this.requireAgent(normalized, `${label}.deliveryAgents[${agentIndex}]`, profileIds);
+			return normalized;
+		});
+		const stageIds = [
+			...loops.flatMap((loop) => [loop.id, ...(loop.deploymentAgentId ? [loop.deploymentAgentId] : [])]),
+			...deliveryAgentIds,
+			...acceptanceAgentIds,
+		];
+		if (new Set(stageIds).size !== stageIds.length) {
+			throw new Error(`${label} 的 TDD、交付和验收阶段 id 不能重复`);
+		}
+		return { id, name, type, loops, deliveryAgentIds, acceptanceAgentIds };
 	}
 
 	private loop(value: unknown, label: string, profileIds: ReadonlySet<string>): TddLoopDefinition {
@@ -130,10 +144,14 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			throw new Error(`${label}.writePaths 在启用 edit/write 时不能为空`);
 		}
 		const deployment = raw.deployment === undefined ? undefined : this.deployment(raw.deployment, `${label}.deployment`);
+		const actionPackage = raw.actionPackage === undefined ? undefined : this.actionPackage(raw.actionPackage, `${label}.actionPackage`);
 		const validation = raw.validation === undefined ? undefined : this.validation(raw.validation, `${label}.validation`);
 		const sandbox = raw.sandbox === undefined ? undefined : this.sandbox(raw.sandbox, `${label}.sandbox`);
 		if (tools.includes("deploy") !== Boolean(deployment)) {
 			throw new Error(`${label} 的 deploy 工具与 deployment 配置必须同时存在`);
+		}
+		if (tools.includes("action-package") !== Boolean(actionPackage)) {
+			throw new Error(`${label} 的 action-package 工具与 actionPackage 配置必须同时存在`);
 		}
 		return {
 			id,
@@ -147,8 +165,21 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			maxToolCalls: this.optionalPositiveIntegerValue(raw.maxToolCalls, `${label}.maxToolCalls`),
 			sandbox,
 			deployment,
+			actionPackage,
 			validation,
 		};
+	}
+
+	private actionPackage(value: unknown, label: string): ActionPackagePlan {
+		const raw = this.record(value, label);
+		const operations = this.stringArray(raw.operations, `${label}.operations`);
+		if (operations.length === 0) throw new Error(`${label}.operations 至少需要一个操作`);
+		const allowed = new Set(["scaffold", "validate", "build"]);
+		for (const operation of operations) {
+			if (!allowed.has(operation)) throw new Error(`${label}.operations 不支持：${operation}`);
+		}
+		if (new Set(operations).size !== operations.length) throw new Error(`${label}.operations 不能重复`);
+		return { operations: operations as ActionPackagePlan["operations"] };
 	}
 
 	private sandbox(value: unknown, label: string): SandboxExecutionPlan {
@@ -162,9 +193,14 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		return { kind, image, network };
 	}
 
-	private validation(value: unknown, label: string): DeliveryValidationPlan {
+	private validation(value: unknown, label: string): DeliveryValidationPlan | undefined {
 		const raw = this.record(value, label);
 		const kind = this.string(raw.kind, `${label}.kind`);
+		// Early v2 configurations exposed this marker even though executable
+		// Python evidence is now enforced by the normal TDD runner. Treat only
+		// this exact retired kind as an absent validation plan so customized
+		// configurations remain loadable while the installer migrates the file.
+		if (kind === "servo-python-test") return undefined;
 		if (kind !== "skill-contract") throw new Error(`${label}.kind 不支持：${kind}`);
 		const evidenceFiles = this.stringArray(raw.evidenceFiles, `${label}.evidenceFiles`).map((path, index) =>
 			this.relativePath(path, `${label}.evidenceFiles[${index}]`),
@@ -218,14 +254,23 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			const mode = artifact.mode === undefined ? "0644" : this.string(artifact.mode, `${label}.artifacts[${index}].mode`);
 			if (!/^0[0-7]{3}$/.test(mode)) throw new Error(`${label}.artifacts[${index}].mode 必须是四位八进制权限`);
 			const recursive = artifact.recursive === undefined ? false : this.boolean(artifact.recursive, `${label}.artifacts[${index}].recursive`);
+			const owner = artifact.owner === undefined ? undefined : this.string(artifact.owner, `${label}.artifacts[${index}].owner`);
+			if (owner !== undefined && !/^[a-z_][a-z0-9_-]*(?::[a-z_][a-z0-9_-]*)?$/.test(owner)) {
+				throw new Error(`${label}.artifacts[${index}].owner 必须是安全的 user 或 user:group`);
+			}
 			return {
 				source: this.relativePath(artifact.source, `${label}.artifacts[${index}].source`),
 				target,
 				mode,
 				recursive,
+				...(owner === undefined ? {} : { owner }),
 			};
 		});
-		return { kind, host, artifacts };
+		const restartService = raw.restartService === undefined ? undefined : this.string(raw.restartService, `${label}.restartService`);
+		if (restartService !== undefined && !/^[a-z0-9@_.-]+\.service$/.test(restartService)) {
+			throw new Error(`${label}.restartService 必须是安全的 systemd service 名称`);
+		}
+		return { kind, host, artifacts, ...(restartService === undefined ? {} : { restartService }) };
 	}
 
 	private relativePath(value: unknown, label: string): string {

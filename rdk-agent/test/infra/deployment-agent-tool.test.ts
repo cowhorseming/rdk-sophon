@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -82,4 +83,73 @@ test("invalid skill delivery is rejected before replacing the installed Skill", 
 	const tool = createDeploymentToolDefinition(workspace, join(config, "skills"), invalidProfile);
 	await assert.rejects(() => tool.execute("call", {}, undefined, undefined, {} as never), /frontmatter/);
 	assert.equal(readFileSync(join(installed, "SKILL.md"), "utf8"), "installed\n");
+});
+
+test("SSH deployment validates staged artifacts before swapping and never rolls back an untouched target", async (context) => {
+	const workspace = mkdtempSync(join(tmpdir(), "rdk-agent-ssh-workspace-"));
+	const fakeBin = mkdtempSync(join(tmpdir(), "rdk-agent-ssh-bin-"));
+	const source = join(workspace, "servo.py");
+	const log = join(fakeBin, "commands.log");
+	writeFileSync(source, "print('servo')\n");
+	writeFileSync(
+		join(fakeBin, "ssh"),
+		"#!/bin/sh\nprintf '%s\\n' \"ssh $*\" >> \"$RDK_TEST_DEPLOY_LOG\"\ncase \"${2:-}\" in sha256sum*) printf '%s  remote\\n' \"$RDK_TEST_REMOTE_HASH\" ;; esac\n",
+	);
+	writeFileSync(
+		join(fakeBin, "scp"),
+		"#!/bin/sh\nprintf '%s\\n' \"scp $*\" >> \"$RDK_TEST_DEPLOY_LOG\"\nif [ \"${RDK_TEST_FAIL_SCP:-0}\" = 1 ]; then echo 'simulated scp failure' >&2; exit 9; fi\n",
+	);
+	chmodSync(join(fakeBin, "ssh"), 0o755);
+	chmodSync(join(fakeBin, "scp"), 0o755);
+	const previousPath = process.env.PATH;
+	const previousLog = process.env.RDK_TEST_DEPLOY_LOG;
+	const previousHash = process.env.RDK_TEST_REMOTE_HASH;
+	const previousFailure = process.env.RDK_TEST_FAIL_SCP;
+	process.env.PATH = `${fakeBin}:${previousPath ?? ""}`;
+	process.env.RDK_TEST_DEPLOY_LOG = log;
+	process.env.RDK_TEST_REMOTE_HASH = createHash("sha256").update(readFileSync(source)).digest("hex");
+	context.after(() => {
+		process.env.PATH = previousPath;
+		if (previousLog === undefined) delete process.env.RDK_TEST_DEPLOY_LOG;
+		else process.env.RDK_TEST_DEPLOY_LOG = previousLog;
+		if (previousHash === undefined) delete process.env.RDK_TEST_REMOTE_HASH;
+		else process.env.RDK_TEST_REMOTE_HASH = previousHash;
+		if (previousFailure === undefined) delete process.env.RDK_TEST_FAIL_SCP;
+		else process.env.RDK_TEST_FAIL_SCP = previousFailure;
+		rmSync(workspace, { recursive: true, force: true });
+		rmSync(fakeBin, { recursive: true, force: true });
+	});
+
+	const profile: AgentProfile = {
+		id: "board-deploy",
+		name: "Board deploy",
+		description: "deploy",
+		tools: ["deploy"],
+		skills: [],
+		systemPrompt: "deploy",
+		writePaths: [],
+		timeoutSeconds: 60,
+		deployment: {
+			kind: "ssh",
+			host: "board",
+			restartService: "probe-daemon.service",
+			artifacts: [{ source: "servo.py", target: "/srv/servo.py", mode: "0755", owner: "probe:probe" }],
+		},
+	};
+	const tool = createDeploymentToolDefinition(workspace, join(workspace, "skills"), profile);
+	await tool.execute("call", {}, undefined, undefined, {} as never);
+	const successfulLog = readFileSync(log, "utf8");
+	const prepareIndex = successfulLog.indexOf("chown -R probe:probe /srv/servo.py.rdk-agent-");
+	const swapIndex = successfulLog.indexOf("had_existing=0");
+	assert.ok(prepareIndex >= 0 && prepareIndex < swapIndex, successfulLog);
+	assert.match(successfulLog, /python3 -m py_compile \/srv\/servo\.py\.rdk-agent-.*\.tmp/);
+	assert.match(successfulLog, /systemctl restart probe-daemon\.service && systemctl is-active --quiet probe-daemon\.service/);
+
+	writeFileSync(log, "");
+	process.env.RDK_TEST_FAIL_SCP = "1";
+	await assert.rejects(() => tool.execute("call", {}, undefined, undefined, {} as never), /simulated scp failure/);
+	const failedLog = readFileSync(log, "utf8");
+	assert.doesNotMatch(failedLog, /rm -f \/srv\/servo\.py(?:\s|$)/);
+	assert.doesNotMatch(failedLog, /rm -rf \/srv\/servo\.py(?:\s|$)/);
+	assert.doesNotMatch(failedLog, /systemctl restart probe-daemon\.service/);
 });

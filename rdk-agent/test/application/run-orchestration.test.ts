@@ -7,7 +7,7 @@ import type { AgentRunner } from "../../src/shared/agent-runner.ts";
 import type { HumanInLoop } from "../../src/shared/human-in-loop.ts";
 import type { WorkflowEvent } from "../../src/shared/workflow-events.ts";
 
-const profiles: readonly AgentProfile[] = ["test", "coding", "verification", "deployment", "application"].map((id) => ({
+const profiles: readonly AgentProfile[] = ["test", "coding", "verification", "deployment", "skill-deploy", "application"].map((id) => ({
 	id,
 	name: id,
 	description: id,
@@ -34,6 +34,7 @@ const developmentMode: RobotDevelopmentMode = {
 			maxIterations: 3,
 		},
 	],
+	deliveryAgentIds: [],
 	acceptanceAgentIds: [],
 };
 
@@ -93,6 +94,7 @@ test("development runs deterministic deployment and final acceptance after a pas
 	const mode: RobotDevelopmentMode = {
 		...developmentMode,
 		loops: [{ ...developmentMode.loops[0]!, deploymentAgentId: "deployment" }],
+		deliveryAgentIds: ["skill-deploy"],
 		acceptanceAgentIds: ["application"],
 	};
 	const result = await new RunOrchestration(runner, profiles).execute({
@@ -105,9 +107,9 @@ test("development runs deterministic deployment and final acceptance after a pas
 	});
 
 	assert.equal(result.succeeded, true);
-	assert.deepEqual(calls, ["test", "coding", "verification", "deployment", "application"]);
-	assert.deepEqual(expectations, ["test", "coding", "verification", "deployment", "application"]);
-	assert.deepEqual(result.stages.map((stage) => stage.id), ["python", "deployment", "application"]);
+	assert.deepEqual(calls, ["test", "coding", "verification", "deployment", "skill-deploy", "application"]);
+	assert.deepEqual(expectations, ["test", "coding", "verification", "deployment", "deployment", "application"]);
+	assert.deepEqual(result.stages.map((stage) => stage.id), ["python", "deployment", "skill-deploy", "application"]);
 });
 
 test("needs-human pauses an agent and retries it with the human response in delivery context", async () => {

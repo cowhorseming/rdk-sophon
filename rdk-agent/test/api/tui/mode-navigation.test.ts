@@ -9,6 +9,7 @@ const modes: readonly OrchestrationMode[] = [
 		name: "机器人开发模式",
 		type: "robot-development",
 		loops: [],
+		deliveryAgentIds: [],
 		acceptanceAgentIds: [],
 	},
 	{

@@ -99,6 +99,7 @@ async function rollbackRemote(installed: readonly InstalledRemoteArtifact[], sig
 async function deploySsh(workspaceRoot: string, plan: SshDeploymentPlan, signal?: AbortSignal): Promise<string> {
 	const stamp = `${Date.now()}-${process.pid}`;
 	const installed: InstalledRemoteArtifact[] = [];
+	const stagedPaths: string[] = [];
 	const receipt: string[] = [];
 	try {
 		for (const artifact of plan.artifacts) {
@@ -111,25 +112,27 @@ async function deploySsh(workspaceRoot: string, plan: SshDeploymentPlan, signal?
 			const staged = `${artifact.target}.rdk-agent-${stamp}.tmp`;
 			const backup = `${artifact.target}.rdk-agent-${stamp}.bak`;
 			const state = { host: plan.host, target: artifact.target, staged, backup, recursive: Boolean(artifact.recursive) };
-			installed.push(state);
 
 			await runProcess("ssh", [plan.host, `mkdir -p ${targetDirectory}`], signal);
 			await runProcess("scp", artifact.recursive ? ["-q", "-r", "--", source, `${plan.host}:${staged}`] : ["-q", "--", source, `${plan.host}:${staged}`], signal);
+			stagedPaths.push(staged);
+			const preparation = [
+				`chmod${artifact.recursive ? " -R" : ""} ${artifact.mode} ${staged}`,
+				...(artifact.owner ? [`chown -R ${artifact.owner} ${staged}`] : []),
+				...(artifact.recursive
+					? [`find ${staged} -type f -name '*.py' -exec python3 -m py_compile {} +`]
+					: artifact.target.endsWith(".py") ? [`python3 -m py_compile ${staged}`] : []),
+			];
+			await runProcess("ssh", [plan.host, `set -eu; ${preparation.join("; ")}`], signal);
 			await runProcess(
 				"ssh",
 				[
 					plan.host,
-					artifact.recursive
-						? `set -eu; if [ -e ${artifact.target} ]; then mv ${artifact.target} ${backup}; fi; chmod -R ${artifact.mode} ${staged}; mv ${staged} ${artifact.target}`
-						: `set -eu; if [ -f ${artifact.target} ]; then cp -p ${artifact.target} ${backup}; fi; chmod ${artifact.mode} ${staged}; mv -f ${staged} ${artifact.target}`,
+					`set -eu; had_existing=0; if [ -e ${artifact.target} ] || [ -L ${artifact.target} ]; then mv ${artifact.target} ${backup}; had_existing=1; fi; if ! mv ${staged} ${artifact.target}; then if [ "$had_existing" -eq 1 ]; then mv ${backup} ${artifact.target}; fi; exit 1; fi`,
 				],
 				signal,
 			);
-			if (artifact.recursive) {
-				await runProcess("ssh", [plan.host, `find ${artifact.target} -type f -name '*.py' -exec python3 -m py_compile {} +`], signal);
-			} else if (artifact.target.endsWith(".py")) {
-				await runProcess("ssh", [plan.host, `python3 -m py_compile ${artifact.target}`], signal);
-			}
+			installed.push(state);
 			if (artifact.recursive) {
 				receipt.push(`${artifact.source}/ -> ${plan.host}:${artifact.target}/ backup=${backup}`);
 			} else {
@@ -139,9 +142,19 @@ async function deploySsh(workspaceRoot: string, plan: SshDeploymentPlan, signal?
 				receipt.push(`${artifact.source} -> ${plan.host}:${artifact.target} sha256=${localHash} backup=${backup}`);
 			}
 		}
+		if (plan.restartService) {
+			await runProcess("ssh", [plan.host, `systemctl restart ${plan.restartService} && systemctl is-active --quiet ${plan.restartService}`], signal);
+			receipt.push(`service restarted: ${plan.restartService}`);
+		}
 		return receipt.join("\n");
 	} catch (error) {
 		await rollbackRemote(installed, signal);
+		for (const staged of stagedPaths) {
+			await runProcess("ssh", [plan.host, `rm -rf ${staged}`], signal).catch(() => undefined);
+		}
+		if (plan.restartService && installed.length > 0) {
+			await runProcess("ssh", [plan.host, `systemctl restart ${plan.restartService}`], signal).catch(() => undefined);
+		}
 		throw error;
 	}
 }

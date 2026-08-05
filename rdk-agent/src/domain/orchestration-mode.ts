@@ -14,6 +14,8 @@ export interface RobotDevelopmentMode {
 	name: string;
 	type: "robot-development";
 	loops: readonly TddLoopDefinition[];
+	/** Deterministic delivery stages after all TDD loops and before live acceptance. */
+	deliveryAgentIds: readonly string[];
 	acceptanceAgentIds: readonly string[];
 }
 
@@ -35,6 +37,7 @@ export function modeAgentIds(mode: OrchestrationMode): readonly string[] {
 			loop.verificationAgentId,
 			...(loop.deploymentAgentId ? [loop.deploymentAgentId] : []),
 		]),
+		...mode.deliveryAgentIds,
 		...mode.acceptanceAgentIds,
 	];
 }

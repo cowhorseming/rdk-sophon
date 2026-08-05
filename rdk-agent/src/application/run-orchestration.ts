@@ -41,6 +41,7 @@ export class RunOrchestration {
 	private async runDevelopment(input: RunOrchestrationInput, mode: RobotDevelopmentMode): Promise<RunOrchestrationResult> {
 		const stageOrder = [
 			...mode.loops.flatMap((loop) => [loop.id, ...(loop.deploymentAgentId ? [loop.deploymentAgentId] : [])]),
+			...mode.deliveryAgentIds,
 			...mode.acceptanceAgentIds,
 		];
 		const workflow = new DeliveryWorkflow(stageOrder);
@@ -74,6 +75,20 @@ export class RunOrchestration {
 			}
 		}
 
+		for (const deliveryAgentId of mode.deliveryAgentIds) {
+			workflow.start(deliveryAgentId);
+			try {
+				const delivery = await this.runAgent(input, deliveryAgentId, "deployment", deliveries);
+				workflow.succeed(deliveryAgentId, delivery.summary);
+				deliveries.push({ stageId: deliveryAgentId, summary: delivery.summary });
+			} catch (error) {
+				const detail = error instanceof Error ? error.message : String(error);
+				workflow.fail(deliveryAgentId, detail);
+				input.onEvent({ type: "workflow-finished", succeeded: false, detail: `${this.profile(deliveryAgentId).name} 中止：${detail}` });
+				return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
+			}
+		}
+
 		for (const acceptanceAgentId of mode.acceptanceAgentIds) {
 			workflow.start(acceptanceAgentId);
 			try {
@@ -88,7 +103,7 @@ export class RunOrchestration {
 			}
 		}
 
-		input.onEvent({ type: "workflow-finished", succeeded: true, detail: "Python、CLI、Skill 的 TDD、部署与真机验收均已通过。" });
+		input.onEvent({ type: "workflow-finished", succeeded: true, detail: "动作包 TDD、release 构建、板端发布、开发机 Skill 安装与双重真机验收均已通过。" });
 		return { modeId: mode.id, stages: workflow.snapshot(), succeeded: true };
 	}
 

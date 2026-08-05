@@ -77,6 +77,19 @@ test("rejects a configured skill that does not exist", (context) => {
 	assert.throws(() => new YamlAgentConfigurationLoader().load(directory), /Skill 不存在/);
 });
 
+test("loads a customized v2 configuration with the retired servo Python validation", (context) => {
+	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
+	context.after(() => rmSync(directory, { recursive: true, force: true }));
+	writeFileSync(
+		join(directory, "agents.yaml"),
+		"version: 2\ndefaultMode: application\nagents:\n  - id: author\n    name: Author\n    description: Test\n    tools: []\n    skills: []\n    validation:\n      kind: servo-python-test\n    systemPrompt: Customized prompt\nmodes:\n  - id: application\n    name: Application\n    type: robot-application\n    agent: author\n",
+	);
+
+	const configuration = new YamlAgentConfigurationLoader().load(directory);
+	assert.equal(configuration.profiles[0]?.validation, undefined);
+	assert.equal(configuration.profiles[0]?.systemPrompt, "Customized prompt");
+});
+
 test("rejects write-capable agents without a path allowlist", (context) => {
 	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
 	context.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -107,72 +120,62 @@ test("bundled robot application mode loads the servo control skill", () => {
 	assert.equal(configuration.modes.find((mode) => mode.id === "robot-application")?.type, "robot-application");
 });
 
-test("bundled development agents have unlimited tool calls and role-specific write permissions", () => {
+test("bundled development workflow uses action-package TDD and deterministic release delivery", () => {
 	const configuration = new YamlAgentConfigurationLoader().load(join(import.meta.dirname, "../../config"));
 	const byId = new Map(configuration.profiles.map((profile) => [profile.id, profile]));
 	assert.equal(configuration.workspace.kind, "managed-template");
 	assert.deepEqual(configuration.workspace.requiredPaths, [
 		"examples/plugins/servo/servo_ctrl.py",
 		"examples/plugins/servo/plugin.toml",
-		"examples/plugins/servo/servo_actions/actions.json",
+		"examples/plugins/servo/servo_actions/README.md",
+		"skills/servo-control/SKILL.md",
+		"tools/servo_action.py",
 	]);
 	if (configuration.workspace.kind === "managed-template") {
 		assert.equal(configuration.workspace.id, "magicbox-servo");
-		assert.equal(configuration.workspace.version, 3);
+		assert.equal(configuration.workspace.version, 5);
 		assert.match(configuration.workspace.templateDirectory, /config\/templates\/magicbox-servo$/);
 	}
 	for (const profile of configuration.profiles) assert.equal(profile.maxToolCalls, undefined);
-	for (const id of ["python-test", "python-coding", "cli-test", "cli-coding", "skill-test", "skill-coding"]) {
+	for (const id of ["action-test", "action-coding"]) {
 		const profile = byId.get(id);
 		assert.ok(profile, `${id} should exist`);
 		assert.equal(profile.maxToolCalls, undefined);
 		assert.ok(profile.timeoutSeconds <= 300);
 		assert.ok(profile.tools.includes("write"));
 	}
-	for (const id of ["python-verification", "cli-verification", "skill-verification"]) {
+	for (const id of ["action-verification"]) {
 		const profile = byId.get(id);
 		assert.ok(profile, `${id} should exist`);
 		assert.equal(profile.tools.includes("write"), false);
 		assert.equal(profile.tools.includes("edit"), false);
 	}
-	for (const id of ["python-test", "python-coding", "python-verification", "cli-test", "cli-coding", "cli-verification", "skill-verification"]) {
+	for (const id of ["action-test", "action-coding", "action-verification"]) {
 		assert.deepEqual(byId.get(id)?.sandbox, {
 			kind: "podman",
 			image: "docker.io/library/python:3.12-slim",
 			network: "none",
 		});
 	}
-	for (const id of ["python-deploy", "cli-deploy", "skill-deploy", "cli-live-acceptance", "skill-live-acceptance", "robot-application"]) {
+	for (const id of ["release-deploy", "skill-deploy", "cli-live-acceptance", "skill-live-acceptance", "robot-application"]) {
 		assert.equal(byId.get(id)?.sandbox, undefined);
 	}
-	assert.match(byId.get("cli-test")?.systemPrompt ?? "", /test_cli_contract\.py/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /禁止自创 `ServoController\.SINGLE_SIDE_ACTIONS`/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /不安装 pytest/);
-	assert.match(byId.get("python-test")?.systemPrompt ?? "", /sys\.modules\["Hobot\.GPIO"\]/);
-	assert.match(byId.get("python-coding")?.systemPrompt ?? "", /禁止对同一个失败重复 edit\/bash 直至超时/);
-	assert.match(byId.get("skill-coding")?.systemPrompt ?? "", /同一处第二次 edit 仍失败时禁止继续 edit/);
-	assert.match(byId.get("skill-coding")?.systemPrompt ?? "", /已有交付 Skill 已包含本次动作及准确映射时允许零修改完成/);
-	assert.match(byId.get("cli-verification")?.systemPrompt ?? "", /开发工作区没有安装到 sophonctl 注册表是正常状态/);
-	assert.match(byId.get("skill-verification")?.systemPrompt ?? "", /静态合同满足时必须返回 passed/);
-	assert.deepEqual(byId.get("skill-verification")?.validation, {
-		kind: "skill-contract",
-		source: ".rdk-agent/deliveries/skills/servo-control",
-		skillName: "servo-control",
-		manifest: "examples/plugins/servo/plugin.toml",
-		entrypointSource: "examples/plugins/servo/servo_ctrl.py",
-		evidenceFiles: [
-			"examples/plugins/servo/tests/test_cli_contract.py",
-		],
-		baselineSkillName: "servo-control",
-	});
-	for (const id of ["python-deploy", "cli-deploy", "skill-deploy"]) {
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /action-package/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /返工轮已存在时绝不能再次 scaffold/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /v1 只支持无参数动作/);
+	assert.match(byId.get("action-coding")?.systemPrompt ?? "", /run\(context, params\)/);
+	assert.match(byId.get("action-verification")?.systemPrompt ?? "", /错误码/);
+	assert.deepEqual(byId.get("action-test")?.actionPackage, { operations: ["scaffold"] });
+	assert.deepEqual(byId.get("action-verification")?.actionPackage, { operations: ["validate"] });
+	for (const id of ["release-deploy", "skill-deploy"]) {
 		const profile = byId.get(id);
 		assert.ok(profile?.tools.includes("deploy"), `${id} should expose deploy`);
 		assert.ok(profile?.deployment, `${id} should have a deterministic deployment plan`);
 	}
-	assert.deepEqual(byId.get("python-deploy")?.deployment, {
+	assert.deepEqual(byId.get("release-deploy")?.deployment, {
 		kind: "ssh",
 		host: "x5-root",
+		restartService: "probe-daemon.service",
 		artifacts: [
 			{
 				source: "examples/plugins/servo/servo_ctrl.py",
@@ -181,23 +184,25 @@ test("bundled development agents have unlimited tool calls and role-specific wri
 				recursive: false,
 			},
 			{
-				source: "examples/plugins/servo/servo_actions",
+				source: ".rdk-agent/releases/current/servo_actions",
 				target: "/userdata/magicbox/scripts/servo_actions",
 				mode: "0755",
 				recursive: true,
+				owner: "probe:probe",
 			},
 		],
 	});
 	assert.deepEqual(byId.get("skill-deploy")?.deployment, {
 		kind: "skill",
-		source: ".rdk-agent/deliveries/skills/servo-control",
+		source: ".rdk-agent/releases/current/skill",
 		skillName: "servo-control",
-		runtimeFiles: ["SKILL.md"],
+		runtimeFiles: ["SKILL.md", "skill-catalog.json"],
 	});
 	const development = configuration.modes.find((mode) => mode.id === "robot-development");
 	assert.equal(development?.type, "robot-development");
 	if (development?.type === "robot-development") {
-		assert.deepEqual(development.loops.map((loop) => loop.deploymentAgentId), ["python-deploy", "cli-deploy", "skill-deploy"]);
+		assert.deepEqual(development.loops.map((loop) => loop.deploymentAgentId), ["release-deploy"]);
+		assert.deepEqual(development.deliveryAgentIds, ["skill-deploy"]);
 		assert.deepEqual(development.acceptanceAgentIds, ["cli-live-acceptance", "skill-live-acceptance"]);
 	}
 });
