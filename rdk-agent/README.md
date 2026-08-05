@@ -1,6 +1,6 @@
 # rdk-agent
 
-RDK 设备的多 Agent 编排服务预留目录。该项目未来会作为独立 TypeScript 应用与 `rdk-sophon` 同仓开发，并只通过系统中已安装的 `sophonctl` 与设备探针交互。
+RDK 设备的多 Agent 编排应用。该项目作为独立 TypeScript 应用与 `rdk-sophon` 同仓开发，并只通过系统中已安装的 `sophonctl` 与设备探针交互。
 
 ## 1. 分层
 
@@ -19,38 +19,170 @@ src/
 
 本目录提供一个基于 [Pi SDK](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 和 `@earendil-works/pi-tui` 的终端编排器，当前包含两种模式：
 
-1. **机器人开发模式**：依次完成 Python、sophonctl CLI、Skill 三个 TDD 小循环。每个循环由测试设计、Coding、独立验证三个 Agent 组成；验证要求返工时自动进入下一轮。各循环通过后由专用 Agent 部署 Python、CLI、Skill，最后分别执行 CLI 和 Skill 自然语言真机验收。
+1. **机器人开发模式**：围绕一个自包含动作包执行测试设计、Coding、独立验证的 TDD 循环；通过后由确定性脚本构建 release，专用 Agent 依次部署板端动作包和开发机 Skill，最后执行 CLI 与自然语言 Skill 真机验收。
 2. **机器人应用模式**：单 Agent 根据自然语言选择一个或多个已交付 Skill；动作式请求会在前置检查后直接执行一次对应的真实机器人动作，查询式请求保持只读。
 
 任意 Agent 无法继续或自动返工达到上限时，工作流暂停并请求人类输入；输入 `/abort` 可以终止。当前不设置人工审批门，正常交付步骤自动继续。
 
-每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。Python、CLI、Skill 的开发测试命令默认在离线 Podman Python 3.12 容器中执行，托管工作区只读挂载，代码修改仍由受 `writePaths` 约束的 Pi 文件工具完成。部署和真机验收留在宿主机执行。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
+每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。动作包测试默认在离线 Podman Python 3.12 容器中执行，托管工作区只读挂载，代码修改仍由受 `writePaths` 约束的 Pi 文件工具完成；脚手架、契约验证和 release 结构由固定脚本生成。部署和真机验收留在宿主机执行。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
 
-Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口和容器/VM 示例。rdk-agent 通过该接口把开发阶段 Bash 路由到 Podman。首次使用研发模式前准备固定镜像：
+当前动作包契约 `rdk-servo-action/v1` 明确只支持无参数动作。`action.py` 只能以同步、顺序方式调用公开的无参数硬件桥接白名单；导入模块、私有控制器方法、任意 duty 和运行时参数都会被构建前的确定性校验拒绝。参数化动作需要先升级契约。
 
-```sh
-podman machine start
-podman pull docker.io/library/python:3.12-slim
+## 3. 板端与开发机部署
+
+rdk-agent 跨两端运行，不能只安装一个本地命令：
+
+```text
+开发机                                      RDK X5 板端
+rdk-agent ──调用──> sophonctl ──TCP 7777──> probe-daemon
+   │                                             │
+   └─ Podman 离线开发沙箱                         └─ /opt/sophon/plugins + /userdata/magicbox/scripts
+```
+
+默认约定如下：
+
+- 开发机通过 SSH 别名 `x5-root` 部署文件；
+- `sophonctl` 中的板子别名固定为 `x5`，与 Agent 提示词和 Skill 保持一致；
+- 板端 `probe-daemon` 监听 TCP `7777`；
+- Node.js 版本必须不低于 22.19.0；机器人研发模式还需要 Podman 和 `python:3.12-slim` 镜像；
+- 开发机安装 `sophonctl` 需要 Rust/Cargo；板端部署脚本会优先交叉编译，缺少交叉工具链时回退到板上编译。
+
+### 3.1 交付物归属
+
+`install-rdk-agent-stack.sh` 是 **rdk-agent 提供的集成部署入口**，它会编排两个项目各自的交付物；脚本放在 rdk-agent 目录下，不代表所有安装内容都属于 rdk-agent。
+
+| 目标机器 | 归属 | 交付物 | 安装结果 |
+| --- | --- | --- | --- |
+| RDK X5 板端 | **rdk-sophon** | aarch64 服务端、CLI/网关二进制、配置和 systemd unit | `/usr/local/bin/{probe-daemon,sophonctl,probe-http-gateway,probe-ws-outbound}`、`/etc/probe-daemon/config.toml`、`probe-daemon.service` |
+| RDK X5 板端 | **rdk-agent** | MagicBox 舵机应用入口、独立动作包和 Sophon 动态插件 manifest | `/userdata/magicbox/scripts/servo_ctrl.py`、`/userdata/magicbox/scripts/servo_actions/<动作 ID>/`、`/opt/sophon/plugins/servo/plugin.toml` |
+| 开发机 | **rdk-sophon** | 为开发机本机架构编译的 `sophonctl` 客户端及板子别名 | `~/.local/bin/sophonctl`、`~/.rdk-sophon/config.toml` 中的 `x5` |
+| 开发机 | **rdk-agent** | TUI 应用、生产依赖、Agent/Skill/模板配置 | `~/.local/share/rdk-agent/`、`~/.local/bin/rdk-agent`、`~/.config/rdk-agent/` |
+| 开发机 | 第三方运行环境 | rdk-agent 研发模式使用的离线 Python 沙箱 | Podman machine 和 `docker.io/library/python:3.12-slim` 镜像 |
+
+板端不会运行 Node.js 或 rdk-agent TUI；开发机上的 rdk-agent 通过本机 `sophonctl` 连接板端 `probe-daemon`。板端的 `sophonctl` 是 rdk-sophon 随板端包一起交付的本地诊断工具，开发机的 `sophonctl` 则必须针对开发机架构单独编译，二者不是同一个二进制文件。
+
+### 3.2 一键部署到板端
+
+先准备 SSH 配置。`rdk-agent/config/agents.yaml` 默认把部署目标写为 `x5-root`，所以该名称既用于登录，也用于开发模式的部署 Agent：
+
+```sshconfig
+Host x5-root
+  HostName 192.168.128.10
+  User root
+  IdentityFile ~/.ssh/id_ed25519
 ```
 
 ```sh
-cd /Users/d-robotics/Documents/project/rdk-sophon/rdk-agent
-# Pi SDK 要求 Node.js >= 22.19.0
-node --version
-npm install --ignore-scripts
-npm run start
+ssh -o BatchMode=yes x5-root 'uname -m'
 ```
 
-部署到用户目录并注册全局命令：
+从仓库根目录执行：
 
 ```sh
-npm run deploy
+./rdk-agent/deploy/install-rdk-agent-stack.sh \
+  --board-only \
+  --ssh-host x5-root \
+  --board-address 192.168.128.10:7777
+```
+
+该命令只改板端，不安装开发机的 `sophonctl`、rdk-agent TUI 或 Podman。它依次：
+
+1. 交付 **rdk-sophon 板端包**，启用动态插件并启动 `probe-daemon`；
+2. 交付 **rdk-agent 板端运行文件**，初始化 MagicBox servo 插件入口，但不会执行任何舵机动作。
+
+`--board-address` 只用于显示和校验，可以省略；脚本会从 `ssh -G x5-root` 推导主机地址。验证：
+
+```sh
+ssh x5-root 'sudo systemctl is-active probe-daemon'
+ssh x5-root 'ss -lnt | grep 7777'
+ssh x5-root 'test -x /userdata/magicbox/scripts/servo_ctrl.py'
+ssh x5-root 'test -f /opt/sophon/plugins/servo/plugin.toml'
+ssh x5-root 'sudo journalctl -u probe-daemon -n 50 --no-pager'
+```
+
+研发模式后续生成的新动作会继续通过 SSH 原子更新 rdk-agent 的这些板端交付物，无需在板上保存 rdk-agent 源码：
+
+```text
+/userdata/magicbox/scripts/servo_ctrl.py
+/userdata/magicbox/scripts/servo_actions/
+/opt/sophon/plugins/servo/plugin.toml
+```
+
+不需要初始化 servo 文件时可传入 `--skip-servo-bootstrap`。`probe-daemon` 的服务用户还必须具备板端 Hobot.GPIO 所需的设备访问权限。不要为了省事把整个 daemon 改成 root；权限不足时应配置设备组或专用硬件控制 Broker。
+
+### 3.3 一键部署到开发机
+
+板端已经部署并能通过 TCP `7777` 访问后，从仓库根目录执行：
+
+```sh
+./rdk-agent/deploy/install-rdk-agent-stack.sh \
+  --development-only \
+  --board-address 192.168.128.10:7777
+```
+
+该命令不通过 SSH 修改板端。它依次：
+
+1. 交付 **rdk-sophon 开发机客户端**：编译并安装本机架构的 `sophonctl`，将地址登记成板子别名 `x5`；
+2. 准备 **rdk-agent 的第三方沙箱依赖**：Podman 和固定 Python 3.12 镜像；
+3. 交付 **rdk-agent 开发机应用**：TUI、生产依赖和可编辑配置；
+4. 用 `state`、`plugins list` 和 `rdk-agent --help` 做只读联调检查。
+
+只使用机器人应用模式、不准备研发沙箱时可传入 `--skip-podman`。安装完成后：
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+sophonctl --board x5 state
+sophonctl --board x5 plugins list
+rdk-agent --help
 rdk-agent
 ```
 
-默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v2`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。`/workspace` 可查看当前工程和来源。模板升级通过提高 `workspace.version` 创建新版本目录，避免覆盖旧工程。
+安装位置和职责：
 
-开发阶段的 Python/CLI/Skill 测试在离线 Podman 容器中执行。运行时只依赖 Python 3.12 标准库，测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。模板自带 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。
+```text
+~/.local/share/rdk-agent/                 应用与生产依赖
+~/.local/bin/rdk-agent                    全局命令链接
+~/.config/rdk-agent/                      可编辑的 Agent、Skill 和模板配置
+~/.local/state/rdk-agent/workspaces/      版本化托管开发工作区
+```
+
+### 3.4 一键部署完整环境
+
+新环境需要同时安装板端和开发机时，不传 `--board-only` 或 `--development-only`：
+
+```sh
+./rdk-agent/deploy/install-rdk-agent-stack.sh \
+  --ssh-host x5-root \
+  --board-address 192.168.128.10:7777
+```
+
+执行顺序是“板端 rdk-sophon → 板端 rdk-agent 运行文件 → 开发机 rdk-sophon → 开发机 rdk-agent”。只想检查基础命令、参数以及板端 SSH（所选目标包含板端时）可追加 `--preflight-only`，不会安装或覆盖任何文件。查看全部参数：
+
+```sh
+./rdk-agent/deploy/install-rdk-agent-stack.sh --help
+```
+
+### 3.5 只交付单个项目
+
+不使用集成脚本时，底层脚本的归属和边界如下：
+
+| 命令 | 交付边界 |
+| --- | --- |
+| `./rdk-sophon/deploy/scripts/deploy-to-board.sh x5-root --enable-plugins` | 只交付 **rdk-sophon 板端包**，不安装 servo 应用文件 |
+| `./rdk-sophon/deploy/scripts/install-sophonctl.sh --release --board x5 192.168.128.10:7777 --default` | 只交付 **rdk-sophon 开发机客户端** |
+| `./rdk-agent/deploy/install-rdk-agent.sh` | 只交付 **rdk-agent 开发机 TUI**，不安装 sophonctl、Podman 或任何板端文件 |
+
+### 3.6 升级与重新部署
+
+拉取新代码后可以直接重新运行一键脚本。板端部署会覆盖 `/etc/probe-daemon/config.toml`，因此手工修改过板端配置时应先备份或把修改同步回仓库配置；`--enable-plugins` 会继续确保插件功能打开。rdk-agent 安装器会原子替换应用目录：未修改的默认配置自动升级，检测到 `~/.config/rdk-agent` 有用户定制时保留原配置，并生成 `agents.yaml.v2.example` 供人工合并。
+
+## 4. 运行与配置
+
+Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口和容器/VM 示例。rdk-agent 通过该接口把开发阶段 Bash 路由到 Podman。
+
+默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v5`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。`/workspace` 可查看当前工程和来源。模板升级通过提高 `workspace.version` 创建新版本目录，避免覆盖旧工程。
+
+开发阶段的动作行为与契约测试在离线 Podman 容器中执行。运行时只依赖 Python 3.12 标准库，测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。模板自带 FakeContext 和 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。
 
 只有参与 rdk-sophon 仓库开发时才需要显式指定外部源码：
 

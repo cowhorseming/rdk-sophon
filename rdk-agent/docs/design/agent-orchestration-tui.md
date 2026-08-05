@@ -456,9 +456,11 @@ npm test
 
 PTY 冒烟测试还应验证模式切换、Editor 输入、Human-in-the-loop 恢复输入以及 Ctrl-C 终端恢复。
 
-### 13.1 可移除的托管二级动作
+### 13.1 可移除的托管动作包
 
-rdk-agent 交付的二级动作以独立 Python 模块和 `servo_actions/actions.json` registry 保存，入口脚本按 registry 加载。用户明确执行 `sophonctl servo remove <动作名>` 后，脚本不会初始化 GPIO/PWM，而是先备份 registry 和模块，再从活动配置及实现目录中删除该动作。内置原子动作和非法动作名会被拒绝。
+rdk-agent 交付的每个动作独占 `servo_actions/<动作 ID>/`，目录内包含自己的 `registry.json` 和 `action.py`；入口脚本扫描一级目录后按局部 registry 加载，不维护全局动作表。用户明确执行 `sophonctl servo remove <动作名>` 后，脚本不会初始化 GPIO/PWM，而是把整个动作包移入 `.rdk-agent-backups/`。内置原子动作、无效动作包和非法动作名会被拒绝。
+
+当前 `rdk-servo-action/v1` 只接受 `arguments: []`。动作实现不得导入模块或访问原始控制器私有方法，只能以同步、顺序方式组合无参数硬件桥接白名单；需要运行时参数的能力必须先演进契约和验证器。
 
 该样例覆盖了两个曾导致流程停滞的问题：Skill 验收文档的过度推断会被确定性合同改写为 `revision`；Coding Agent 对同一处精确 edit 连续失败时必须停止重试，文件已满足需求可零修改完成，确需修改则重新读取后最多整文件 write 一次。
 
@@ -466,7 +468,7 @@ Skill 安装只覆盖配置声明的运行时文件 `SKILL.md`，不会再用研
 
 ## 14. 当前限制
 
-- 三个开发循环仍然串行；
+- 单个动作包内的测试设计、实现和验证仍然串行；
 - 每个 Profile 只主动展开第一个 Skill；
 - Agent 结构化结果依赖文本尾部协议，不是 Provider 原生结构化输出；
 - 工作流、日志和 Human 请求没有持久化；
