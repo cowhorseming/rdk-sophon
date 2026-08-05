@@ -113,7 +113,9 @@ if [ -d "$CONFIG_DIR" ] && [ -d "$INSTALL_DIR/config" ]; then
   CONFIG_COMPARE_DIR="$TEMP_DIR/current-config"
   cp -R "$CONFIG_DIR" "$CONFIG_COMPARE_DIR"
   # 旧安装器生成的升级示例不属于用户自定义，比较默认配置时忽略它。
-  rm -f "$CONFIG_COMPARE_DIR/agents.yaml.v2.example"
+  rm -f \
+    "$CONFIG_COMPARE_DIR/agents.yaml.v2.example" \
+    "$CONFIG_COMPARE_DIR/agents.yaml.before-servo-python-test-migration"
   if diff -qr "$CONFIG_COMPARE_DIR" "$INSTALL_DIR/config" >/dev/null 2>&1; then
     CONFIG_WAS_DEFAULT=1
   fi
@@ -135,6 +137,37 @@ else
   echo -e "${YELLOW}保留已有配置：$CONFIG_DIR${RESET}"
   cp "$INSTALL_DIR/config/agents.yaml" "$CONFIG_DIR/agents.yaml.v2.example"
   echo -e "${YELLOW}新的双模式配置已写入 $CONFIG_DIR/agents.yaml.v2.example，请手动合并自定义内容${RESET}"
+fi
+
+# 早期 v2 默认配置曾在 python-test 下写入一个从未成为运行时合同的
+# servo-python-test validation。只删除这个精确的两行历史块，保留用户对
+# 提示词、工具、Skill 和其他 validation 的全部定制。
+ACTIVE_AGENT_CONFIG="$CONFIG_DIR/agents.yaml"
+MIGRATED_AGENT_CONFIG="$TEMP_DIR/agents.yaml.migrated"
+if [ -f "$ACTIVE_AGENT_CONFIG" ]; then
+  awk '
+    /^[[:space:]]+validation:[[:space:]]*$/ {
+      pending_validation = $0
+      next
+    }
+    pending_validation != "" {
+      if ($0 ~ /^[[:space:]]+kind:[[:space:]]+servo-python-test[[:space:]]*$/) {
+        pending_validation = ""
+        next
+      }
+      print pending_validation
+      pending_validation = ""
+    }
+    { print }
+    END {
+      if (pending_validation != "") print pending_validation
+    }
+  ' "$ACTIVE_AGENT_CONFIG" > "$MIGRATED_AGENT_CONFIG"
+  if ! cmp -s "$ACTIVE_AGENT_CONFIG" "$MIGRATED_AGENT_CONFIG"; then
+    cp "$ACTIVE_AGENT_CONFIG" "$CONFIG_DIR/agents.yaml.before-servo-python-test-migration"
+    mv "$MIGRATED_AGENT_CONFIG" "$ACTIVE_AGENT_CONFIG"
+    echo -e "${GREEN}✓ 已迁移旧版 servo-python-test 配置；原文件已备份${RESET}"
+  fi
 fi
 
 echo -e "${BLUE}========== [4/4] 注册命令 ==========${RESET}"

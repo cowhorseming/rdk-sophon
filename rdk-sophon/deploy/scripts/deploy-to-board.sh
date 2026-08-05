@@ -7,13 +7,15 @@
 #   2. 若 Mac 装了 cargo-zigbuild + zig → 跑 build-release.sh 交叉编译（最快，不在板上编）
 #   3. 否则 fallback：把源码 rsync 到板子，在板上 cargo build（板上 Rust 已装即可，约 3 分钟）
 #
-# 用法：./deploy/scripts/deploy-to-board.sh <board-host> [board-user]
+# 用法：./deploy/scripts/deploy-to-board.sh <board-host> [board-user] [--enable-plugins]
 #   board-host   板子 ssh 主机名或 IP（如 x5-root 或 192.168.128.10）
 #   board-user   可选，板子用户名（默认用 ssh config，如 x5-root 已含）
-# 示例：./deploy/scripts/deploy-to-board.sh x5-root
+#   --enable-plugins  部署前把目标配置的 [plugins].enabled 改为 true
+# 示例：./deploy/scripts/deploy-to-board.sh x5-root --enable-plugins
 set -euo pipefail
 
-cd "$(dirname "$0")/../.." || exit 2
+SCRIPT_PATH="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
+cd "$(dirname "$SCRIPT_PATH")/../.." || exit 2
 
 # 探测 cargo 环境：非交互 shell 可能没 source ~/.cargo/env。
 if ! command -v cargo >/dev/null 2>&1; then
@@ -28,10 +30,72 @@ fi
 TARGET="aarch64-unknown-linux-gnu"
 BINS=("probe-daemon" "sophonctl" "probe-http-gateway" "probe-ws-outbound")
 CROSS_DIR="target/$TARGET/release"
-BOARD_HOST="${1:?用法: $0 <board-host> [board-user]}"
-BOARD_USER="${2:-}"
+BOARD_HOST=""
+BOARD_USER=""
+ENABLE_PLUGINS=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --enable-plugins)
+      ENABLE_PLUGINS=1
+      shift
+      ;;
+    -h|--help)
+      sed -n '2,14p' "$SCRIPT_PATH" | sed -E 's/^# ?//'
+      exit 0
+      ;;
+    --*)
+      echo "未知参数: $1" >&2
+      exit 2
+      ;;
+    *)
+      if [ -z "$BOARD_HOST" ]; then
+        BOARD_HOST="$1"
+      elif [ -z "$BOARD_USER" ]; then
+        BOARD_USER="$1"
+      else
+        echo "位置参数过多: $1" >&2
+        exit 2
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$BOARD_HOST" ]; then
+  echo "用法: $0 <board-host> [board-user] [--enable-plugins]" >&2
+  exit 2
+fi
+
 SSH_TARGET="$BOARD_HOST"
 if [ -n "$BOARD_USER" ]; then SSH_TARGET="${BOARD_USER}@${BOARD_HOST}"; fi
+
+CONFIG_SOURCE="config/config.toml"
+TEMP_CONFIG=""
+cleanup() {
+  if [ -n "$TEMP_CONFIG" ]; then rm -f "$TEMP_CONFIG"; fi
+}
+trap cleanup EXIT
+
+if [ "$ENABLE_PLUGINS" -eq 1 ]; then
+  TEMP_CONFIG="$(mktemp "${TMPDIR:-/tmp}/rdk-sophon-config.XXXXXX")"
+  awk '
+    $0 == "[plugins]" { in_plugins = 1; print; next }
+    in_plugins && /^\[/ { exit 42 }
+    in_plugins && /^enabled[[:space:]]*=/ {
+      print "enabled = true"
+      in_plugins = 0
+      updated = 1
+      next
+    }
+    { print }
+    END { if (!updated) exit 42 }
+  ' "$CONFIG_SOURCE" > "$TEMP_CONFIG" || {
+    echo "无法在 config/config.toml 中启用 [plugins]" >&2
+    exit 1
+  }
+  CONFIG_SOURCE="$TEMP_CONFIG"
+fi
 
 # 颜色
 if [ -t 1 ]; then G='\033[0;32m'; R='\033[0;31m'; B='\033[0;34m'; Y='\033[0;33m'; N='\033[0m'; else G=''; R=''; B=''; Y=''; N=''; fi
@@ -101,11 +165,16 @@ else
   echo
 
   echo -e "${B}========== [3/6] 推送配置与 systemd unit ==========${N}"
-  scp -q config/config.toml "$SSH_TARGET:$REMOTE_TMP/config.toml"
+  scp -q "$CONFIG_SOURCE" "$SSH_TARGET:$REMOTE_TMP/config.toml"
   scp -q systemd/probe-daemon.service "$SSH_TARGET:$REMOTE_TMP/probe-daemon.service"
   scp -q deploy/scripts/install-on-board.sh "$SSH_TARGET:$REMOTE_TMP/install-on-board.sh"
   echo -e "${G}✓ 二进制/配置/unit/安装脚本已推送${N}"
   echo
+fi
+
+# 板上编译分支会先从同步源码复制默认配置；启用插件时用临时配置覆盖它。
+if [ "$BUILD_MODE" = "onboard" ] && [ "$ENABLE_PLUGINS" -eq 1 ]; then
+  scp -q "$CONFIG_SOURCE" "$SSH_TARGET:$REMOTE_TMP/config.toml"
 fi
 
 # ───────── 通用安装 + 起服务 ─────────

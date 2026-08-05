@@ -21,7 +21,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/log/probe-daemon /run/probe-daemon
+ReadWritePaths=/var/log/probe-daemon /run/probe-daemon -/userdata/magicbox/scripts/servo_actions
 CapabilityBoundingSet=
 AmbientCapabilities=
 
