@@ -5,7 +5,7 @@ description: 对已交付的 RDK Skill、sophonctl 接入和底层指令进行�
 
 # Skill 自然语言验收
 
-先定位本需求新交付的 `SKILL.md`，把用户自然语言需求与 Skill 的触发条件、`sophonctl` 命令和插件 manifest 一一对照。首先检查文件具有 `---` 包围的 YAML frontmatter，`name` 与交付名一致、`description` 非空，并确认更新没有丢失已安装 Skill 的既有动作。
+先定位本次用户指令新交付的 `SKILL.md`，把用户指令与 Skill 的触发条件、`sophonctl` 命令和插件 manifest 一一对照。首先检查文件具有 `---` 包围的 YAML frontmatter，`name` 与交付名一致、`description` 非空，并确认更新没有丢失已安装 Skill 的既有动作。
 
 验收文档引用的每个测试类、`test_*` 方法、参数字段和错误行为都必须在实际文件中逐项搜索。不存在的测试名、错误文本、权限字段或参数 schema 一律判定返工，不能凭概括性描述当作证据。
 

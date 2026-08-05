@@ -36,12 +36,12 @@ function parseArgs(args: readonly string[]): CliOptions {
 		} else if (argument === "--run") {
 			const modeId = args[index + 1];
 			const request = args[index + 2];
-			if (!modeId || !request) throw new Error("--run 需要 <mode-id> 和 <需求>");
+			if (!modeId || !request) throw new Error("--run 需要 <mode-id> 和 <用户指令>");
 			if (headlessRun) throw new Error("只能指定一次 --run");
 			headlessRun = { modeId, request };
 			index += 2;
 		} else if (argument === "-h" || argument === "--help") {
-			console.log("用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <需求>]");
+			console.log("用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <用户指令>]");
 			console.log("不指定 workspace 时使用配置中的内置模板托管工作区。");
 			process.exit(0);
 		} else if (argument?.startsWith("-")) {

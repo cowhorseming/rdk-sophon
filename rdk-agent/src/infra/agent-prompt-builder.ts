@@ -24,7 +24,7 @@ coding: `## 本阶段硬约束：实现
 - 只能做静态、mock 或模拟验证，禁止驱动真实硬件。无法满足测试时返回 needs-human，不要篡改测试。`,
 	verification: `## 本阶段硬约束：独立验证
 - 全程只读，禁止修改任何文件。
-- 逐项核对用户需求、上游测试与实现，并亲自运行安全测试；只看代码或只相信上游描述都不能判定通过。
+- 逐项核对用户指令、上游测试与实现，并亲自运行安全测试；只看代码或只相信上游描述都不能判定通过。
 - 任一 Bash 检查失败时必须返回 revision，不能把失败归因为“非本阶段责任”后返回 passed。先从入口源码验证 loader、环境变量、文件路径和注册字段；只有证明当前阶段无权修复且缺少真实外部依赖时才返回 needs-human。
 - 所有约定测试通过且没有弱测试、绕过 CLI 或硬件副作用时才返回 passed；可修复问题返回 revision。`,
 	deployment: `## 本阶段硬约束：确定性交付
@@ -33,7 +33,7 @@ coding: `## 本阶段硬约束：实现
 - deploy 失败时不得改用 scp、ssh、cp 等方式绕过工具策略；应返回 needs-human 并附上真实错误。
 - 部署阶段只做语法、清单、帮助或无硬件检查，不得执行真实舵机动作。`,
 	application: `## 本阶段硬约束：应用验收
-- 从严格 Skill 白名单中根据 name 和 description 选择与需求匹配的一个或多个 Skill，先用 read 完整读取每个选中的 SKILL.md，再按其中的自然语言映射执行最终 CLI 调用。没有匹配 Skill 时不得改用白名单外能力。
+- 从严格 Skill 白名单中根据 name 和 description 选择与用户指令匹配的一个或多个 Skill，先用 read 完整读取每个选中的 SKILL.md，再按其中的自然语言映射执行最终 CLI 调用。没有匹配 Skill 时不得改用白名单外能力。
 - 用户在机器人应用模式输入“摇一下耳朵”“站起来”“先动左手再动右手”等动作式请求，本身就是对相应真实动作的一次明确授权。前置检查通过后必须直接执行一次，不得再次索要“确认真机”，也不得只运行 plugins list 或 --help 就宣布完成。
 - 用户只询问能力、命令或状态时才保持只读；缺少 Skill、设备不可达或动作必填参数缺失时返回 needs-human。`,
 };
@@ -58,7 +58,7 @@ export class AgentPromptBuilder {
 			? request.profile.skills.map((name) => `- ${name}: ${join(request.skillDirectory, name, "SKILL.md")}`).join("\n")
 			: "- 无";
 		const skillRule = request.profile.skills.length > 0
-			? "只能使用这里列出的 Skill。必须根据当前需求选择匹配项，并在使用前通过 read 读取下面给出的精确绝对路径；一个需求可选择多个。不得猜测 Skill 位于业务工作区，不得默认固定使用列表第一项。"
+			? "只能使用这里列出的 Skill。必须根据当前用户指令选择匹配项，并在使用前通过 read 读取下面给出的精确绝对路径；一条用户指令可选择多个。不得猜测 Skill 位于业务工作区，不得默认固定使用列表第一项。"
 			: "当前阶段没有配置 Skill，不得自行发现或使用全局、项目或其他 Agent 的 Skill。";
 		const toolCallBudget = request.profile.maxToolCalls === undefined
 			? "工具调用次数不设上限"
@@ -66,7 +66,7 @@ export class AgentPromptBuilder {
 		const sandboxBoundary = request.profile.sandbox?.kind === "podman"
 			? `Bash 命令在离线 Podman 容器 ${request.profile.sandbox.image} 中执行；工作区以只读方式挂载，HOME 和 /tmp 位于临时容器内。容器只保证 Python 3.12 标准库，不提供 pytest 或板端 Hobot.GPIO；Python 测试必须使用 unittest 并在导入生产模块前 mock 板端模块，不得安装依赖。read/edit/write 仍由宿主进程执行并受 writePaths 白名单约束；write 可递归创建白名单内的父目录，Bash 保持只读，所以不要在 Bash 中运行 mkdir。不要探测或依赖开发机 Python、HOME、SSH 凭据或全局包。`
 			: "Bash 命令在宿主环境执行。";
-		return `## 当前阶段\nAgent ID：${request.profile.id}\nAgent 名称：${request.profile.name}\n工作区绝对根目录：${request.workspaceRoot}\n后文所有 writePaths 均为相对于该根目录的路径；调用 read/edit/write 时优先原样使用工作区相对路径，禁止自行删减路径前缀。\n必须完成该 Agent 外置 systemPrompt 指定的专属交付，不能用其他阶段已有文件替代。\n\n## 用户需求\n${request.userRequest}\n\n## 上游交付\n${history}${iteration}\n\n${roleContracts[request.expectation]}${retryRule}\n\n${executionBoundary}\n\n## 执行环境\n${sandboxBoundary}\n\n## Skill 白名单\n${skillWhitelist}\n${skillRule}\n可读取的 Skill 文件：\n${skillFiles}\n\n${toolCallBudget}，阶段超时为 ${request.profile.timeoutSeconds} 秒。先定位最小文件集合，避免扫描或改动无关目录。\n\n## 当前 Agent 的唯一任务（优先级最高）\n${request.profile.systemPrompt}\n\n工具层允许写入的唯一路径范围：${writable}\n即使完整用户需求提到了下游 CLI、Skill 或部署，你也只能完成上面的当前任务。不要尝试写入白名单外路径；路径被拒绝时先按这里列出的相对路径纠正，不能把自己的路径错误升级为人类授权问题。下游 Agent 会接手其他交付。\n\n在工作目录内完成本阶段。最后用简洁中文列出：交付文件、调用方式、验证结果和未解决风险。\n\n${this.resultContract(request.expectation)}`;
+		return `## 当前阶段\nAgent ID：${request.profile.id}\nAgent 名称：${request.profile.name}\n工作区绝对根目录：${request.workspaceRoot}\n后文所有 writePaths 均为相对于该根目录的路径；调用 read/edit/write 时优先原样使用工作区相对路径，禁止自行删减路径前缀。\n必须完成该 Agent 外置 systemPrompt 指定的专属交付，不能用其他阶段已有文件替代。\n\n## 用户指令\n${request.userRequest}\n\n## 上游交付\n${history}${iteration}\n\n${roleContracts[request.expectation]}${retryRule}\n\n${executionBoundary}\n\n## 执行环境\n${sandboxBoundary}\n\n## Skill 白名单\n${skillWhitelist}\n${skillRule}\n可读取的 Skill 文件：\n${skillFiles}\n\n${toolCallBudget}，阶段超时为 ${request.profile.timeoutSeconds} 秒。先定位最小文件集合，避免扫描或改动无关目录。\n\n## 当前 Agent 的唯一任务（优先级最高）\n${request.profile.systemPrompt}\n\n工具层允许写入的唯一路径范围：${writable}\n即使完整用户指令提到了下游 CLI、Skill 或部署，你也只能完成上面的当前任务。不要尝试写入白名单外路径；路径被拒绝时先按这里列出的相对路径纠正，不能把自己的路径错误升级为人类授权问题。下游 Agent 会接手其他交付。\n\n在工作目录内完成本阶段。最后用简洁中文列出：交付文件、调用方式、验证结果和未解决风险。\n\n${this.resultContract(request.expectation)}`;
 	}
 
 	private deliveryHistory(deliveries: readonly Delivery[]): string {

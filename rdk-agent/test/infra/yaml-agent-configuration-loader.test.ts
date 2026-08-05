@@ -164,7 +164,7 @@ test("bundled robot application mode loads the servo control skill", () => {
 	const application = configuration.profiles.find((profile) => profile.id === "robot-application");
 	assert.equal(configuration.defaultModeId, "robot-application");
 	assert.deepEqual(application?.skills, ["servo-control"]);
-	assert.match(application?.systemPrompt ?? "", /动作式需求即已授权执行该动作一次/);
+	assert.match(application?.systemPrompt ?? "", /动作式用户指令即已授权执行该动作一次/);
 	assert.match(application?.systemPrompt ?? "", /不得只做帮助检查就返回 completed/);
 	assert.equal(configuration.modes.find((mode) => mode.id === "robot-application")?.type, "robot-application");
 });

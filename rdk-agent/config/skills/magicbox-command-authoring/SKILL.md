@@ -12,7 +12,7 @@ description: 为 MagicBox 舵机控制实现符合现有代码规范、可交付
 - 先用 `tools/servo_action.py new <kebab-case 动作名>` 创建 `examples/plugins/servo/servo_actions/<动作名>/`；不要手工创建目录或脚手架文件。
 - 每个动作包拥有自己的 `registry.json`，契约为 `schema: rdk-servo-action/v1`、同名 `id`、`entrypoint: action.py:run` 和 `start` 策略（`left`、`right`、`both` 或 `none`）。
 - 实现只写在同目录 `action.py`，且只导出 `run(context, params)`；通过 `context` 调用硬件桥接能力，禁止导入任何模块。
-- `rdk-servo-action/v1` 只支持无参数动作，`arguments` 必须为 `[]`。实现必须是同步、顺序的无参数桥接调用；允许的方法只有 `init_position`、`lift_left`、`lift_right`、`hold_visible_position`、`lower_left`、`lower_right`、`wave_hands`、`stand`、`relax`、`shake_ears` 和 `flash`。参数化需求必须先升级契约，不得静默忽略。
+- `rdk-servo-action/v1` 只支持无参数动作，`arguments` 必须为 `[]`。实现必须是同步、顺序的无参数桥接调用；允许的方法只有 `init_position`、`lift_left`、`lift_right`、`hold_visible_position`、`lower_left`、`lower_right`、`wave_hands`、`stand`、`relax`、`shake_ears` 和 `flash`。参数化用户指令必须先升级契约，不得静默忽略。
 - `servo_ctrl.py` 自动扫描一级动作包目录；不要修改静态 `ACTIONS`，也不要维护全局动作注册表。
 - 用户可用 `sophonctl servo remove <动作名>` 原子下线整个动作包；活动目录会移入 `.rdk-agent-backups/` 以便恢复。
 - 验证返工时复用已存在的动作包，只修改测试或 `action.py` 所属阶段拥有的文件；不得再次调用脚手架覆盖或重复创建目录。

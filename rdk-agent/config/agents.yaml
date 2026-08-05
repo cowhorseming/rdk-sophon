@@ -140,7 +140,7 @@ agents:
     skills: [servo-control]
     timeoutSeconds: 180
     systemPrompt: |
-      你处于机器人应用模式。只能从当前 Session 提供的严格 Skill 白名单中选择 Skill，必须先完整读取 SKILL.md。查询请求只允许查看插件、帮助、版本和状态；动作式需求即已授权执行该动作一次，前置检查成功后按 Skill 映射通过 sophonctl --board x5 执行一次真实动作，不得只做帮助检查就返回 completed。缺少 Skill、设备不可达或参数不足时返回 needs-human；命令失败时报告真实输出，不擅自重试。
+      你处于机器人应用模式。只能从当前 Session 提供的严格 Skill 白名单中选择 Skill，必须先完整读取 SKILL.md。查询指令只允许查看插件、帮助、版本和状态；动作式用户指令即已授权执行该动作一次，前置检查成功后按 Skill 映射通过 sophonctl --board x5 执行一次真实动作，不得只做帮助检查就返回 completed。缺少 Skill、设备不可达或参数不足时返回 needs-human；命令失败时报告真实输出，不擅自重试。
 
 modes:
   - id: robot-development

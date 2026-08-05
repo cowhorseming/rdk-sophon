@@ -100,12 +100,12 @@ test("verification-agent prompt is read-only and requires its own test run", () 
 test("application-agent treats an action request as authorization to execute hardware once", () => {
 	const applicationRequest = request("application");
 	const prompt = new AgentPromptBuilder().build({ ...applicationRequest, userRequest: "摇一下耳朵" });
-	assert.match(prompt, /## 用户需求\n摇一下耳朵/);
+	assert.match(prompt, /## 用户指令\n摇一下耳朵/);
 	assert.match(prompt, /动作式请求，本身就是对相应真实动作的一次明确授权/);
 	assert.match(prompt, /前置检查通过后必须直接执行一次/);
 	assert.match(prompt, /运行时已将当前输入判定为动作式请求/);
 	assert.match(prompt, /设备不可达或动作必填参数缺失时返回 needs-human/);
-	assert.match(prompt, /选择与需求匹配的一个或多个 Skill/);
+	assert.match(prompt, /选择与用户指令匹配的一个或多个 Skill/);
 	assert.match(prompt, /先用 read 完整读取每个选中的 SKILL.md/);
 	assert.doesNotMatch(prompt, /未经人类明确确认不得驱动真实硬件/);
 });
