@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -8,6 +8,18 @@ import { fileURLToPath } from "node:url";
 
 const projectDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const repositoryDirectory = resolve(projectDirectory, "..");
+
+test("installer help explains the safe config refresh option", () => {
+	const result = spawnSync("bash", [join(projectDirectory, "deploy", "install-rdk-agent.sh"), "--help"], {
+		encoding: "utf8",
+	});
+
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /--refresh-config/);
+	assert.match(result.stdout, /备份后覆盖包内同名静态配置/);
+	assert.match(result.stdout, /不删除额外文件/);
+	assert.match(result.stdout, /保留运行时 servo-control/);
+});
 
 test("installer upgrades an unchanged default config while ignoring its generated migration example", (context) => {
 	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-"));
@@ -65,6 +77,590 @@ test("installer upgrades an unchanged default config while ignoring its generate
 	);
 });
 
+test("installer upgrades an unchanged agents config despite runtime config directory changes", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-runtime-files-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	mkdirSync(join(installDirectory, "config", "skills", "servo-control"), { recursive: true });
+	mkdirSync(join(configDirectory, "skills", "servo-control"), { recursive: true });
+	mkdirSync(join(configDirectory, "skills", ".servo-control.rdk-agent-runtime.bak"), { recursive: true });
+	mkdirSync(join(installDirectory, "config", "templates", "magicbox-servo", "tools"), { recursive: true });
+	mkdirSync(join(configDirectory, "templates", "magicbox-servo", "tools", "__pycache__"), { recursive: true });
+	mkdirSync(fakeBinaryDirectory, { recursive: true });
+
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "old-default\n");
+	writeFileSync(join(configDirectory, "agents.yaml"), "old-default\n");
+	writeFileSync(join(installDirectory, "config", "skills", "servo-control", "SKILL.md"), "installed skill\n");
+	writeFileSync(join(configDirectory, "skills", "servo-control", "SKILL.md"), "runtime-updated skill\n");
+	writeFileSync(
+		join(configDirectory, "skills", ".servo-control.rdk-agent-runtime.bak", "SKILL.md"),
+		"runtime backup\n",
+	);
+	writeFileSync(
+		join(installDirectory, "config", "templates", "magicbox-servo", "tools", "servo_action.py"),
+		"static tool\n",
+	);
+	writeFileSync(
+		join(configDirectory, "templates", "magicbox-servo", "tools", "servo_action.py"),
+		"static tool\n",
+	);
+	writeFileSync(
+		join(configDirectory, "templates", "magicbox-servo", "tools", "__pycache__", "servo_action.pyc"),
+		"runtime bytecode\n",
+	);
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /未修改的默认配置已升级到最新版本/);
+	assert.equal(
+		readFileSync(join(configDirectory, "agents.yaml"), "utf8"),
+		readFileSync(join(projectDirectory, "config", "agents.yaml"), "utf8"),
+	);
+	assert.equal(readFileSync(join(configDirectory, "skills", "servo-control", "SKILL.md"), "utf8"), "runtime-updated skill\n");
+	assert.equal(
+		readFileSync(join(configDirectory, "skills", ".servo-control.rdk-agent-runtime.bak", "SKILL.md"), "utf8"),
+		"runtime backup\n",
+	);
+	assert.match(result.stdout, /已保留运行时 servo-control Skill/);
+});
+
+test("installer migrates the byte-identical retired default actions registry during a default upgrade", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-retired-actions-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	const actionsRegistry = join(
+		"templates",
+		"magicbox-servo",
+		"examples",
+		"plugins",
+		"servo",
+		"servo_actions",
+		"actions.json",
+	);
+	const retiredDefault = '{\n  "version": 1,\n  "actions": {}\n}\n';
+
+	for (const directory of [
+		join(installDirectory, "config", dirname(actionsRegistry)),
+		join(configDirectory, dirname(actionsRegistry)),
+		fakeBinaryDirectory,
+	]) {
+		mkdirSync(directory, { recursive: true });
+	}
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "old-default\n");
+	writeFileSync(join(configDirectory, "agents.yaml"), "old-default\n");
+	writeFileSync(join(installDirectory, "config", actionsRegistry), retiredDefault);
+	writeFileSync(join(configDirectory, actionsRegistry), retiredDefault);
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /未修改的默认配置已升级到最新版本/);
+	assert.match(result.stdout, /已移除旧版默认空 actions\.json/);
+	assert.equal(existsSync(join(configDirectory, actionsRegistry)), false);
+});
+
+test("installer preserves a byte-modified actions registry as customized config", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-custom-actions-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	const actionsRegistry = join(
+		"templates",
+		"magicbox-servo",
+		"examples",
+		"plugins",
+		"servo",
+		"servo_actions",
+		"actions.json",
+	);
+	const retiredDefault = '{\n  "version": 1,\n  "actions": {}\n}\n';
+	const customizedRegistry = '{\n "version": 1,\n "actions": {}\n}\n';
+
+	for (const directory of [
+		join(installDirectory, "config", dirname(actionsRegistry)),
+		join(configDirectory, dirname(actionsRegistry)),
+		fakeBinaryDirectory,
+	]) {
+		mkdirSync(directory, { recursive: true });
+	}
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "old-default\n");
+	writeFileSync(join(configDirectory, "agents.yaml"), "old-default\n");
+	writeFileSync(join(installDirectory, "config", actionsRegistry), retiredDefault);
+	writeFileSync(join(configDirectory, actionsRegistry), customizedRegistry);
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /保留已有配置/);
+	assert.equal(readFileSync(join(configDirectory, actionsRegistry), "utf8"), customizedRegistry);
+	assert.equal(readFileSync(join(configDirectory, "agents.yaml"), "utf8"), "old-default\n");
+	assert.equal(
+		readFileSync(join(configDirectory, "agents.yaml.v2.example"), "utf8"),
+		readFileSync(join(projectDirectory, "config", "agents.yaml"), "utf8"),
+	);
+});
+
+test("installer preserves real static template and authoring skill customizations", (context) => {
+	const staticPaths = [
+		join("skills", "magicbox-command-authoring", "SKILL.md"),
+		join("templates", "magicbox-servo", "custom-contract.md"),
+	];
+
+	for (const [index, customizedPath] of staticPaths.entries()) {
+		const temporaryDirectory = mkdtempSync(join(tmpdir(), `rdk-agent-installer-static-${index}-`));
+		context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+		const installDirectory = join(temporaryDirectory, "app");
+		const binaryDirectory = join(temporaryDirectory, "bin");
+		const configDirectory = join(temporaryDirectory, "config");
+		const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+		mkdirSync(join(installDirectory, "config", dirname(customizedPath)), { recursive: true });
+		mkdirSync(join(configDirectory, dirname(customizedPath)), { recursive: true });
+		mkdirSync(fakeBinaryDirectory, { recursive: true });
+
+		writeFileSync(join(installDirectory, "config", "agents.yaml"), "old-default\n");
+		writeFileSync(join(configDirectory, "agents.yaml"), "old-default\n");
+		writeFileSync(join(installDirectory, "config", customizedPath), "static default\n");
+		writeFileSync(join(configDirectory, customizedPath), "user customization\n");
+
+		const fakeNode = join(fakeBinaryDirectory, "node");
+		const fakeNpm = join(fakeBinaryDirectory, "npm");
+		writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+		writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+		chmodSync(fakeNode, 0o755);
+		chmodSync(fakeNpm, 0o755);
+
+		const result = spawnSync(
+			"bash",
+			[
+				join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+				"--install-dir",
+				installDirectory,
+				"--bin-dir",
+				binaryDirectory,
+				"--config-dir",
+				configDirectory,
+			],
+			{
+				encoding: "utf8",
+				env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+			},
+		);
+
+		assert.equal(result.status, 0, result.stderr || result.stdout);
+		assert.match(result.stdout, /保留已有配置/);
+		assert.equal(readFileSync(join(configDirectory, customizedPath), "utf8"), "user customization\n");
+		assert.equal(readFileSync(join(configDirectory, "agents.yaml"), "utf8"), "old-default\n");
+		assert.equal(
+			readFileSync(join(configDirectory, "agents.yaml.v2.example"), "utf8"),
+			readFileSync(join(projectDirectory, "config", "agents.yaml"), "utf8"),
+		);
+	}
+});
+
+test("refresh-config backs up and refreshes customized static config while preserving runtime servo files", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-refresh-config-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	const authoringSkill = join("skills", "magicbox-command-authoring", "SKILL.md");
+	const runtimeSkill = join("skills", "servo-control", "SKILL.md");
+	const runtimeRollback = join("skills", ".servo-control.rdk-agent-runtime.bak", "SKILL.md");
+	const templateTool = join("templates", "magicbox-servo", "tools", "servo_action.py");
+	const extraStaticFile = join("templates", "local-extra.md");
+
+	for (const directory of [
+		join(installDirectory, "config", dirname(authoringSkill)),
+		join(installDirectory, "config", dirname(runtimeSkill)),
+		join(installDirectory, "config", dirname(templateTool)),
+		join(configDirectory, dirname(authoringSkill)),
+		join(configDirectory, dirname(runtimeSkill)),
+		join(configDirectory, dirname(runtimeRollback)),
+		join(configDirectory, dirname(templateTool)),
+		join(configDirectory, dirname(extraStaticFile)),
+		fakeBinaryDirectory,
+	]) {
+		mkdirSync(directory, { recursive: true });
+	}
+
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "old bundled agents\n");
+	writeFileSync(join(installDirectory, "config", authoringSkill), "old bundled authoring\n");
+	writeFileSync(join(installDirectory, "config", runtimeSkill), "old bundled runtime\n");
+	writeFileSync(join(installDirectory, "config", templateTool), "old bundled template\n");
+	writeFileSync(join(configDirectory, "agents.yaml"), "custom agents\n");
+	writeFileSync(join(configDirectory, authoringSkill), "custom authoring\n");
+	writeFileSync(join(configDirectory, runtimeSkill), "runtime servo-control\n");
+	writeFileSync(join(configDirectory, runtimeRollback), "runtime rollback\n");
+	writeFileSync(join(configDirectory, templateTool), "custom template\n");
+	writeFileSync(join(configDirectory, extraStaticFile), "local extra static file\n");
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+			"--refresh-config",
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /刷新前配置已完整备份/);
+	assert.match(result.stdout, /已覆盖包内同名静态配置/);
+	assert.equal(
+		readFileSync(join(configDirectory, "agents.yaml"), "utf8"),
+		readFileSync(join(projectDirectory, "config", "agents.yaml"), "utf8"),
+	);
+	assert.equal(
+		readFileSync(join(configDirectory, authoringSkill), "utf8"),
+		readFileSync(join(projectDirectory, "config", authoringSkill), "utf8"),
+	);
+	assert.equal(
+		readFileSync(join(configDirectory, templateTool), "utf8"),
+		readFileSync(join(projectDirectory, "config", templateTool), "utf8"),
+	);
+	assert.equal(readFileSync(join(configDirectory, runtimeSkill), "utf8"), "runtime servo-control\n");
+	assert.equal(readFileSync(join(configDirectory, runtimeRollback), "utf8"), "runtime rollback\n");
+	assert.equal(readFileSync(join(configDirectory, extraStaticFile), "utf8"), "local extra static file\n");
+
+	const configBackups = readdirSync(temporaryDirectory).filter((name) => name.startsWith("config.backup."));
+	assert.equal(configBackups.length, 1);
+	assert.match(configBackups[0]!, /^config\.backup\.\d{8}-\d{6}(?:\.\d+)?$/);
+	const configBackup = join(temporaryDirectory, configBackups[0]!);
+	assert.equal(readFileSync(join(configBackup, "agents.yaml"), "utf8"), "custom agents\n");
+	assert.equal(readFileSync(join(configBackup, authoringSkill), "utf8"), "custom authoring\n");
+	assert.equal(readFileSync(join(configBackup, templateTool), "utf8"), "custom template\n");
+	assert.equal(readFileSync(join(configBackup, runtimeSkill), "utf8"), "runtime servo-control\n");
+	assert.equal(readFileSync(join(configBackup, runtimeRollback), "utf8"), "runtime rollback\n");
+	assert.equal(readFileSync(join(configBackup, extraStaticFile), "utf8"), "local extra static file\n");
+});
+
+test("refresh-config rolls back the application and config when command registration fails", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-refresh-rollback-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	const authoringSkill = join("skills", "magicbox-command-authoring", "SKILL.md");
+	const runtimeSkill = join("skills", "servo-control", "SKILL.md");
+	const runtimeRollback = join("skills", ".servo-control.rdk-agent-runtime.bak", "SKILL.md");
+	const templateTool = join("templates", "magicbox-servo", "tools", "servo_action.py");
+
+	for (const directory of [
+		join(installDirectory, "config"),
+		join(configDirectory, dirname(authoringSkill)),
+		join(configDirectory, dirname(runtimeSkill)),
+		join(configDirectory, dirname(runtimeRollback)),
+		join(configDirectory, dirname(templateTool)),
+		binaryDirectory,
+		fakeBinaryDirectory,
+	]) {
+		mkdirSync(directory, { recursive: true });
+	}
+
+	writeFileSync(join(installDirectory, "installed-version.txt"), "previous application\n");
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "previous bundled agents\n");
+	writeFileSync(join(configDirectory, "agents.yaml"), "custom agents before failed refresh\n");
+	writeFileSync(join(configDirectory, authoringSkill), "custom authoring before failed refresh\n");
+	writeFileSync(join(configDirectory, runtimeSkill), "runtime skill before failed refresh\n");
+	writeFileSync(join(configDirectory, runtimeRollback), "runtime rollback before failed refresh\n");
+	writeFileSync(join(configDirectory, templateTool), "custom template before failed refresh\n");
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	const fakeLn = join(fakeBinaryDirectory, "ln");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	writeFileSync(fakeLn, "#!/bin/sh\necho 'forced command registration failure' >&2\nexit 73\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+	chmodSync(fakeLn, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+			"--refresh-config",
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 73, result.stderr || result.stdout);
+	assert.match(result.stderr, /forced command registration failure/);
+	assert.match(result.stderr, /自动恢复配置/);
+	assert.equal(readFileSync(join(installDirectory, "installed-version.txt"), "utf8"), "previous application\n");
+	assert.equal(readFileSync(join(configDirectory, "agents.yaml"), "utf8"), "custom agents before failed refresh\n");
+	assert.equal(
+		readFileSync(join(configDirectory, authoringSkill), "utf8"),
+		"custom authoring before failed refresh\n",
+	);
+	assert.equal(readFileSync(join(configDirectory, runtimeSkill), "utf8"), "runtime skill before failed refresh\n");
+	assert.equal(
+		readFileSync(join(configDirectory, runtimeRollback), "utf8"),
+		"runtime rollback before failed refresh\n",
+	);
+	assert.equal(
+		readFileSync(join(configDirectory, templateTool), "utf8"),
+		"custom template before failed refresh\n",
+	);
+
+	const configBackups = readdirSync(temporaryDirectory).filter((name) => name.startsWith("config.backup."));
+	assert.equal(configBackups.length, 1);
+	const configBackup = join(temporaryDirectory, configBackups[0]!);
+	assert.equal(readFileSync(join(configBackup, "agents.yaml"), "utf8"), "custom agents before failed refresh\n");
+	assert.equal(readFileSync(join(configBackup, runtimeSkill), "utf8"), "runtime skill before failed refresh\n");
+	assert.equal(
+		readdirSync(temporaryDirectory).some((name) => name.startsWith("app.backup.")),
+		false,
+	);
+});
+
+test("automatic default config upgrade rolls back the full config and application when command registration fails", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-default-upgrade-rollback-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	const runtimeSkill = join("skills", "servo-control", "SKILL.md");
+	const legacyActionsRegistry = join(
+		"templates",
+		"magicbox-servo",
+		"examples",
+		"plugins",
+		"servo",
+		"servo_actions",
+		"actions.json",
+	);
+	const retiredDefault = '{\n  "version": 1,\n  "actions": {}\n}\n';
+
+	for (const directory of [
+		join(installDirectory, "config", dirname(runtimeSkill)),
+		join(installDirectory, "config", dirname(legacyActionsRegistry)),
+		join(configDirectory, dirname(runtimeSkill)),
+		join(configDirectory, dirname(legacyActionsRegistry)),
+		binaryDirectory,
+		fakeBinaryDirectory,
+	]) {
+		mkdirSync(directory, { recursive: true });
+	}
+
+	writeFileSync(join(installDirectory, "installed-version.txt"), "previous application\n");
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), "previous default agents\n");
+	writeFileSync(join(installDirectory, "config", runtimeSkill), "previous bundled runtime skill\n");
+	writeFileSync(join(installDirectory, "config", legacyActionsRegistry), retiredDefault);
+	writeFileSync(join(configDirectory, "agents.yaml"), "previous default agents\n");
+	writeFileSync(join(configDirectory, runtimeSkill), "runtime-updated skill\n");
+	writeFileSync(join(configDirectory, legacyActionsRegistry), retiredDefault);
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	const fakeLn = join(fakeBinaryDirectory, "ln");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	writeFileSync(fakeLn, "#!/bin/sh\necho 'forced automatic upgrade registration failure' >&2\nexit 74\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+	chmodSync(fakeLn, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 74, result.stderr || result.stdout);
+	assert.match(result.stderr, /forced automatic upgrade registration failure/);
+	assert.match(result.stderr, /已自动恢复升级前的默认配置/);
+	assert.equal(readFileSync(join(installDirectory, "installed-version.txt"), "utf8"), "previous application\n");
+	assert.equal(readFileSync(join(configDirectory, "agents.yaml"), "utf8"), "previous default agents\n");
+	assert.equal(readFileSync(join(configDirectory, runtimeSkill), "utf8"), "runtime-updated skill\n");
+	assert.equal(readFileSync(join(configDirectory, legacyActionsRegistry), "utf8"), retiredDefault);
+	assert.equal(
+		readdirSync(temporaryDirectory).some((name) => name.startsWith("app.backup.")),
+		false,
+	);
+});
+
+test("installer recognizes its prior automatic agents migration as an unchanged default", (context) => {
+	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-auto-migration-"));
+	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
+
+	const installDirectory = join(temporaryDirectory, "app");
+	const binaryDirectory = join(temporaryDirectory, "bin");
+	const configDirectory = join(temporaryDirectory, "config");
+	const fakeBinaryDirectory = join(temporaryDirectory, "fake-bin");
+	mkdirSync(join(installDirectory, "config"), { recursive: true });
+	mkdirSync(configDirectory, { recursive: true });
+	mkdirSync(fakeBinaryDirectory, { recursive: true });
+
+	const previousDefault = `version: 2
+agents:
+  - id: python-test
+    validation:
+      kind: servo-python-test
+    systemPrompt: Default prompt
+`;
+	const automaticallyMigratedDefault = `version: 2
+agents:
+  - id: python-test
+    systemPrompt: Default prompt
+`;
+	writeFileSync(join(installDirectory, "config", "agents.yaml"), previousDefault);
+	writeFileSync(join(configDirectory, "agents.yaml"), automaticallyMigratedDefault);
+	writeFileSync(join(configDirectory, "agents.yaml.before-servo-python-test-migration"), previousDefault);
+
+	const fakeNode = join(fakeBinaryDirectory, "node");
+	const fakeNpm = join(fakeBinaryDirectory, "npm");
+	writeFileSync(fakeNode, '#!/bin/sh\nif [ "${1:-}" = "--version" ]; then echo v22.23.2; fi\nexit 0\n');
+	writeFileSync(fakeNpm, "#!/bin/sh\nexit 0\n");
+	chmodSync(fakeNode, 0o755);
+	chmodSync(fakeNpm, 0o755);
+
+	const result = spawnSync(
+		"bash",
+		[
+			join(projectDirectory, "deploy", "install-rdk-agent.sh"),
+			"--install-dir",
+			installDirectory,
+			"--bin-dir",
+			binaryDirectory,
+			"--config-dir",
+			configDirectory,
+		],
+		{
+			encoding: "utf8",
+			env: { ...process.env, PATH: `${fakeBinaryDirectory}:/usr/bin:/bin` },
+		},
+	);
+
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /未修改的默认配置已升级到最新版本/);
+	assert.equal(
+		readFileSync(join(configDirectory, "agents.yaml"), "utf8"),
+		readFileSync(join(projectDirectory, "config", "agents.yaml"), "utf8"),
+	);
+});
+
 test("installer removes retired servo Python validation without overwriting customized configuration", (context) => {
 	const temporaryDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-installer-migration-"));
 	context.after(() => rmSync(temporaryDirectory, { recursive: true, force: true }));
@@ -112,6 +708,7 @@ agents:
 	);
 
 	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.match(result.stdout, /保留已有配置/);
 	assert.match(result.stdout, /已迁移旧版 servo-python-test 配置/);
 	const migratedConfiguration = readFileSync(join(configDirectory, "agents.yaml"), "utf8");
 	assert.doesNotMatch(migratedConfiguration, /servo-python-test/);
