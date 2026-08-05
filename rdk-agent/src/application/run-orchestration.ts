@@ -49,14 +49,17 @@ export class RunOrchestration {
 
 		for (const loop of mode.loops) {
 			workflow.start(loop.id);
+			input.onEvent({ type: "stage-status", stageId: loop.id, status: "running" });
 			try {
 				await this.runTddLoop(input, loop, deliveries);
 				const detail = `${loop.deliverable} 已通过 ${loop.name}`;
 				workflow.succeed(loop.id, detail);
+				input.onEvent({ type: "stage-status", stageId: loop.id, status: "succeeded", detail });
 				deliveries.push({ stageId: loop.id, summary: detail });
 			} catch (error) {
 				const detail = error instanceof Error ? error.message : String(error);
 				workflow.fail(loop.id, detail);
+				input.onEvent({ type: "stage-status", stageId: loop.id, status: "failed", detail });
 				input.onEvent({ type: "workflow-finished", succeeded: false, detail: `${loop.name} 中止：${detail}` });
 				return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 			}
@@ -123,12 +126,6 @@ export class RunOrchestration {
 			deliveries.push({ stageId: loop.verificationAgentId, summary: verification.summary });
 			if (verification.outcome === "completed") return;
 
-			input.onEvent({
-				type: "stage-status",
-				stageId: loop.verificationAgentId,
-				status: "failed",
-				detail: verification.feedback ?? "验证要求返工",
-			});
 			if (iteration < loop.maxIterations) continue;
 
 			const response = await this.requestHuman(
@@ -168,21 +165,22 @@ export class RunOrchestration {
 		iteration?: number,
 	): Promise<AgentRunResult> {
 		const profile = this.profile(agentId);
-		while (true) {
+		try {
 			input.onEvent({ type: "stage-status", stageId: agentId, status: "running" });
-			let result: AgentRunResult;
-			try {
-				result = await this.agentRunner.run({
-					profile,
-					userRequest: input.request,
-					workspaceRoot: input.workspaceRoot,
-					skillDirectory: input.skillDirectory,
-					expectation,
-					iteration,
-					previousDeliveries: deliveries,
-					onEvent: (event) => {
-						if (event.type === "text") input.onEvent({ type: "agent-event", stageId: agentId, text: event.text });
-						else if (event.type === "status") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[状态] ${event.message}\n` });
+			while (true) {
+				let result: AgentRunResult;
+				try {
+					result = await this.agentRunner.run({
+						profile,
+						userRequest: input.request,
+						workspaceRoot: input.workspaceRoot,
+						skillDirectory: input.skillDirectory,
+						expectation,
+						iteration,
+						previousDeliveries: deliveries,
+						onEvent: (event) => {
+							if (event.type === "text") input.onEvent({ type: "agent-event", stageId: agentId, text: event.text });
+							else if (event.type === "status") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[状态] ${event.message}\n` });
 							else if (event.type === "tool-start") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具] ${event.toolName}${event.summary ? `：${event.summary}` : ""}\n` });
 							else if (event.type === "tool-end") {
 								const visibleResult = event.isError || event.toolName === "bash" || event.toolName === "deploy"
@@ -190,31 +188,39 @@ export class RunOrchestration {
 									: "\n";
 								input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具完成] ${event.toolName}${event.isError ? "（失败）" : ""}${visibleResult}` });
 							}
-						else if (event.type === "skills-loaded") input.onEvent({ type: "skills-loaded", stageId: agentId, skills: event.skills });
-						else input.onEvent({ type: "skill-selected", stageId: agentId, skill: event.skill });
-					},
-				});
-			} catch (error) {
-				const detail = error instanceof Error ? error.message : String(error);
-				const response = await this.requestHuman(input, agentId, profile.name, `${profile.name} 无法继续，请补充信息后重试，或输入 /abort 终止。`, detail);
-				deliveries.push({ stageId: "human", summary: response.message });
-				continue;
-			}
+							else if (event.type === "skills-loaded") input.onEvent({ type: "skills-loaded", stageId: agentId, skills: event.skills });
+							else input.onEvent({ type: "skill-selected", stageId: agentId, skill: event.skill });
+						},
+					});
+				} catch (error) {
+					const detail = error instanceof Error ? error.message : String(error);
+					const response = await this.requestHuman(input, agentId, profile.name, `${profile.name} 无法继续，请补充信息后重试，或输入 /abort 终止。`, detail);
+					deliveries.push({ stageId: "human", summary: response.message });
+					continue;
+				}
 
-			if (result.outcome === "needs-human") {
-				const response = await this.requestHuman(
-					input,
-					agentId,
-					profile.name,
-					result.question ?? `${profile.name} 需要人类补充信息，或输入 /abort 终止。`,
-					result.summary,
-				);
-				deliveries.push({ stageId: "human", summary: response.message });
-				continue;
-			}
+				if (result.outcome === "needs-human") {
+					const response = await this.requestHuman(
+						input,
+						agentId,
+						profile.name,
+						result.question ?? `${profile.name} 需要人类补充信息，或输入 /abort 终止。`,
+						result.summary,
+					);
+					deliveries.push({ stageId: "human", summary: response.message });
+					continue;
+				}
+				if (result.outcome === "revision" && expectation !== "verification") {
+					throw new Error(`${profile.name} 在 ${expectation} 阶段返回了不支持的 revision 结果`);
+				}
 
-			input.onEvent({ type: "stage-status", stageId: agentId, status: result.outcome === "completed" ? "succeeded" : "failed", detail: result.feedback });
-			return result;
+				input.onEvent({ type: "stage-status", stageId: agentId, status: result.outcome === "completed" ? "succeeded" : "failed", detail: result.feedback });
+				return result;
+			}
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : String(error);
+			input.onEvent({ type: "stage-status", stageId: agentId, status: "failed", detail });
+			throw error;
 		}
 	}
 

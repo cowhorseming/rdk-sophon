@@ -79,15 +79,28 @@ test("TDD loop repeats test, coding and verification until verification passes",
 	assert.deepEqual(expectations, ["test", "coding", "verification", "test", "coding", "verification"]);
 	assert.equal(result.succeeded, true);
 	assert.equal(events.filter((event) => event.type === "loop-iteration").length, 2);
+	assert.deepEqual(
+		events.filter((event) => event.type === "stage-status" && event.stageId === "python"),
+		[
+			{ type: "stage-status", stageId: "python", status: "running" },
+			{ type: "stage-status", stageId: "python", status: "succeeded", detail: "Python script 已通过 Python TDD" },
+		],
+	);
+	assert.deepEqual(
+		events.flatMap((event) => event.type === "stage-status" && event.stageId === "verification" ? [event.status] : []),
+		["running", "failed", "running", "succeeded"],
+	);
 });
 
 test("development runs deterministic deployment and final acceptance after a passing TDD loop", async () => {
 	const calls: string[] = [];
 	const expectations: string[] = [];
+	const userRequests: string[] = [];
 	const runner: AgentRunner = {
 		async run(request) {
 			calls.push(request.profile.id);
 			expectations.push(request.expectation);
+			userRequests.push(request.userRequest);
 			return { summary: `${request.profile.id} done`, outcome: "completed" };
 		},
 	};
@@ -109,6 +122,7 @@ test("development runs deterministic deployment and final acceptance after a pas
 	assert.equal(result.succeeded, true);
 	assert.deepEqual(calls, ["test", "coding", "verification", "deployment", "skill-deploy", "application"]);
 	assert.deepEqual(expectations, ["test", "coding", "verification", "deployment", "deployment", "application"]);
+	assert.deepEqual(userRequests, Array.from({ length: 6 }, () => "开发一个挥动左手的功能"));
 	assert.deepEqual(result.stages.map((stage) => stage.id), ["python", "deployment", "skill-deploy", "application"]);
 });
 
@@ -129,17 +143,70 @@ test("needs-human pauses an agent and retries it with the human response in deli
 			return { action: "continue", message: "使用 v2" };
 		},
 	};
+	const events: WorkflowEvent[] = [];
 	const result = await new RunOrchestration(runner, profiles).execute({
 		mode: applicationMode,
 		request: "组合测试站立和摇头 Skill",
 		workspaceRoot: "/tmp/rdk",
 		skillDirectory: "/tmp/skills",
 		humanInLoop: human,
-		onEvent: () => undefined,
+		onEvent: (event) => events.push(event),
 	});
 
 	assert.equal(result.succeeded, true);
 	assert.deepEqual(seenHumanDelivery, [false, true]);
+	assert.deepEqual(
+		events.flatMap((event) => event.type === "stage-status" && event.stageId === "application" ? [event.status] : []),
+		["running", "succeeded"],
+	);
+});
+
+test("an Agent runner error followed by human input remains one logical lifecycle", async () => {
+	let calls = 0;
+	const runner: AgentRunner = {
+		async run() {
+			if (++calls === 1) throw new Error("temporary transport failure");
+			return { summary: "application tested", outcome: "completed" };
+		},
+	};
+	const events: WorkflowEvent[] = [];
+	const result = await new RunOrchestration(runner, profiles).execute({
+		mode: applicationMode,
+		request: "测试效果",
+		workspaceRoot: "/tmp/rdk",
+		skillDirectory: "/tmp/skills",
+		humanInLoop: { async requestInput() { return { action: "continue", message: "请重试" }; } },
+		onEvent: (event) => events.push(event),
+	});
+
+	assert.equal(result.succeeded, true);
+	assert.deepEqual(
+		events.flatMap((event) => event.type === "stage-status" && event.stageId === "application" ? [event.status] : []),
+		["running", "succeeded"],
+	);
+});
+
+test("revision is terminal outside a verification Agent", async () => {
+	const runner: AgentRunner = {
+		async run() {
+			return { summary: "not complete", outcome: "revision", feedback: "needs changes" };
+		},
+	};
+	const events: WorkflowEvent[] = [];
+	const result = await new RunOrchestration(runner, profiles).execute({
+		mode: applicationMode,
+		request: "测试效果",
+		workspaceRoot: "/tmp/rdk",
+		skillDirectory: "/tmp/skills",
+		humanInLoop: noHuman,
+		onEvent: (event) => events.push(event),
+	});
+
+	assert.equal(result.succeeded, false);
+	assert.deepEqual(
+		events.flatMap((event) => event.type === "stage-status" && event.stageId === "application" ? [event.status] : []),
+		["running", "failed"],
+	);
 });
 
 test("human can abort a blocked workflow", async () => {
@@ -153,16 +220,22 @@ test("human can abort a blocked workflow", async () => {
 			return { action: "abort", message: "/abort" };
 		},
 	};
+	const events: WorkflowEvent[] = [];
 	const result = await new RunOrchestration(runner, profiles).execute({
 		mode: applicationMode,
 		request: "测试效果",
 		workspaceRoot: "/tmp/rdk",
 		skillDirectory: "/tmp/skills",
 		humanInLoop: human,
-		onEvent: () => undefined,
+		onEvent: (event) => events.push(event),
 	});
 	assert.equal(result.succeeded, false);
 	assert.match(result.stages[0]?.detail ?? "", /人类终止/);
+	assert.deepEqual(
+		events
+			.flatMap((event) => event.type === "stage-status" && event.stageId === "application" ? [event.status] : []),
+		["running", "failed"],
+	);
 });
 
 test("application forwards loaded and selected Skill events to the UI", async () => {
