@@ -39,6 +39,26 @@ test("no-argument developer mode provisions and reuses a versioned managed works
 	assert.equal(readFileSync(join(second.root, "examples", "servo.py"), "utf8"), "developer change\n");
 });
 
+test("a template contract version bump provisions a fresh workspace and preserves the previous one", (context) => {
+	const { root, template, configuration } = fixture(context);
+	const resolver = new ManagedWorkspaceResolver(join(root, "state"));
+	const previous = resolver.resolve(configuration);
+	writeFileSync(join(previous.root, "examples", "servo.py"), "developer change\n");
+	writeFileSync(join(template, "README.md"), "new template contract\n");
+
+	const upgraded = resolver.resolve({
+		...configuration,
+		version: configuration.version + 1,
+		requiredPaths: [...configuration.requiredPaths, "README.md"],
+	});
+
+	assert.equal(upgraded.created, true);
+	assert.match(upgraded.root, /workspaces\/magicbox\/v4$/);
+	assert.equal(readFileSync(join(upgraded.root, "examples", "servo.py"), "utf8"), "baseline\n");
+	assert.equal(readFileSync(join(upgraded.root, "README.md"), "utf8"), "new template contract\n");
+	assert.equal(readFileSync(join(previous.root, "examples", "servo.py"), "utf8"), "developer change\n");
+});
+
 test("an explicit workspace keeps repository-contributor mode without provisioning", (context) => {
 	const { root, configuration } = fixture(context);
 	const external = join(root, "external-project");

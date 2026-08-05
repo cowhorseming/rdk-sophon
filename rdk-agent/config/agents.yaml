@@ -4,7 +4,8 @@ defaultMode: robot-application
 workspace:
   kind: managed-template
   id: magicbox-servo
-  version: 5
+  # 模板交付契约变化时必须递增，避免复用缺少新基线文件的旧托管工作区。
+  version: 6
   template: templates/magicbox-servo
   requiredPaths:
     - examples/plugins/servo/servo_ctrl.py

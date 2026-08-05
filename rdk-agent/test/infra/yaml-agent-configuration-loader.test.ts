@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -176,6 +176,15 @@ test("bundled development workflow uses action-package TDD and deterministic rel
 	assert.equal(configuration.intake.timeoutSeconds, 30);
 	assert.match(configuration.intake.developmentScope, /动作包/);
 	assert.equal(configuration.workspace.kind, "managed-template");
+	if (configuration.workspace.kind === "managed-template") {
+		for (const requiredPath of configuration.workspace.requiredPaths) {
+			assert.equal(
+				existsSync(join(configuration.workspace.templateDirectory, requiredPath)),
+				true,
+				`bundled workspace template is missing ${requiredPath}`,
+			);
+		}
+	}
 	assert.deepEqual(configuration.workspace.requiredPaths, [
 		"examples/plugins/servo/servo_ctrl.py",
 		"examples/plugins/servo/plugin.toml",
@@ -185,7 +194,7 @@ test("bundled development workflow uses action-package TDD and deterministic rel
 	]);
 	if (configuration.workspace.kind === "managed-template") {
 		assert.equal(configuration.workspace.id, "magicbox-servo");
-		assert.equal(configuration.workspace.version, 5);
+		assert.equal(configuration.workspace.version, 6);
 		assert.match(configuration.workspace.templateDirectory, /config\/templates\/magicbox-servo$/);
 	}
 	for (const profile of configuration.profiles) assert.equal(profile.maxToolCalls, undefined);
