@@ -16,6 +16,12 @@ export interface CurrentDirectoryWorkspaceConfiguration {
 
 export type WorkspaceConfiguration = ManagedTemplateWorkspaceConfiguration | CurrentDirectoryWorkspaceConfiguration;
 
+export interface RequestIntakeConfiguration {
+	autoStartConfidence: number;
+	timeoutSeconds: number;
+	developmentScope: string;
+}
+
 export interface AgentConfiguration {
 	configDirectory: string;
 	skillDirectory: string;
@@ -23,6 +29,7 @@ export interface AgentConfiguration {
 	modes: readonly OrchestrationMode[];
 	defaultModeId: string;
 	workspace: WorkspaceConfiguration;
+	intake: RequestIntakeConfiguration;
 }
 
 export interface AgentConfigurationLoader {

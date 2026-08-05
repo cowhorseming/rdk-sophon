@@ -8,7 +8,7 @@
     "start": "node --experimental-strip-types src/api/tui/main.ts",
     "deploy": "bash deploy/install-rdk-agent.sh",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test test/**/*.test.ts"
+    "test": "node --experimental-strip-types --test 'test/**/*.test.ts'"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.83.0",

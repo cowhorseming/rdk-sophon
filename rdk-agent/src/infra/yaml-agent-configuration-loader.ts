@@ -13,6 +13,7 @@ import type { OrchestrationMode, TddLoopDefinition } from "../domain/orchestrati
 import type {
 	AgentConfiguration,
 	AgentConfigurationLoader,
+	RequestIntakeConfiguration,
 	WorkspaceConfiguration,
 } from "../shared/agent-configuration.ts";
 
@@ -42,6 +43,7 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		const defaultModeId = this.string(root.defaultMode, "defaultMode");
 		if (!modeIds.includes(defaultModeId)) throw new Error(`defaultMode 引用了不存在的模式：${defaultModeId}`);
 		const workspace = this.workspace(root.workspace, resolvedDirectory);
+		const intake = this.intake(root.intake);
 
 		const skillDirectory = join(resolvedDirectory, "skills");
 		for (const profile of profiles) {
@@ -51,7 +53,26 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			}
 		}
 
-		return { configDirectory: resolvedDirectory, skillDirectory, profiles, modes, defaultModeId, workspace };
+		return { configDirectory: resolvedDirectory, skillDirectory, profiles, modes, defaultModeId, workspace, intake };
+	}
+
+	private intake(value: unknown): RequestIntakeConfiguration {
+		if (value === undefined) {
+			return {
+				autoStartConfidence: 0.9,
+				timeoutSeconds: 30,
+				developmentScope: "只有用户指令明确要求新增、修改、修复、测试或部署当前机器人能力时，才启动受支持的研发流程。",
+			};
+		}
+		const raw = this.record(value, "intake");
+		const autoStartConfidence = raw.autoStartConfidence === undefined
+			? 0.9
+			: this.probability(raw.autoStartConfidence, "intake.autoStartConfidence");
+		const timeoutSeconds = this.optionalPositiveInteger(raw.timeoutSeconds, "intake.timeoutSeconds", 30);
+		const developmentScope = raw.developmentScope === undefined
+			? "只有用户指令明确要求新增、修改、修复、测试或部署当前机器人能力时，才启动受支持的研发流程。"
+			: this.string(raw.developmentScope, "intake.developmentScope");
+		return { autoStartConfidence, timeoutSeconds, developmentScope };
 	}
 
 	private workspace(value: unknown, configDirectory: string): WorkspaceConfiguration {
@@ -298,6 +319,13 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 
 	private positiveInteger(value: unknown, label: string): number {
 		if (typeof value !== "number" || !Number.isInteger(value) || value < 1) throw new Error(`${label} 必须是正整数`);
+		return value;
+	}
+
+	private probability(value: unknown, label: string): number {
+		if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 1) {
+			throw new Error(`${label} 必须是大于 0 且不超过 1 的数字`);
+		}
 		return value;
 	}
 

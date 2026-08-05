@@ -60,11 +60,60 @@ modes:
 		network: "none",
 	});
 	assert.deepEqual(configuration.workspace, { kind: "current-directory", requiredPaths: ["examples/plugin.toml"] });
+	assert.deepEqual(configuration.intake, {
+		autoStartConfidence: 0.9,
+		timeoutSeconds: 30,
+		developmentScope: "只有用户指令明确要求新增、修改、修复、测试或部署当前机器人能力时，才启动受支持的研发流程。",
+	});
 	assert.equal(configuration.defaultModeId, "development");
 	assert.equal(configuration.modes[0]?.type, "robot-development");
 	if (configuration.modes[0]?.type === "robot-development") {
 		assert.deepEqual(configuration.modes[0].acceptanceAgentIds, []);
 	}
+});
+
+test("loads an independent no-tool intake configuration", (context) => {
+	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
+	context.after(() => rmSync(directory, { recursive: true, force: true }));
+	writeFileSync(
+		join(directory, "agents.yaml"),
+		`version: 2
+defaultMode: application
+intake:
+  autoStartConfidence: 0.95
+  timeoutSeconds: 12
+  developmentScope: Only robot action packages.
+agents:
+  - id: author
+    name: Author
+    description: Test
+    tools: []
+    skills: []
+    systemPrompt: Test
+modes:
+  - id: application
+    name: Application
+    type: robot-application
+    agent: author
+`,
+	);
+	const configuration = new YamlAgentConfigurationLoader().load(directory);
+	assert.deepEqual(configuration.intake, {
+		autoStartConfidence: 0.95,
+		timeoutSeconds: 12,
+		developmentScope: "Only robot action packages.",
+	});
+	assert.equal(configuration.profiles.some((profile) => profile.id === "intake"), false);
+});
+
+test("rejects unsafe intake thresholds", (context) => {
+	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-"));
+	context.after(() => rmSync(directory, { recursive: true, force: true }));
+	writeFileSync(
+		join(directory, "agents.yaml"),
+		"version: 2\ndefaultMode: application\nintake:\n  autoStartConfidence: 1.5\nagents:\n  - id: author\n    name: Author\n    description: Test\n    tools: []\n    skills: []\n    systemPrompt: Test\nmodes:\n  - id: application\n    name: Application\n    type: robot-application\n    agent: author\n",
+	);
+	assert.throws(() => new YamlAgentConfigurationLoader().load(directory), /autoStartConfidence/);
 });
 
 test("rejects a configured skill that does not exist", (context) => {
@@ -123,6 +172,9 @@ test("bundled robot application mode loads the servo control skill", () => {
 test("bundled development workflow uses action-package TDD and deterministic release delivery", () => {
 	const configuration = new YamlAgentConfigurationLoader().load(join(import.meta.dirname, "../../config"));
 	const byId = new Map(configuration.profiles.map((profile) => [profile.id, profile]));
+	assert.equal(configuration.intake.autoStartConfidence, 0.9);
+	assert.equal(configuration.intake.timeoutSeconds, 30);
+	assert.match(configuration.intake.developmentScope, /动作包/);
 	assert.equal(configuration.workspace.kind, "managed-template");
 	assert.deepEqual(configuration.workspace.requiredPaths, [
 		"examples/plugins/servo/servo_ctrl.py",

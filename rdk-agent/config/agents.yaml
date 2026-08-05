@@ -13,6 +13,13 @@ workspace:
     - skills/servo-control/SKILL.md
     - tools/servo_action.py
 
+intake:
+  autoStartConfidence: 0.9
+  timeoutSeconds: 30
+  developmentScope: |
+    当前研发流程只支持新增、修改、修复或测试基于 rdk-servo-action/v1 的机器人舵机动作包，随后构建 release、部署并验收。
+    问候、感谢、闲聊、能力咨询不要求启动研发流程；通用前端、Rust、网络服务或 rdk-agent 自身改造也不属于该动作包流程。
+
 # 动作包研发：脚本管理结构与交付，Agent 只负责测试、实现、语义判断与验收。
 agents:
   - id: action-test
