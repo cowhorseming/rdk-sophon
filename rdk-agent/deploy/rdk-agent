@@ -22,7 +22,7 @@ export RDK_AGENT_CONFIG_DIR="${RDK_AGENT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
 
 case "${1:-}" in
   -h|--help)
-    echo "用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace]"
+    echo "用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <需求>]"
     echo "启动 RDK 多 Agent 编排 TUI；默认从内置模板创建托管工作区。"
     exit 0
     ;;
