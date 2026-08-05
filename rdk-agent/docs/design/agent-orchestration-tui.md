@@ -2,7 +2,7 @@
 
 ## 1. 背景与目标
 
-`rdk-agent` 把自然语言机器人需求转换为可交付能力，并允许使用已交付 Skill 测试机器人应用效果。当前实现基于 Pi Coding Agent SDK 和 Pi TUI，同时保持领域与应用层不依赖具体 SDK 或界面。
+`rdk-agent` 把自然语言用户指令转换为可交付的机器人能力，并允许使用已交付 Skill 测试机器人应用效果。当前实现基于 Pi Coding Agent SDK 和 Pi TUI，同时保持领域与应用层不依赖具体 SDK 或界面。
 
 设计目标：
 
@@ -85,7 +85,7 @@ ${XDG_STATE_HOME:-~/.local/state}/rdk-agent/workspaces/<workspace.id>/v<workspac
 机器人应用模式只有一个 Agent。它只能看到该 Profile `skills` 配置中的严格白名单，根据 Skill frontmatter 的 `name` 和 `description` 匹配用户自然语言要求，完整读取一个或多个匹配的 `SKILL.md` 后组合调用并测试效果。
 
 ```text
-用户应用需求
+用户应用指令
     ↓
 机器人应用 Agent
     ├── 选择 Skill A
@@ -94,6 +94,20 @@ ${XDG_STATE_HOME:-~/.local/state}/rdk-agent/workspaces/<workspace.id>/v<workspac
 ```
 
 该模式把用户输入的动作式请求视为执行对应动作一次的授权。Agent 完成 Skill 要求的只读前置检查后直接调用 sophonctl，不能再次要求“确认真机”，也不能只显示帮助就结束。用户只询问能力、命令或状态时才保持只读；白名单中没有匹配 Skill、设备不可达或动作必填参数缺失时进入 Human-in-the-loop。
+
+### 2.3 研发输入意图门禁
+
+机器人研发模式表示当前可用的工作方式，不等于每条输入都是研发授权。TUI 和 headless 入口在 workspace 预检及 `RunOrchestration` 之前统一调用 `RouteUserRequest`：
+
+```text
+用户输入 → 确定性问候规则 → 无工具意图分类 Session
+                              ├─ development → workspace 预检 → 研发工作流
+                              ├─ conversation → 对话响应，流程不启动
+                              ├─ clarification → 等待补充，流程不启动
+                              └─ unsupported-development → 说明能力边界
+```
+
+分类 Session 使用内存会话，禁用全部工具、Extensions、Skills、Prompt 模板、主题和项目上下文，只接收当前模式能力摘要及不可信的用户文本。结果必须符合严格 JSON 契约；缺少标记、未知枚举、非法置信度、超时或模型异常全部安全降级为 `clarification`。只有达到 `intake.autoStartConfidence` 且明确要求受支持研发工作的用户指令才自动放行。`/develop <用户指令>` 表示用户已明确授权，可跳过分类。
 
 查询/动作分界不只依赖提示词。运行时先识别问号和“哪些、什么、怎么、查看、状态、配置、加载”等查询表达；只读查询的 Bash 工具只允许 `sophonctl plugins list`、插件 `--help`、版本和命令存在性检查，其他本地、远程或硬件命令在进程启动前拒绝。动作式表达才保持应用模式的一次真实执行授权。
 
@@ -151,6 +165,10 @@ flowchart TD
 ```yaml
 version: 2
 defaultMode: robot-application
+intake:
+  autoStartConfidence: 0.9
+  timeoutSeconds: 30
+  developmentScope: 当前流程只支持机器人舵机动作包研发。
 workspace:
   kind: managed-template
   id: magicbox-servo
@@ -196,6 +214,7 @@ modes:
 
 - `version` 必须为 `2`；
 - `defaultMode` 必须引用已存在模式；
+- `intake.autoStartConfidence` 必须大于 `0` 且不超过 `1`，`timeoutSeconds` 必须为正整数，`developmentScope` 必须为非空文本；省略 `intake` 时使用安全默认值；
 - Agent、模式和同一模式中的循环 ID 不得重复；
 - ID 只允许小写字母、数字和连字符；
 - Agent 提示词、名称和描述不能为空；
@@ -333,7 +352,7 @@ Human-in-the-loop 不是人工审批。正常测试、Coding 和验证步骤默�
 - `bash` 只用于测试和只读检查，拒绝重定向以及常见文件修改、安装和 Git 写操作，并设置 `PYTHONDONTWRITEBYTECODE=1`；
 - Profile 的 `systemPrompt` 追加到 Pi 默认提示词；
 - 禁用 Pi 默认 Skill 发现，只把 Profile 的 `skills` 作为严格白名单加载；
-- Pi 系统提示只展示白名单 Skill 的名称、描述和路径，Agent 根据当前需求选择匹配项；
+- Pi 系统提示只展示白名单 Skill 的名称、描述和路径，Agent 根据当前用户指令选择匹配项；
 - Agent 必须通过 `read` 完整读取每个选中的 `SKILL.md`；读取事件形成可观测的“本次选择”，不固定使用列表第一项；
 - Session 完成后取消订阅并释放。
 
@@ -358,7 +377,7 @@ Human-in-the-loop 不是人工审批。正常测试、Coding 和验证步骤默�
 
 | 事件 | 用途 |
 |---|---|
-| `workflow-started` | 模式和需求开始 |
+| `workflow-started` | 模式和用户指令开始 |
 | `loop-iteration` | 展示循环名称和迭代次数 |
 | `stage-status` | Agent 的运行、成功或失败状态 |
 | `agent-event` | 模型文本、工具开始和工具结束 |
@@ -370,6 +389,8 @@ Human-in-the-loop 不是人工审批。正常测试、Coding 和验证步骤默�
 
 UI 只依赖这些事件，不需要理解 Pi SDK 事件结构。
 
+工作流启动前另有 `RequestRoutingEvent`，包括 `intent-classification-started`、`intent-classified` 和 `intent-classification-failed`。这些事件只描述入口门禁，不计入研发节点进度；只有通过门禁后才发布 `workflow-started`。
+
 ## 10. TUI 设计
 
 ### 10.1 页面结构
@@ -378,17 +399,21 @@ UI 只依赖这些事件，不需要理解 Pi SDK 事件结构。
 当前模式标题
 当前模式涉及的 Agent、状态及 Skill 配置/加载/选择
 循环、模型、工具和 Human-in-the-loop 日志
+固定在输入区上方的整体进度、当前节点和当前 Agent
 Editor
 模式与快捷命令提示
 ```
 
 Editor 挂载后必须调用 `tui.setFocus(editor)`，否则输入不会进入文本框。
 
+研发工作流运行时，进度区放在日志之后、Editor 之前，确保长日志只会向上滚动，不会把当前进展推出底部 viewport。窄终端使用最多五行的紧凑进度；流程结束后保留最终成功或失败状态，直到用户提交下一条输入或切换模式。研发 Agent 生命周期在日志中使用带 ANSI 颜色的短标识：青色 `▶▶ AGENT 开始`、绿色 `✓✓ AGENT 完成`、红色 `✗✗ AGENT 失败`，标识前后各留一个空白行；禁用颜色时仍可依靠符号和文字辨识。机器人应用模式只有一个执行 Agent，不渲染进度区、阶段列表或生命周期标识，只保留 Agent 正文、工具、Skill、Human-in-the-loop 和最终结果日志。
+
 ### 10.2 命令
 
 | 命令 | 行为 |
 |---|---|
 | `Shift+Tab` | 同时按下，循环切换配置中的模式 |
+| `/develop <用户指令>` | 明确跳过意图分类并启动研发流程 |
 | `/skills` | 显示当前 Agent 配置、实际加载和本次选择的 Skill |
 | `/modes` | 显示可用模式和当前模式 |
 | `/mode robot-development` | 切换机器人开发模式 |
@@ -402,6 +427,7 @@ TUI 默认进入机器人应用模式。模式只能在空闲时切换；工作�
 ## 11. 权限与安全
 
 - 测试与 Coding Agent 只能写 `writePaths` 明确分配的交付物；测试、生产代码、CLI manifest 和 Skill 互不越权；
+- 动作包工具和文件写入策略始终绑定未经分类器改写的用户原始指令；明确指定左、右或双侧的用户指令必须与动作 ID、metadata、目录及桥接调用一致，冲突时在落盘前返回 `ACTION-DIRECTION-001`；
 - 验证 Agent 没有 `edit`、`write`，只能读取和运行安全验证；
 - 机器人应用 Agent 默认只读，但可用 Bash 调用已交付 Skill 的安全或模拟命令；
 - 机器人应用模式的查询请求有独立 Bash 硬门禁，提示词误判也不能启动动作、SSH 或其他任意命令；
@@ -426,6 +452,7 @@ TUI 默认进入机器人应用模式。模式只能在空闲时切换；工作�
 - 配置目录不存在：初始化 Version 2 默认配置；
 - 用户配置与旧安装包默认配置完全一致：自动升级；
 - 用户修改过配置：保留原文件，并写入 `agents.yaml.v2.example` 供人工合并。
+- 用户显式传入 `--refresh-config`：先完整备份配置目录，再刷新包内静态配置，同时保留运行期 `servo-control` 和回滚目录；后续安装步骤失败时恢复刷新前状态。
 
 程序重新部署只替换安装目录和默认配置，不删除 `XDG_STATE_HOME` 下的托管工程。
 
@@ -444,6 +471,7 @@ TUI 默认进入机器人应用模式。模式只能在空闲时切换；工作�
 - 配置引用和 Skill 文件校验。
 - Skill 严格白名单、动态选择事件和 `/skills` 状态格式；
 - 应用查询/动作分类及只读 Bash 硬门禁；
+- 研发输入的问候快速路径、语义分类、低置信度确认、分类失败安全降级和 `/develop` 人工覆盖；
 - Agent 写路径白名单、排除规则和只读 Bash 策略；
 - 验证 Agent 缺少 Bash 证据、Bash 失败和同 Session 补跑；
 - Skill 确定性交付合同对错误命令、虚假参数限制、错误测试归属、缺失元数据和既有能力丢失的拒绝；
@@ -462,7 +490,7 @@ rdk-agent 交付的每个动作独占 `servo_actions/<动作 ID>/`，目录内�
 
 当前 `rdk-servo-action/v1` 只接受 `arguments: []`。动作实现不得导入模块或访问原始控制器私有方法，只能以同步、顺序方式组合无参数硬件桥接白名单；需要运行时参数的能力必须先演进契约和验证器。
 
-该样例覆盖了两个曾导致流程停滞的问题：Skill 验收文档的过度推断会被确定性合同改写为 `revision`；Coding Agent 对同一处精确 edit 连续失败时必须停止重试，文件已满足需求可零修改完成，确需修改则重新读取后最多整文件 write 一次。
+该样例覆盖了两个曾导致流程停滞的问题：Skill 验收文档的过度推断会被确定性合同改写为 `revision`；Coding Agent 对同一处精确 edit 连续失败时必须停止重试，文件已满足要求可零修改完成，确需修改则重新读取后最多整文件 write 一次。
 
 Skill 安装只覆盖配置声明的运行时文件 `SKILL.md`，不会再用研发交付目录整体替换已安装 Skill，因此配置仓库中的标准 `acceptance.md` 会被保留。
 

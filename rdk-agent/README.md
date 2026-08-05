@@ -24,9 +24,11 @@ src/
 
 任意 Agent 无法继续或自动返工达到上限时，工作流暂停并请求人类输入；输入 `/abort` 可以终止。当前不设置人工审批门，正常交付步骤自动继续。
 
-每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。动作包测试默认在离线 Podman Python 3.12 容器中执行，托管工作区只读挂载，代码修改仍由受 `writePaths` 约束的 Pi 文件工具完成；脚手架、契约验证和 release 结构由固定脚本生成。部署和真机验收留在宿主机执行。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户需求，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
+研发模式的普通输入会先经过独立的入口意图分类器。精确问候和感谢由确定性规则直接响应；其他输入由无工具、无 Skill、无项目上下文且不落盘的短 Pi Session 分类为需要研发、普通对话、待澄清或当前研发流程不支持。只有高置信度、明确要求研发且匹配当前动作包能力边界的用户指令才进行 workspace 预检并启动 TDD；分类异常或低置信度默认请求确认。`/develop <用户指令>` 可作为明确的人工覆盖入口。
 
-当前动作包契约 `rdk-servo-action/v1` 明确只支持无参数动作。`action.py` 只能以同步、顺序方式调用公开的无参数硬件桥接白名单；导入模块、私有控制器方法、任意 duty 和运行时参数都会被构建前的确定性校验拒绝。参数化动作需要先升级契约。
+每个 Agent 有独立的系统提示词、工具白名单、写路径白名单、阶段超时、执行沙箱和严格 Skill 白名单；当前不限制工具调用次数。普通开发者直接运行 `rdk-agent`，程序会从 `config/templates/magicbox-servo` 初始化版本化托管工程，无需下载 rdk-sophon 源码。动作包测试默认在离线 Podman Python 3.12 容器中执行，托管工作区只读挂载，代码修改仍由受 `writePaths` 约束的 Pi 文件工具完成；脚手架、契约验证和 release 结构由固定脚本生成。部署和真机验收留在宿主机执行。Pi 不会向该 Agent 暴露白名单之外的全局或项目 Skill；Agent 根据 Skill 的名称和描述匹配用户指令，先读取一个或多个对应 `SKILL.md` 再执行。机器人应用模式会在工具层区分查询和动作：查询只允许 sophonctl 列表、帮助及版本检查，其他 Bash 命令在启动前拒绝；动作式请求才开放一次真实动作。验证 Agent 只有实际运行安全测试且 Bash 没有报错时才能通过；Skill 交付还会经过确定性合同校验，错误命令、虚假参数或测试结论会被强制改为返工。工作区来源、模式、TDD 循环、部署、最终验收和最大返工次数全部来自运行时读取的 [`config/agents.yaml`](config/agents.yaml)，Skill 位于 `config/skills/<name>/SKILL.md`。
+
+当前动作包契约 `rdk-servo-action/v1` 明确只支持无参数动作。`action.py` 只能以同步、顺序方式调用公开的无参数硬件桥接白名单；导入模块、私有控制器方法、任意 duty 和运行时参数都会被构建前的确定性校验拒绝。参数化动作需要先升级契约。用户原始指令还会作为不可改写的执行上下文贯穿所有 Agent；当用户指令明确指定左、右或双侧时，动作 ID、`start`、描述、触发语句、写入路径和实际桥接调用必须同向，否则工具会在文件创建或覆盖前以 `ACTION-DIRECTION-001` 阻断。
 
 ## 3. 板端与开发机部署
 
@@ -174,13 +176,13 @@ rdk-agent
 
 ### 3.6 升级与重新部署
 
-拉取新代码后可以直接重新运行一键脚本。板端部署会覆盖 `/etc/probe-daemon/config.toml`，因此手工修改过板端配置时应先备份或把修改同步回仓库配置；`--enable-plugins` 会继续确保插件功能打开。rdk-agent 安装器会原子替换应用目录：未修改的默认配置自动升级，检测到 `~/.config/rdk-agent` 有用户定制时保留原配置，并生成 `agents.yaml.v2.example` 供人工合并。
+拉取新代码后可以直接重新运行一键脚本。板端部署会覆盖 `/etc/probe-daemon/config.toml`，因此手工修改过板端配置时应先备份或把修改同步回仓库配置；`--enable-plugins` 会继续确保插件功能打开。rdk-agent 安装器会原子替换应用目录：未修改的默认配置自动升级，检测到 `~/.config/rdk-agent` 有用户定制时保留原配置，并生成 `agents.yaml.v2.example` 供人工合并。确认要用当前版本的静态配置替换旧配置时，可执行 `npm run deploy -- --refresh-config`；安装器会先把整个配置目录备份到同级时间戳目录，并保留运行期 `skills/servo-control` 及其回滚目录。
 
 ## 4. 运行与配置
 
 Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口和容器/VM 示例。rdk-agent 通过该接口把开发阶段 Bash 路由到 Podman。
 
-默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v5`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。`/workspace` 可查看当前工程和来源。模板升级通过提高 `workspace.version` 创建新版本目录，避免覆盖旧工程。
+默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v<workspace.version>`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。它是研发 Agent 在当前开发机上的可写交付工程，不是对 rdk-sophon 源码仓库的依赖；动作包在这里完成测试与构建后才部署到目标板。`/workspace` 可查看当前工程和来源。模板交付契约升级时必须提高 `workspace.version`，以创建新目录并保留旧工程，不能在同一版本下复用不完整模板。
 
 开发阶段的动作行为与契约测试在离线 Podman 容器中执行。运行时只依赖 Python 3.12 标准库，测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。模板自带 FakeContext 和 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。
 
@@ -209,12 +211,13 @@ rdk-agent --workspace /path/to/rdk-sophon
 rdk-agent --config-dir /path/to/config
 ```
 
-部署目录可通过 `npm run deploy -- --install-dir <dir> --bin-dir <dir> --config-dir <dir>` 覆盖；脚本会先在临时目录安装生产依赖，成功后再替换旧版本。
+部署目录可通过 `npm run deploy -- --install-dir <dir> --bin-dir <dir> --config-dir <dir>` 覆盖；脚本会先在临时目录安装生产依赖，成功后再替换旧版本。需要显式刷新静态配置时追加 `--refresh-config`。
 
 TUI 命令：
 
 ```text
 Shift+Tab                    同时按下，循环切换模式
+/develop <用户指令>         明确跳过意图识别并启动研发流程
 /workspace                   查看托管/外部工作区及其来源
 /skills                      查看当前 Agent 配置、实际加载和本次选择的 Skill
 /modes                       查看模式
@@ -227,7 +230,7 @@ Shift+Tab                    同时按下，循环切换模式
 
 TUI 默认进入机器人应用模式。模式只能在工作流空闲时切换。
 
-页面和运行日志会实时输出 Skill 白名单、实际加载列表和本次选择，同时展示实际模型、推理级别、循环次数、Agent 状态、工具调用和人类接入请求。Pi 使用其已配置的模型和认证（通常来自 `~/.pi/agent`）。
+页面和运行日志会实时输出 Skill 白名单、实际加载列表和本次选择，同时展示实际模型、推理级别、循环次数、Agent 状态、工具调用和人类接入请求。研发工作进展固定在输入框上方，并显示整体节点进度、当前节点和当前 Agent；流程结束后保留最终状态。研发模式的 Agent 开始、完成和失败分别使用青、绿、红色短标识，标识前后留有空白行。应用模式只有一个执行步骤，因此不显示工作进展面板、阶段列表和 Agent 生命周期标识，只保留执行日志、Skill 信息及最终结果。Pi 使用其已配置的模型和认证（通常来自 `~/.pi/agent`）。
 
 ```text
 src/
