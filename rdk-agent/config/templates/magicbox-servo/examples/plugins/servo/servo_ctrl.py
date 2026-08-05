@@ -53,7 +53,6 @@ import importlib.util
 import os
 import re
 import shutil
-import tempfile
 from pathlib import Path
 
 try:
@@ -72,12 +71,18 @@ PWM_FREQ = 50            # 50Hz，舵机标准频率
 
 LEFT_INITIAL_DUTY = 9.0  # 左腿初始占空比
 RIGHT_INITIAL_DUTY = 7.0  # 右腿初始占空比
+# 复合挥动动作在抬起姿态的可见停留时长；底层 50ms 仅用于 PWM 状态切换。
+WAVE_POSITION_HOLD_SECONDS = 0.8
 
 
-# 由 rdk-agent 交付的二级动作不写入本文件，而是独立保存为可管理模块。
-# 这样 `sophonctl servo remove <action>` 可以原子下线一个动作，绝不需要
-# 对正在执行的入口脚本做脆弱的文本替换。
+# 由 rdk-agent 交付的动作不写入本文件；每个动作包以自己的 registry.json
+# 描述入口。入口脚本只扫描一级动作目录并按契约加载，避免维护全局动作表。
 MANAGED_ACTION_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
+MANAGED_ACTION_SCHEMA = "rdk-servo-action/v1"
+MANAGED_ACTION_RESERVED = {
+    "init", "lift-left", "lift-right", "lower-left", "lower-right",
+    "stand", "relax", "shake-ears", "flash", "servo", "remove",
+}
 
 
 def managed_actions_dir():
@@ -87,93 +92,75 @@ def managed_actions_dir():
     ))
 
 
-def managed_actions_registry():
-    return managed_actions_dir() / "actions.json"
-
-
-def action_module_path(action):
-    """由安全的 CLI 动作名导出唯一模块路径，拒绝 registry 中的任意路径。"""
+def action_package_dir(action):
     if not MANAGED_ACTION_NAME.fullmatch(action):
         raise ValueError("动作名必须是小写字母开头，且只能包含小写字母、数字和连字符")
-    return managed_actions_dir() / (action.replace("-", "_") + ".py")
+    if action in MANAGED_ACTION_RESERVED:
+        raise ValueError("内置动作不能作为托管动作包：{}".format(action))
+    return managed_actions_dir() / action
 
 
-def load_managed_actions_registry():
-    path = managed_actions_registry()
+def action_manifest(action):
+    package = action_package_dir(action)
+    path = package / "registry.json"
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return {"version": 1, "actions": {}}
+        return None
     except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError("无法读取托管动作配置 {}: {}".format(path, error))
-    if value.get("version") != 1 or not isinstance(value.get("actions"), dict):
-        raise RuntimeError("托管动作配置格式无效: {}".format(path))
+        raise RuntimeError("无法读取动作注册信息 {}: {}".format(path, error))
+    if not isinstance(value, dict):
+        raise RuntimeError("动作注册信息必须为对象: {}".format(path))
+    if value.get("schema") != MANAGED_ACTION_SCHEMA or value.get("id") != action:
+        raise RuntimeError("动作注册信息无效: {}".format(path))
+    if value.get("entrypoint") != "action.py:run":
+        raise RuntimeError("动作入口必须为 action.py:run: {}".format(path))
+    if value.get("start") not in {"left", "right", "both", "none"}:
+        raise RuntimeError("动作启动策略无效: {}".format(path))
+    if value.get("arguments") != []:
+        raise RuntimeError("rdk-servo-action/v1 只支持无参数动作: {}".format(path))
     return value
 
 
-def atomic_write_json(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=".actions-", suffix=".json", dir=path.parent)
+def managed_action_names():
+    root = managed_actions_dir()
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except Exception:
+        directories = sorted(path for path in root.iterdir() if path.is_dir() and not path.name.startswith("."))
+    except FileNotFoundError:
+        return []
+    names = []
+    for directory in directories:
+        if not MANAGED_ACTION_NAME.fullmatch(directory.name) or directory.name in MANAGED_ACTION_RESERVED:
+            continue
         try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
+            manifest = action_manifest(directory.name)
+        except RuntimeError:
+            continue
+        if manifest is not None:
+            names.append(directory.name)
+    return names
 
 
 def remove_managed_action(action):
-    """下线 rdk-agent 托管动作，并保留可恢复备份而不接触 GPIO/PWM。"""
-    if not MANAGED_ACTION_NAME.fullmatch(action):
-        raise ValueError("动作名非法: {}".format(action))
-    registry = load_managed_actions_registry()
-    if action not in registry["actions"]:
+    """下线整个动作包，并保留可恢复备份而不接触 GPIO/PWM。"""
+    if action_manifest(action) is None:
         raise ValueError("动作 {} 不是可删除的 rdk-agent 托管动作".format(action))
-
-    action_path = action_module_path(action)
-    if not action_path.is_file():
-        raise RuntimeError("托管动作 {} 的实现文件不存在: {}".format(action, action_path))
-
+    action_path = action_package_dir(action)
     root = managed_actions_dir()
     backup = root / ".rdk-agent-backups" / ("remove-{}-{}".format(action, time.time_ns()))
     backup.mkdir(parents=True, exist_ok=False)
-    registry_path = managed_actions_registry()
-    if registry_path.exists():
-        shutil.copy2(registry_path, backup / "actions.json")
-    shutil.copy2(action_path, backup / action_path.name)
-
-    updated = {"version": 1, "actions": dict(registry["actions"])}
-    del updated["actions"][action]
-    atomic_write_json(registry_path, updated)
-    try:
-        action_path.unlink()
-    except Exception:
-        # registry 已先下线；删除实现失败时回滚配置，使两者保持一致。
-        atomic_write_json(registry_path, registry)
-        raise
+    shutil.move(str(action_path), str(backup / action))
     return backup
 
 
 def load_managed_action(action):
-    """加载一个受 registry 约束的交付动作；返回 (callable, 启动侧) 或 None。"""
+    """加载一个受本地 registry.json 约束的动作包；返回 (callable, 启动侧) 或 None。"""
     if not MANAGED_ACTION_NAME.fullmatch(action):
         return None
-    entry = load_managed_actions_registry()["actions"].get(action)
+    entry = action_manifest(action)
     if entry is None:
         return None
-    if not isinstance(entry, dict) or entry.get("module") != action_module_path(action).name:
-        raise RuntimeError("托管动作 {} 的配置无效".format(action))
-    start = entry.get("start", "both")
-    if start not in {"left", "right", "both", "none"}:
-        raise RuntimeError("托管动作 {} 的启动策略无效".format(action))
-    path = action_module_path(action)
+    path = action_package_dir(action) / "action.py"
     if not path.is_file():
         raise RuntimeError("托管动作 {} 的实现文件不存在: {}".format(action, path))
     spec = importlib.util.spec_from_file_location("rdk_agent_servo_{}".format(action.replace("-", "_")), path)
@@ -183,8 +170,8 @@ def load_managed_action(action):
     spec.loader.exec_module(module)
     run = getattr(module, "run", None)
     if not callable(run):
-        raise RuntimeError("托管动作 {} 必须导出 run(controller)".format(action))
-    return run, start
+        raise RuntimeError("托管动作 {} 必须导出 run(context, params)".format(action))
+    return run, entry["start"]
 
 
 class ServoController:
@@ -254,6 +241,10 @@ class ServoController:
         self._set_right(RIGHT_INITIAL_DUTY + 5.0)
         time.sleep(0.05)
 
+    def hold_visible_position(self):
+        """保持当前姿态，使复合挥动动作具有肉眼可见的停留。"""
+        time.sleep(WAVE_POSITION_HOLD_SECONDS)
+
     def lower_left(self):
         """放左腿回初位。"""
         self._set_left(LEFT_INITIAL_DUTY)
@@ -263,6 +254,15 @@ class ServoController:
         """放右腿回初位。"""
         self._set_right(RIGHT_INITIAL_DUTY)
         time.sleep(0.05)
+
+    def wave_hands(self):
+        """依次挥动左、右两侧，保留既有模板动作的测试契约。"""
+        self.lift_left()
+        self.hold_visible_position()
+        self.lower_left()
+        self.lift_right()
+        self.hold_visible_position()
+        self.lower_right()
 
     def stand(self):
         """双腿撑起站立。"""
@@ -335,11 +335,6 @@ class ServoController:
                 self._lamp = False  # 标记失败，不再重试
         return self._lamp if self._lamp is not False else None
 
-    def wave_right_hand(self):
-        """仅挥动右手（底层为右腿舵机）。"""
-        self.lift_right()
-        self.lower_right()
-
     # ---- 生命周期 ----
     def close(self):
         """只停止并清理本次进程实际启动的 PWM 通道。"""
@@ -380,11 +375,10 @@ ACTIONS = {
     "relax": lambda c: c.relax(),
     "shake-ears": lambda c: c.shake_ears(),
     "flash": lambda c: c.flash(use_lamp=not getattr(c, "_no_lamp", False)),
-    "wave-right-hand": lambda c: c.wave_right_hand(),
 }
 
 LEFT_ONLY_ACTIONS = {"lift-left", "lower-left"}
-RIGHT_ONLY_ACTIONS = {"lift-right", "lower-right", "wave-right-hand"}
+RIGHT_ONLY_ACTIONS = {"lift-right", "lower-right"}
 
 HELP_EPILOG = """
 常用示例:
@@ -392,7 +386,6 @@ HELP_EPILOG = """
   sophonctl servo stand             双腿撑起站立
   sophonctl servo relax             平滑回到初始姿态并放松
   sophonctl servo shake-ears        摇耳朵
-  sophonctl servo wave-right-hand   挥动右手
   sophonctl servo servo 0 -2.0      将左侧舵机占空比偏移 -2.0
   sophonctl servo remove <动作名>    删除 rdk-agent 交付的二级动作
 
@@ -406,7 +399,6 @@ HELP_EPILOG = """
   relax                平滑回到初始姿态
   shake-ears           摇耳朵
   flash                放松腿部并闪烁灯带
-  wave-right-hand      只挥动右手
   remove <动作名>      下线 rdk-agent 托管动作，保留备份供恢复
   servo <index> <duty> 手动控制单路舵机：index 为 0（左）或 1（右），
                        duty 为相对初始位置的占空比偏移量
@@ -416,12 +408,29 @@ HELP_EPILOG = """
   每次命令结束都会释放 PWM，舵机将不再保持当前姿态。
 """
 
+
+def help_epilog():
+    """静态内置动作加上已发现动作包，避免维护第二份全局动作注册表。"""
+    entries = []
+    for action in managed_action_names():
+        try:
+            manifest = action_manifest(action)
+        except RuntimeError:
+            continue
+        if manifest is None:
+            continue
+        description = str(manifest.get("description", "")).replace("\n", " ").strip()
+        entries.append("  {:<20} {}".format(action, description or "rdk-agent 托管动作"))
+    if not entries:
+        return HELP_EPILOG
+    return HELP_EPILOG + "\nrdk-agent 托管动作（自动发现）:\n" + "\n".join(entries) + "\n"
+
 def main():
     parser = argparse.ArgumentParser(
         description="MagicBox 舵机命令行控制（无 ROS 依赖）",
         usage="sophonctl servo <动作> [参数] [选项]",
         formatter_class=argparse.RawTextHelpFormatter,
-        epilog=HELP_EPILOG,
+        epilog=help_epilog(),
     )
     parser.add_argument("action", help="要执行的动作；详见下方“动作说明”")
     parser.add_argument("args", nargs="*", help="servo 需要 <index> <duty>；remove 需要 <动作名>")
@@ -483,16 +492,19 @@ def main():
             sys.exit(2)
         if managed is None:
             sys.stderr.write("未知动作: {}，可选: {}\n".format(
-                args.action, ", ".join(list(ACTIONS) + ["servo", "remove"])))
+                args.action, ", ".join(list(ACTIONS) + managed_action_names() + ["servo", "remove"])))
             sys.exit(2)
         run, start = managed
+        if args.args:
+            sys.stderr.write("托管动作 {} 不接受参数\n".format(args.action))
+            sys.exit(2)
         if start == "left":
             ctrl._start_left(LEFT_INITIAL_DUTY)
         elif start == "right":
             ctrl._start_right(RIGHT_INITIAL_DUTY)
         elif start == "both":
             ctrl._start(LEFT_INITIAL_DUTY, RIGHT_INITIAL_DUTY)
-        run(ctrl)
+        run(ctrl, [])
 
     # 保持阶段：让舵机有时间执行动作并保持姿态
     if args.hold == "inf":

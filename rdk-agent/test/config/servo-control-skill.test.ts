@@ -6,13 +6,17 @@ import test from "node:test";
 const skillDirectory = join(import.meta.dirname, "../../config/skills/servo-control");
 const skill = readFileSync(join(skillDirectory, "SKILL.md"), "utf8");
 const acceptance = readFileSync(join(skillDirectory, "acceptance.md"), "utf8");
+const templateSkill = readFileSync(
+	join(import.meta.dirname, "../../config/templates/magicbox-servo/skills/servo-control/SKILL.md"),
+	"utf8",
+);
 
 test("servo Skill exposes only supported motion commands", () => {
+	assert.equal(templateSkill, skill);
 	assert.match(skill, /^---\nname: servo-control\n/);
 	assert.match(skill, /^- `shake-ears`$/m);
 	assert.match(skill, /`sophonctl servo shake-ears`/);
-	assert.match(skill, /`sophonctl servo wave-right-hand`/);
-	assert.doesNotMatch(skill, /wave-hands|wave-left-hand/);
+	assert.doesNotMatch(skill, /wave-hands|wave-left-hand|wave-right-hand/);
 });
 
 test("servo Skill acceptance separates static checks from physical confirmation", () => {

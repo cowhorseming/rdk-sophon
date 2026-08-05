@@ -19,7 +19,7 @@ sys.modules['Hobot.GPIO'] = MagicMock()
 
 # 3. 导入 CLI 模块（此时必须已 mock Hobot）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from servo_ctrl import ACTIONS, LEFT_INITIAL_DUTY, RIGHT_INITIAL_DUTY, ServoController  # noqa: E402
+from servo_ctrl import ACTIONS, LEFT_INITIAL_DUTY, MANAGED_ACTION_RESERVED, RIGHT_INITIAL_DUTY, ServoController  # noqa: E402
 
 # 4. 验证 ACTIONS 包含目标动作
 TARGET_ACTIONS = {'lift-left', 'lower-left', 'lift-right', 'lower-right'}
@@ -72,6 +72,12 @@ class TestCLIServiceContract(unittest.TestCase):
         self.assertEqual(PLUGIN_ID, "servo")
         self.assertEqual(ENTRYPOINT, ["/usr/bin/python3", "/userdata/magicbox/scripts/servo_ctrl.py"])
 
+    def test_retired_wave_right_hand_is_not_an_available_action(self):
+        self.assertNotIn("wave-right-hand", ACTIONS)
+
+    def test_managed_packages_cannot_shadow_builtin_commands(self):
+        self.assertEqual(MANAGED_ACTION_RESERVED, set(ACTIONS) | {"servo", "remove"})
+
     def assert_single_side_lowering(self, action, start_method, untouched_start_method, initial_duty, action_method):
         with patch('sys.argv', ['servo_ctrl.py', action, '--hold', '0']), \
                 patch('servo_ctrl.ServoController') as mock_servo_controller, \
@@ -96,12 +102,6 @@ class TestCLIServiceContract(unittest.TestCase):
         self.assert_single_side_lowering(
             'lower-right', '_start_right', '_start_left', RIGHT_INITIAL_DUTY, 'lower_right'
         )
-
-    def test_wave_right_hand_starts_only_right_pwm(self):
-        self.assert_single_side_lowering(
-            'wave-right-hand', '_start_right', '_start_left', RIGHT_INITIAL_DUTY, 'wave_right_hand'
-        )
-
 
 if __name__ == '__main__':
     unittest.main()

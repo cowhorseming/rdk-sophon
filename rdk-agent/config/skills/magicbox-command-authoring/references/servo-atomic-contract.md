@@ -10,9 +10,9 @@
 ## 复合动作契约
 
 - “抬起再放下”“挥动”必须包含 `lift → visible hold → lower`，默认 `WAVE_POSITION_HOLD_SECONDS = 0.8`。
-- v2 静态入口在 lift/lower 之间直接使用共享常量等待；v3 托管动作必须调用控制器的 `hold_visible_position()`，不要在动作模块中复制魔法数字。
+- 静态入口在 lift/lower 之间直接使用共享常量等待；托管动作包必须调用控制器的 `hold_visible_position()`，不要在动作模块中复制魔法数字。
 - CLI 的通用 `--hold` 发生在完整动作执行之后。它只能保持最终姿态，不能代替 lift 与 lower 中间的可见停留。
-- 单侧动作必须只启动目标侧 PWM。v2 由 `LEFT_ONLY_ACTIONS`/`RIGHT_ONLY_ACTIONS` 表达；v3 由 `servo_actions/actions.json` 的 `start` 表达。
+- 单侧动作必须只启动目标侧 PWM。静态动作由 `LEFT_ONLY_ACTIONS`/`RIGHT_ONLY_ACTIONS` 表达；托管动作由 `servo_actions/<动作 ID>/registry.json` 的 `start` 表达。
 
 ## 自动验收能证明什么
 
