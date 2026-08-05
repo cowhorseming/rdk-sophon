@@ -161,6 +161,12 @@ test("bundled development workflow uses action-package TDD and deterministic rel
 		assert.equal(byId.get(id)?.sandbox, undefined);
 	}
 	assert.match(byId.get("action-test")?.systemPrompt ?? "", /action-package/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /挥动左手.*wave-left-hand/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /挥动右手.*wave-right-hand/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /actionId、description、start、intentExamples.*方向一致/);
+	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /对“开发一个挥动右手的功能”/);
+	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /start\s*=\s*`?(?:left|right)`?/);
+	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /lift_(?:left|right).*lower_(?:left|right)/);
 	assert.match(byId.get("action-test")?.systemPrompt ?? "", /返工轮已存在时绝不能再次 scaffold/);
 	assert.match(byId.get("action-test")?.systemPrompt ?? "", /v1 只支持无参数动作/);
 	assert.match(byId.get("action-coding")?.systemPrompt ?? "", /run\(context, params\)/);

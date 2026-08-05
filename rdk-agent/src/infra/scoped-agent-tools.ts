@@ -11,7 +11,12 @@ import { isReadOnlyApplicationRequest } from "../domain/application-intent.ts";
 import type { AgentProfile } from "../domain/agent-profile.ts";
 import type { AgentExpectation } from "../shared/agent-runner.ts";
 import { createDeploymentToolDefinition } from "./deployment-agent-tool.ts";
-import { createActionPackageToolDefinition } from "./action-package-tool.ts";
+import {
+	assertActionPackagePathDirectionConsistent,
+	assertActionPythonContentDirectionConsistent,
+	assertActionRegistryContentDirectionConsistent,
+	createActionPackageToolDefinition,
+} from "./action-package-tool.ts";
 import { createPodmanSandboxOperations } from "./podman-sandbox.ts";
 
 type AnyToolDefinition = ToolDefinition<any, any, any>;
@@ -22,9 +27,11 @@ export class WorkspaceWritePolicy {
 	private readonly patterns: readonly RegExp[];
 	private readonly deniedPatterns: readonly RegExp[];
 	private readonly directoryPrefixes: readonly string[];
+	private readonly userRequest?: string;
 
-	constructor(workspaceRoot: string, writePaths: readonly string[]) {
+	constructor(workspaceRoot: string, writePaths: readonly string[], userRequest?: string) {
 		this.root = resolve(workspaceRoot);
+		this.userRequest = userRequest;
 		this.patterns = writePaths.filter((pattern) => !pattern.startsWith("!")).map((pattern) => this.glob(pattern));
 		this.deniedPatterns = writePaths.filter((pattern) => pattern.startsWith("!")).map((pattern) => this.glob(pattern.slice(1)));
 		this.directoryPrefixes = writePaths.filter((pattern) => !pattern.startsWith("!")).map((pattern) => {
@@ -39,6 +46,7 @@ export class WorkspaceWritePolicy {
 		if (!this.patterns.some((pattern) => pattern.test(workspacePath)) || this.deniedPatterns.some((pattern) => pattern.test(workspacePath))) {
 			throw new Error(`写入被拒绝：${workspacePath} 不在 Agent 的 writePaths 白名单中`);
 		}
+		this.assertRequestDirection(workspacePath);
 	}
 
 	assertDirectoryAllowed(path: string): void {
@@ -46,6 +54,19 @@ export class WorkspaceWritePolicy {
 		if (!this.directoryPrefixes.some((prefix) => workspacePath.startsWith(prefix) || prefix.startsWith(workspacePath))) {
 			throw new Error(`创建目录被拒绝：${workspacePath} 不在 Agent 的 writePaths 范围中`);
 		}
+		this.assertRequestDirection(workspacePath);
+	}
+
+	assertFileContentAllowed(path: string, content: string): void {
+		this.assertFileAllowed(path);
+		if (this.userRequest) {
+			assertActionRegistryContentDirectionConsistent(this.userRequest, this.workspacePath(path), content);
+			assertActionPythonContentDirectionConsistent(this.userRequest, this.workspacePath(path), content);
+		}
+	}
+
+	private assertRequestDirection(workspacePath: string): void {
+		if (this.userRequest) assertActionPackagePathDirectionConsistent(this.userRequest, workspacePath);
 	}
 
 	private workspacePath(path: string): string {
@@ -110,7 +131,30 @@ export function scopedAgentTools(
 	profile: AgentProfile,
 	runContext?: { expectation: AgentExpectation; userRequest: string },
 ): AnyToolDefinition[] {
-	const policy = new WorkspaceWritePolicy(workspaceRoot, profile.writePaths);
+	if (profile.actionPackage && !runContext) {
+		throw new Error(`${profile.id} 的 action-package 工具缺少原始用户指令上下文`);
+	}
+	const policy = new WorkspaceWritePolicy(workspaceRoot, profile.writePaths, runContext?.userRequest);
+	const writeTool = createWriteToolDefinition(workspaceRoot, {
+		operations: {
+			mkdir: async (path) => {
+				policy.assertDirectoryAllowed(path);
+				await mkdir(path, { recursive: true });
+			},
+			writeFile: async (path, content) => {
+				policy.assertFileContentAllowed(path, content);
+				await writeFile(path, content);
+			},
+		},
+	});
+	const guardedWriteTool = {
+		...writeTool,
+		async execute(...executeArgs: Parameters<typeof writeTool.execute>) {
+			const input = executeArgs[1];
+			policy.assertFileContentAllowed(input.path, input.content);
+			return writeTool.execute(...executeArgs);
+		},
+	} as AnyToolDefinition;
 	const definitions: Record<string, AnyToolDefinition | undefined> = {
 		read: createReadToolDefinition(workspaceRoot),
 		bash: createBashToolDefinition(workspaceRoot, {
@@ -133,25 +177,16 @@ export function scopedAgentTools(
 					await access(path);
 				},
 				writeFile: async (path, content) => {
-					policy.assertFileAllowed(path);
+					policy.assertFileContentAllowed(path, content);
 					await writeFile(path, content);
 				},
 			},
 		}),
-		write: createWriteToolDefinition(workspaceRoot, {
-			operations: {
-				mkdir: async (path) => {
-					policy.assertDirectoryAllowed(path);
-					await mkdir(path, { recursive: true });
-				},
-				writeFile: async (path, content) => {
-					policy.assertFileAllowed(path);
-					await writeFile(path, content);
-				},
-			},
-		}),
+		write: guardedWriteTool,
 		deploy: profile.deployment ? createDeploymentToolDefinition(workspaceRoot, skillDirectory, profile) : undefined,
-		"action-package": profile.actionPackage ? createActionPackageToolDefinition(workspaceRoot, profile) : undefined,
+		"action-package": profile.actionPackage
+			? createActionPackageToolDefinition(workspaceRoot, profile, runContext!.userRequest)
+			: undefined,
 	};
 	return profile.tools.map((name) => {
 		const definition = definitions[name];
