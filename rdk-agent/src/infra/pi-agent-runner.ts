@@ -52,11 +52,16 @@ function skillInfo(skill: Skill): AgentSkillInfo {
 	return { name: skill.name, description: skill.description, filePath: skill.filePath };
 }
 
-function toolCallSummary(toolName: string, args: unknown): string | undefined {
+export function toolCallSummary(toolName: string, args: unknown): string | undefined {
 	if (typeof args !== "object" || args === null) return undefined;
 	const values = args as Record<string, unknown>;
 	if (toolName === "bash" && typeof values.command === "string") return values.command;
 	if (["read", "edit", "write"].includes(toolName) && typeof values.path === "string") return values.path;
+	if (toolName === "action-package" && typeof values.operation === "string") {
+		const actionId = typeof values.actionId === "string" ? ` · ${values.actionId}` : "";
+		const start = typeof values.start === "string" ? ` · start=${values.start}` : "";
+		return `${values.operation}${actionId}${start}`;
+	}
 	return undefined;
 }
 
@@ -82,7 +87,7 @@ export function enforceApplicationSkillSelection(
 	return {
 		summary: result.summary,
 		outcome: "needs-human",
-		question: "机器人应用 Agent 未读取任何白名单 Skill，无法证明本次需求经过 Skill 选择与约束。请补充需求后重试，或输入 /abort 终止。",
+		question: "机器人应用 Agent 未读取任何白名单 Skill，无法证明本次用户指令经过 Skill 选择与约束。请补充用户指令后重试，或输入 /abort 终止。",
 	};
 }
 
@@ -97,7 +102,7 @@ export function needsConfiguredSkillSelectionRetry(
 export function configuredSkillSelectionRetryPrompt(skills: readonly Pick<Skill, "name" | "filePath">[]): string {
 	const files = skills.map((skill) => `- ${skill.name}: ${skill.filePath}`).join("\n");
 	return `运行时检测到你尚未通过 read 读取任何已配置 Skill，因此不能接受刚才的完成结论。
-请立即从下列精确路径中选择与需求匹配的 Skill，用 read 完整读取对应 SKILL.md；不得在业务工作区猜路径：
+请立即从下列精确路径中选择与用户指令匹配的 Skill，用 read 完整读取对应 SKILL.md；不得在业务工作区猜路径：
 ${files}
 读取后核对本阶段工作是否符合 Skill，再简洁复述交付结论，并重新输出本阶段要求的单行 RDK_AGENT_RESULT。不要重复已经完成的文件编辑或真实硬件动作。`;
 }

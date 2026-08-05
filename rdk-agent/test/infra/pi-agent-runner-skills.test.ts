@@ -11,6 +11,7 @@ import {
 	exceedsToolCallLimit,
 	needsConfiguredSkillSelectionRetry,
 	selectedSkillFromRead,
+	toolCallSummary,
 } from "../../src/infra/pi-agent-runner.ts";
 import type { AgentRunRequest } from "../../src/shared/agent-runner.ts";
 
@@ -62,7 +63,7 @@ test("application cannot report completion without reading a configured Skill", 
 	assert.deepEqual(enforceApplicationSkillSelection(completed, "application", 1, 0), {
 		summary: "done",
 		outcome: "needs-human",
-		question: "机器人应用 Agent 未读取任何白名单 Skill，无法证明本次需求经过 Skill 选择与约束。请补充需求后重试，或输入 /abort 终止。",
+		question: "机器人应用 Agent 未读取任何白名单 Skill，无法证明本次用户指令经过 Skill 选择与约束。请补充用户指令后重试，或输入 /abort 终止。",
 	});
 });
 
@@ -82,4 +83,12 @@ test("omitting maxToolCalls keeps tool calls unlimited", () => {
 	assert.equal(exceedsToolCallLimit(10_000, undefined), false);
 	assert.equal(exceedsToolCallLimit(10, 10), false);
 	assert.equal(exceedsToolCallLimit(11, 10), true);
+});
+
+test("action-package tool logs expose the selected action id and side", () => {
+	assert.equal(
+		toolCallSummary("action-package", { operation: "scaffold", actionId: "wave-left-hand", start: "left" }),
+		"scaffold · wave-left-hand · start=left",
+	);
+	assert.equal(toolCallSummary("action-package", { operation: "validate", actionId: "wave-left-hand" }), "validate · wave-left-hand");
 });
