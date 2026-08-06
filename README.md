@@ -88,7 +88,7 @@ A developer can request a new self-contained robot action without manually coord
 Example:
 
 ```text
-Create a new action that moves its left side once.
+Developed a feature that waves the left hand.
 ```
 
 The system preserves the original request throughout the workflow. If generated metadata, paths, or hardware calls reverse the requested side, a deterministic guard rejects the change before it is written.
