@@ -330,20 +330,22 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 
 ### 9.5 当前证据状态
 
-| 项目 | 状态 |
-| --- | --- |
-| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏。 |
-| AMD Radeon GPU 型号 | 证据待补（Evidence pending）。 |
-| ROCm/HIP 版本 | 证据待补（Evidence pending）。 |
-| 专用 vLLM 服务器版本与配置 | 证据待补（Evidence pending）。 |
-| 模型 revision 与精度/量化 | 证据待补（Evidence pending）。 |
-| 本地 `/v1/models` 响应 | 证据待补（Evidence pending）。 |
-| 基线与优化后 TTFT | 证据待补（Evidence pending）。 |
-| 基线与优化后解码吞吐量 | 证据待补（Evidence pending）。 |
-| 峰值 VRAM 与利用率 | 证据待补（Evidence pending）。 |
-| 智能体工作流端到端延迟 | 证据待补（Evidence pending）。 |
+本提交涉及两条不同的服务路径，二者分别取证。**(A)** 是本团队自训练的模型，运行在参赛者控制的 Radeon 主机上，证据在 [`model/`](model/README.md) 且可离线重算。**(B)** 是 Agent 客户端经 vLLM 路由到的现成 80B，该服务器仍未独立佐证，此处不为它编造任何数字。
 
-本项目不会编造 AMD 性能数据。任何未经测量的项目都不得从 `Evidence pending` 改为具体数值。评审前应附上脱敏服务器输出、确切的 vLLM 启动命令、模型 revision、精度或量化设置、使用容器时的容器 digest、预热策略，以及不包含凭据且能证明参赛者控制 Radeon Cloud 实例的截图。
+| 项目 | (A) 自训练 32B 服务 | (B) 80B vLLM Agent 后端 |
+| --- | --- | --- |
+| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏 | 已在本地验证；公开材料已脱敏 |
+| AMD Radeon GPU 型号 | `gfx1100`，Card Model `0x744b`，显存 51,522,830,336 B | 证据待补 |
+| ROCm/HIP 版本 | ROCm 7.2.1，HIP `7.2.26015-fc0010cf6a`，torch `2.9.1+rocm7.2.0` | 证据待补 |
+| 服务器版本与配置 | 服务端原件 `qwen3_agentic_openai_server.py`（SHA-256 `95d5c139…`），SDPA attention、fp32 RMSNorm、贪心解码；启动器见 [`model/model/serving/`](model/model/serving/README.md) | **证据待补** —— 确切 vLLM 版本与启动命令未佐证 |
+| 模型 revision 与精度/量化 | `unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8cc9ee352f7e49303a2c1705f9083`，bnb NF4 4-bit 双重量化，bf16 计算；adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | 证据待补 |
+| 本地 `/v1/models` 响应 | 已在主机上实测；返回的 `id` 与 `/health` 如实反映当前加载的是哪一臂，这也是 A/B 的身份对照手段 | 证据待补 |
+| 基线与优化后 TTFT | 用户可见 TTFT p50 17.41 s → **8.26 s**，p95 83.97 s → **12.89 s**（每臂 88 次试验） | 证据待补 |
+| 基线与优化后解码吞吐量 | 6.54 → **6.72** tok/s，且 88/88 输出逐字节一致。同一张卡上的独立 80B llama.cpp 案例：37.19 → **49.82** tok/s（+34.0%） | 证据待补 |
+| 峰值 VRAM 与利用率 | 加载后约 19.3 GB；基准峰值 27.99 → 28.06 GB；解码期间 `rocm-smi` 采样观测到 GPU 利用率 99% | 证据待补 |
+| 智能体工作流端到端延迟 | RDK X5 实机上的完整五节点 `rdk-agent` 工作流：SFT **4 分 04 秒**验收通过（5/5 节点）；Base 停在 3/5，14 分 25 秒后被终止 —— 见 [`model/AGENT_E2E.md`](model/AGENT_E2E.md) | 证据待补 |
+
+本项目不会编造 AMD 性能数据。(A) 列中每个数值都在参赛者控制的 `gfx1100` 主机上实测，并由 [`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py`](model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py) 重新生成到 `results.json`，其中同时内嵌 GPU、ROCm 与各库版本、模型与 adapter 的 SHA-256，以及代码 SHA-256。(B) 列没有任何一项被从"证据待补"改成数字：该服务器仍需附上脱敏输出、确切的 vLLM 启动命令、模型 revision、精度或量化设置、使用容器时的容器 digest 与预热策略。
 
 ## 10. 安装、部署与复现
 
