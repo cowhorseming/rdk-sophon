@@ -1,3 +1,5 @@
+> English version: [RESULTS.en.md](RESULTS.en.md)
+
 # RESULTS — 模型侧全部结果一页看完
 
 每个结果块都附:证据位置 + 一条本机可跑的核验命令 + 诚实边界。
@@ -53,7 +55,26 @@ cat model/served-model-manifest.json   # 身份链 + 服务时间线 + 行为对
 
 边界:曾存在 base 服务以别名应答 SFT 模型名的时间窗(证据内如实记录);复核服务身份时应同时查看响应 `model` 字段与 `/health`,接入接口见 `model/serving/README.md`。
 
-## 4. Radeon 推理优化:Qwen3-Next-80B 单卡部署(独立案例)
+## 4. Radeon 推理优化
+
+### 4.1 主 32B Agent 模型(本仓库的那个模型)
+
+同一 base、同一 adapter、同一 GPU、temperature=0,14 任务 / 44 回合 / 2 轮 = 每臂 88 次试验。Baseline 为未改动的生产推理路径;优化为真流式 + lean LoRA 解码路径(`radeon-optimization/qwen3-32b-agentic-sft/runtime.py`):
+
+| 指标 | 基线 | 优化后 | 变化 |
+|---|---:|---:|---:|
+| 用户可见 TTFT p50 | 17.41 s | **8.26 s** | **2.11×** |
+| 用户可见 TTFT p95 | 83.97 s | **12.89 s** | **6.52×** |
+| Decode | 6.54 tok/s | **6.72 tok/s** | +2.8% |
+| 与基线输出一致性 | — | **88/88 逐字节一致** | 质量门禁全过 |
+
+```bash
+cd radeon-optimization/qwen3-32b-agentic-sft && cat results.json   # 由 benchmark.py 在 Radeon 实机自动生成
+```
+
+边界:该提升应诚实归类为 streaming/TTFT 优化而非 kernel 加速——生产 server 本已付出 prefill 代价,却把全部 token 扣到生成结束才吐出。两个上限更高的候选(把 LoRA 合并进 NF4 base;`torch.compile` + StaticCache 解码)已实现并实机测量,基于证据被否决,详见该目录 README。优化已验证但尚未接入线上服务路径。
+
+### 4.2 Qwen3-Next-80B 单卡部署(独立案例)
 
 官方预量化 Q4_K_M(48.4GB)+ ROCm/HIP llama.cpp,单张 gfx1100;优化仅改 KV 精度(Q8→Q4)与 GPU offload 层数(45→47):
 
@@ -74,4 +95,4 @@ cd radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 重算全
 
 ## 结果总述(一句话版)
 
-> 在 Radeon 上:训练收敛(CE −48.4%)、产物身份四方哈希闭合、SFT 把严格工具调用一致率提升 30.6 个百分点(0→15 个任务满足全回合合同),另以独立案例证明 80B 级模型的单卡部署优化(decode +34%)。以上每个数字都可用本页命令离线重算。
+> 在 Radeon 上:训练收敛(CE −48.4%)、产物身份四方哈希闭合、SFT 把严格工具调用一致率提升 30.6 个百分点(0→15 个任务满足全回合合同),同一 32B 模型的推理把用户可见 TTFT 压缩 2.11× 且输出逐字节不变,另以独立案例证明 80B 级模型的单卡部署优化(decode +34%)。以上每个数字都可用本页命令离线重算。

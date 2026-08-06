@@ -75,7 +75,8 @@ Training does not need to be rerun: the public adapter is the artifact used by t
 | `model/serving/` | Original server artifact (same evidence hash) + serve.sh + dependencies | Tier 1: run it yourself |
 | `benchmark/` | Frozen replay evaluator + sealed run evidence | How much stronger SFT is than Base, and at what cost |
 | `data/releases/…/agentic/test.jsonl` | Historically held-out frozen Test (released after evaluation) | Evaluation input, SHA `d1e1856b…5e283`, for independent re-scoring by judges |
-| `radeon-optimization/` | Qwen3-Next-80B single-GPU deployment optimization (independent case study) | decode +34%, reproducible offline |
+| `radeon-optimization/qwen3-32b-agentic-sft/` | Inference optimization of **this** 32B model on gfx1100 + on-device A/B | user-visible TTFT 2.11×, outputs byte-identical |
+| `radeon-optimization/qwen3-next-80b/` | Qwen3-Next-80B single-GPU deployment optimization (independent case study) | decode +34%, reproducible offline |
 | [`EVIDENCE_MAP.en.md`](EVIDENCE_MAP.en.md) | Claim → evidence file → hash master index | One map for the entire repository |
 
 ## Boundaries (Use These in Public Claims)

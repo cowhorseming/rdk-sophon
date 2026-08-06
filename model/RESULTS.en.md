@@ -55,7 +55,26 @@ cat model/served-model-manifest.json   # Identity chain + service timeline + beh
 
 Boundary: there was a time window in which the Base service answered under the SFT model alias (faithfully recorded in the evidence). When verifying service identity, inspect both the response `model` field and `/health`; see `model/serving/README.md` for the integration interface.
 
-## 4. Radeon Inference Optimization: Single-GPU Qwen3-Next-80B Deployment (Independent Case Study)
+## 4. Radeon Inference Optimization
+
+### 4.1 Main 32B agent model (the model this repository is about)
+
+Same base, same adapter, same GPU, temperature=0, 14 tasks / 44 turns / 2 passes = 88 trials per arm. Baseline is the unmodified production inference path; the optimization is true token streaming plus a lean LoRA decode path (`radeon-optimization/qwen3-32b-agentic-sft/runtime.py`):
+
+| Metric | Baseline | Optimized | Change |
+|---|---:|---:|---:|
+| User-visible TTFT p50 | 17.41 s | **8.26 s** | **2.11×** |
+| User-visible TTFT p95 | 83.97 s | **12.89 s** | **6.52×** |
+| Decode | 6.54 tok/s | **6.72 tok/s** | +2.8% |
+| Output agreement vs baseline | — | **88/88 byte-identical** | all quality gates passed |
+
+```bash
+cd radeon-optimization/qwen3-32b-agentic-sft && cat results.json   # generated on the Radeon host by benchmark.py
+```
+
+Boundary: the gain is honest to classify as a streaming/TTFT optimization, not a kernel speedup — the production server already paid the prefill and then withheld every token until generation ended. Two higher-ceiling candidates (merging LoRA into the NF4 base; `torch.compile` + StaticCache decode) were implemented, measured on the machine, and rejected on evidence; see the README in that directory. The optimization is validated but not yet wired into the live serving path.
+
+### 4.2 Single-GPU Qwen3-Next-80B Deployment (Independent Case Study)
 
 Official pre-quantized Q4_K_M (48.4GB) + ROCm/HIP llama.cpp on one gfx1100 GPU; the optimization changes only KV precision (Q8→Q4) and the number of GPU-offloaded layers (45→47):
 
@@ -76,4 +95,4 @@ Boundary: this case study is independent of the 32B SFT mainline (not the demo m
 
 ## Overall Result (One-Sentence Version)
 
-> On Radeon: training converged (CE −48.4%), artifact identity closed across four hash-matched sources, SFT improved strict tool-call agreement by 30.6 percentage points (0→15 tasks satisfying the all-turn contract), and an independent case study demonstrated single-GPU deployment optimization for an 80B-class model (decode +34%). Every number above can be recomputed offline with the commands on this page.
+> On Radeon: training converged (CE −48.4%), artifact identity closed across four hash-matched sources, SFT improved strict tool-call agreement by 30.6 percentage points (0→15 tasks satisfying the all-turn contract), inference on that same 32B model cut user-visible TTFT by 2.11× with byte-identical outputs, and an independent case study demonstrated single-GPU deployment optimization for an 80B-class model (decode +34%). Every number above can be recomputed offline with the commands on this page.

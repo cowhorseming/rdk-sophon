@@ -43,10 +43,13 @@ The repository-wide canonical evidence index. Each row is an independently verif
 | Costs are disclosed faithfully | Observed cost in `RESULTS.md` | SFT latency/tokens ≈ 2.1×; strict final-text equality is 0 for both arms (no claim of semantic correctness) |
 | Independent re-scoring | `benchmark/recompute_ab.py` + Test + Base/SFT raw | Rebuilds references from public inputs and per-turn responses, then checks each item against `summary.json` |
 
-## Radeon Inference Optimization (Independent Case Study)
+## Radeon Inference Optimization
 
 | Claim | Evidence | Key Hashes/Numbers |
 |---|---|---|
+| Inference optimization of the main 32B model is effective | `radeon-optimization/qwen3-32b-agentic-sft/{README.md,runtime.py,benchmark.py,results.json}` | Same base + adapter `4dcee691…` + GPU, 88 trials/arm: user-visible TTFT p50 17.41s→8.26s (2.11×), p95 6.52×, decode +2.8% |
+| That optimization changes no outputs | `results.json` → `baseline_vs_optimized_output_agreement` + `quality_gates` | 88/88 outputs byte-identical; all gates passed; 0 failures/timeouts/truncations |
+| Rejected candidates are recorded, not hidden | `radeon-optimization/qwen3-32b-agentic-sft/README.md` §5 + `results.json` → `boundaries` | LoRA-into-NF4 merge (delta below the quantization step, cosine 0.006) and `torch.compile`+StaticCache (slower at 3–6k prompts) implemented, measured, rejected |
 | 80B single-GPU deployment optimization is effective | `radeon-optimization/qwen3-next-80b/{README.md,results/ab-20260730.json}` | Q4 KV + 47-layer offload: decode +34.0%, TTFT −10.5%; `verify_results.py` reproduces all ten measurements consistently |
 | The optimization preserves functionality | Canary records in the same README | Structured tool_calls, tool continuation, and 42,028-token needle retrieval pass |
 | Model source is pinned | Model fingerprint recorded in the README | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf` 48,410,988,384 B, SHA `d103b273…` |

@@ -1,3 +1,5 @@
+> English version: [README.en.md](README.en.md)
+
 # Frozen Base/SFT model replay
 
 This directory contains three small, standard-library-only tools:

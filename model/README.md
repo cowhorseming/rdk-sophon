@@ -1,3 +1,5 @@
+> English version: [README.en.md](README.en.md)
+
 Author: 韩兆鸣；汪明
 
 
@@ -73,7 +75,8 @@ python3 ../../recompute_ab.py \
 | `model/serving/` | 服务端原件(证据同哈希)+ serve.sh + 依赖 | Tier 1:自己把它跑起来 |
 | `benchmark/` | 冻结重放评测器 + sealed 运行证据 | SFT 比 base 强多少、代价几何 |
 | `data/releases/…/agentic/test.jsonl` | historically held-out 冻结 Test(评测后公开) | 评测输入,SHA `d1e1856b…5e283`,供评委独立重评分 |
-| `radeon-optimization/` | Qwen3-Next-80B 单卡部署优化(独立案例) | decode +34%,可离线重算 |
+| `radeon-optimization/qwen3-32b-agentic-sft/` | **本模型**在 gfx1100 上的推理优化 + 实机 A/B | 用户可见 TTFT 2.11×,输出逐字节一致 |
+| `radeon-optimization/qwen3-next-80b/` | Qwen3-Next-80B 单卡部署优化(独立案例) | decode +34%,可离线重算 |
 | `EVIDENCE_MAP.md` | claim → 证据文件 → 哈希 总索引 | 全仓一张地图 |
 
 ## 边界(公开表述以此为准)

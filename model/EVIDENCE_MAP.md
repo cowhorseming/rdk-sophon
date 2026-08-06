@@ -1,3 +1,5 @@
+> English version: [EVIDENCE_MAP.en.md](EVIDENCE_MAP.en.md)
+
 # EVIDENCE MAP — claim → 证据 → 哈希
 
 全仓唯一的证据总索引。每一行是一个可独立核验的 claim。
@@ -41,10 +43,13 @@
 | 代价如实披露 | `RESULTS.md` Observed cost | SFT 延迟/token ≈ 2.1×;final-text 严格相等两臂均 0(不宣称语义正确性) |
 | 独立重评分 | `benchmark/recompute_ab.py` + Test + Base/SFT raw | 从公开输入与逐回合响应重建参考并逐项比对 `summary.json` |
 
-## Radeon 推理优化(独立案例)
+## Radeon 推理优化
 
 | Claim | 证据 | 关键哈希/数字 |
 |---|---|---|
+| 主 32B 模型推理优化有效 | `radeon-optimization/qwen3-32b-agentic-sft/{README.md,runtime.py,benchmark.py,results.json}` | 同 base + adapter `4dcee691…` + 同 GPU,每臂 88 次:用户可见 TTFT p50 17.41s→8.26s(2.11×),p95 6.52×,decode +2.8% |
+| 该优化不改变输出 | `results.json` → `baseline_vs_optimized_output_agreement` + `quality_gates` | 88/88 输出逐字节一致;门禁全过;0 失败/超时/截断 |
+| 被否决方案如实入档 | `radeon-optimization/qwen3-32b-agentic-sft/README.md` §5 + `results.json` → `boundaries` | LoRA 合并进 NF4(delta 低于量化步长,cosine 0.006)与 `torch.compile`+StaticCache(3–6k prompt 下更慢)均已实现、实测、否决 |
 | 80B 单卡部署优化有效 | `radeon-optimization/qwen3-next-80b/{README.md,results/ab-20260730.json}` | Q4 KV + 47 层 offload:decode +34.0%,TTFT −10.5%;`verify_results.py` 重算十次测量全部一致 |
 | 优化不破坏功能 | 同 README 的 canary 记录 | 结构化 tool_calls、tool continuation、42,028-token needle 检索通过 |
 | 模型来源固定 | README 记录的模型指纹 | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf` 48,410,988,384 B,SHA `d103b273…` |
