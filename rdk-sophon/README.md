@@ -114,7 +114,7 @@ sudo systemctl enable --now probe-daemon
 ## 9. 测试（三层）
 
 ```sh
-cargo test --workspace                # 52 个测试全过
+cargo test --workspace                # 62 个测试全过
 cargo clippy --workspace --all-targets -- -D warnings   # 零警告
 ```
 
@@ -122,7 +122,7 @@ cargo clippy --workspace --all-targets -- -D warnings   # 零警告
   domain CommandPolicy（deny/enabled）、AlertService 阈值判定、collectors 用 FakeReader 解析。
 - **集成测试**（`crates/daemon/tests/`）：用 `daemon::build_test_app` + StubTransport，
   跑 client→dispatcher→domain→collector 全链路，不起真实端口。覆盖 ping/get_state/exec_shell（deny/disabled/正常）与 telemetry/alert 推送。
-- **E2E 测试**（`crates/e2e-tests/tests/`）：真实 TCP/Unix 端口 + 真实 transport。
+- **E2E 测试**（`crates/testkit/tests/`）：真实 TCP/Unix 端口 + 真实 transport。
   daemon 注入 FakeReader（Mac 上可跑）但走真实网络栈。覆盖 ping/get_state/exec deny/超时/telemetry 推送。
 
 采集器通过 `ports::SysfsReader`/`ProcReader`/`HrutGateway` 注入，Mac 上用 `FakeReader` 测解析逻辑，
@@ -137,7 +137,7 @@ cargo clippy --workspace --all-targets -- -D warnings   # 零警告
 - [x] RPC 方法表 + 可审计、受黑名单约束的 shell 应急通道（策略与执行分离）。
 - [x] 周期性遥测推送 + 阈值告警。
 - [x] 四种 API 形式：`sophonctl`（本地+远程）、Rust `client` 库、HTTP/REST 网关、WebSocket 出站。
-- [x] 三层测试（单元 + 集成 + E2E），52 个测试全过，clippy 零警告。
+- [x] 三层测试（单元 + 集成 + E2E），62 个测试全过，clippy 零警告。
 - [ ] TLS（mTLS）— trait 已就绪，待补适配器。
 - [ ] MQTT 适配器（可选）。
 - [ ] 客户端级鉴权 / 限流。

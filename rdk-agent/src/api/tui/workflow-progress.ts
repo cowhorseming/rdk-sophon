@@ -1,6 +1,7 @@
 import type { AgentProfile, StageId } from "../../domain/agent-profile.ts";
 import type { OrchestrationMode, RobotDevelopmentMode } from "../../domain/orchestration-mode.ts";
 import type { StageStatus } from "../../domain/workflow.ts";
+import { defaultLocale, localeText, type Locale } from "../../shared/locale.ts";
 import { stageMarker, tuiStyle } from "./tui-style.ts";
 
 export interface LoopIterationProgress {
@@ -41,7 +42,10 @@ export function workflowProgressReport(input: {
 	statuses: ReadonlyMap<StageId, StageStatus>;
 	loopIteration?: LoopIterationProgress;
 	compact?: boolean;
+	locale?: Locale;
 }): string {
+	const locale = input.locale ?? defaultLocale;
+	const text = (chinese: string, english: string): string => localeText(locale, chinese, english);
 	const nodes = progressNodes(input.mode, input.profiles);
 	const completedNodes = nodes.filter((node) => input.statuses.get(node.id) === "succeeded").length;
 	const running = nodes.find((node) => input.statuses.get(node.id) === "running");
@@ -55,20 +59,27 @@ export function workflowProgressReport(input: {
 		.find((agentId) => input.statuses.get(agentId) === "failed");
 	let activeLabel: string;
 	if (activeAgent) activeLabel = workflowStageLabel(input.mode, input.profiles, activeAgent);
-	else if (failedAgent) activeLabel = `${workflowStageLabel(input.mode, input.profiles, failedAgent)}（失败）`;
+	else if (failedAgent) activeLabel = `${workflowStageLabel(input.mode, input.profiles, failedAgent)}${text("（失败）", " (failed)")}`;
 	else if (running) activeLabel = running.label;
-	else if (failed) activeLabel = `${failed.label}（失败）`;
-	else activeLabel = next?.label ?? (completedNodes === nodes.length ? "全部节点已完成" : "等待下一节点");
+	else if (failed) activeLabel = `${failed.label}${text("（失败）", " (failed)")}`;
+	else activeLabel = next?.label ?? (completedNodes === nodes.length
+		? text("全部节点已完成", "All nodes completed")
+		: text("等待下一节点", "Waiting for the next node"));
 	const currentNode = running?.label
-		?? (failed ? `${failed.label}（失败）` : undefined)
+		?? (failed ? `${failed.label}${text("（失败）", " (failed)")}` : undefined)
 		?? next?.label
-		?? (completedNodes === nodes.length ? "工作流完成" : "工作流已停止");
+		?? (completedNodes === nodes.length ? text("工作流完成", "Workflow completed") : text("工作流已停止", "Workflow stopped"));
 	const percentage = nodes.length === 0 ? 0 : Math.floor((completedNodes / nodes.length) * 100);
 	const iteration = input.loopIteration && running?.id === input.loopIteration.loopId
-		? ` · 第 ${input.loopIteration.iteration}/${input.loopIteration.maxIterations} 轮`
+		? text(
+			` · 第 ${input.loopIteration.iteration}/${input.loopIteration.maxIterations} 轮`,
+			` · iteration ${input.loopIteration.iteration}/${input.loopIteration.maxIterations}`,
+		)
 		: "";
 	const currentCompleted = running ? completedAgentSteps(running, input.statuses) : 0;
-	const currentProgressLabel = running?.agentIds.length === 1 ? "节点 Agent 进度" : "本轮 Agent 进度";
+	const currentProgressLabel = running?.agentIds.length === 1
+		? text("节点 Agent 进度", "Node Agent progress")
+		: text("本轮 Agent 进度", "Iteration Agent progress");
 	const currentProgress = running
 		? `${tuiStyle.title(currentProgressLabel)}  ${progressBar(currentCompleted, running.agentIds.length)}  ${currentCompleted}/${running.agentIds.length} Agent`
 		: undefined;
@@ -85,25 +96,25 @@ export function workflowProgressReport(input: {
 
 	if (input.compact) {
 		return [
-			tuiStyle.accent("━━ 研发工作进展 ━━"),
-			`${tuiStyle.title("整体")}  ${completedNodes}/${nodes.length} 节点 · ${percentage}%`,
-			`${tuiStyle.title("节点")}  ${styledCurrentNode}`,
+			tuiStyle.accent(text("━━ 研发工作进展 ━━", "━━ Development Progress ━━")),
+			`${tuiStyle.title(text("整体", "Overall"))}  ${completedNodes}/${nodes.length} ${text("节点", "nodes")} · ${percentage}%`,
+			`${tuiStyle.title(text("节点", "Node"))}  ${styledCurrentNode}`,
 			`${tuiStyle.title("Agent")}  ${styledActiveAgent}`,
-			...(running ? [`${tuiStyle.title(running.agentIds.length === 1 ? "节点" : "本轮")}  ${currentCompleted}/${running.agentIds.length} Agent`] : []),
+			...(running ? [`${tuiStyle.title(running.agentIds.length === 1 ? text("节点", "Node") : text("本轮", "Iteration"))}  ${currentCompleted}/${running.agentIds.length} Agent`] : []),
 		].join("\n");
 	}
 
 	const summary = [
-		tuiStyle.accent("┏━━ 研发工作进展 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
-		`${tuiStyle.title("整体进度")}  ${progressBar(completedNodes, nodes.length)}  ${completedNodes}/${nodes.length} 节点 · ${percentage}%`,
-		`${tuiStyle.title("当前节点")}  ${styledCurrentNode}`,
-		`${tuiStyle.title("当前 Agent")}  ${styledActiveAgent}`,
+		tuiStyle.accent(text("┏━━ 研发工作进展 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "┏━━ Development Progress ━━━━━━━━━━━━━━━━━━━━━━━━━━")),
+		`${tuiStyle.title(text("整体进度", "Overall progress"))}  ${progressBar(completedNodes, nodes.length)}  ${completedNodes}/${nodes.length} ${text("节点", "nodes")} · ${percentage}%`,
+		`${tuiStyle.title(text("当前节点", "Current node"))}  ${styledCurrentNode}`,
+		`${tuiStyle.title(text("当前 Agent", "Current Agent"))}  ${styledActiveAgent}`,
 		...(currentProgress ? [currentProgress] : []),
 	];
 	return [
 		...summary,
 		"",
-		tuiStyle.title("执行路径"),
+		tuiStyle.title(text("执行路径", "Execution path")),
 		...nodes.flatMap((node, index) => nodeLines(node, index, input)),
 		tuiStyle.accent("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	].join("\n");
@@ -134,7 +145,11 @@ function nodeLines(
 	const status = input.statuses.get(node.id) ?? "pending";
 	const loop = input.mode.loops.find((candidate) => candidate.id === node.id);
 	const suffix = loop && input.loopIteration?.loopId === loop.id
-		? ` · 第 ${input.loopIteration.iteration}/${input.loopIteration.maxIterations} 轮`
+		? localeText(
+			input.locale ?? defaultLocale,
+			` · 第 ${input.loopIteration.iteration}/${input.loopIteration.maxIterations} 轮`,
+			` · iteration ${input.loopIteration.iteration}/${input.loopIteration.maxIterations}`,
+		)
 		: "";
 	const lines = [`${stageMarker(status)} ${index + 1}. ${node.label}${suffix}`];
 	if (loop) {

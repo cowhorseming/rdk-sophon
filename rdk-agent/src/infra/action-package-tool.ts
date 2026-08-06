@@ -7,6 +7,10 @@ import type { ActionPackageOperation, AgentProfile } from "../domain/agent-profi
 
 type AnyToolDefinition = ToolDefinition<any, any, any>;
 
+export interface ActionPackageToolOptions {
+	freshExisting?: boolean;
+}
+
 export type ActionDirection = "left" | "right" | "both";
 
 export interface ActionPackageScaffoldMetadata {
@@ -271,6 +275,7 @@ export function createActionPackageToolDefinition(
 	workspaceRoot: string,
 	profile: AgentProfile,
 	userRequest: string,
+	options: ActionPackageToolOptions = {},
 ): AnyToolDefinition {
 	const plan = profile.actionPackage;
 	if (!plan) throw new Error(`${profile.id} 未配置 actionPackage`);
@@ -301,7 +306,14 @@ export function createActionPackageToolDefinition(
 			await access(script);
 			const command = operation === "scaffold" ? "new" : operation;
 			const metadata = operation === "scaffold"
-				? ["--description", input.description!, "--start", input.start!, ...input.intentExamples!.flatMap((intent) => ["--intent", intent])]
+				? [
+					...(options.freshExisting ? ["--fresh"] : []),
+					"--description",
+					input.description!,
+					"--start",
+					input.start!,
+					...input.intentExamples!.flatMap((intent) => ["--intent", intent]),
+				]
 				: [];
 			const result = await run("python3", [script, command, ...(actionId ? [actionId] : []), ...metadata], workspaceRoot, signal);
 			return { content: [{ type: "text", text: result.stdout.trim() || result.stderr.trim() }], details: undefined };

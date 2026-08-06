@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { YamlAgentConfigurationLoader } from "../../infra/yaml-agent-configuration-loader.ts";
 import { ManagedWorkspaceResolver } from "../../infra/managed-workspace.ts";
+import { localeText, parseLocale, type Locale } from "../../shared/locale.ts";
 import { runHeadless } from "../cli/headless-runner.ts";
 import { OrchestrationApp } from "./orchestration-app.ts";
 
@@ -9,6 +10,8 @@ interface CliOptions {
 	workspaceRoot?: string;
 	configDirectory: string;
 	headlessRun?: { modeId: string; request: string };
+	locale: Locale;
+	helpRequested: boolean;
 }
 
 function parseArgs(args: readonly string[]): CliOptions {
@@ -18,10 +21,17 @@ function parseArgs(args: readonly string[]): CliOptions {
 	let workspaceRoot: string | undefined;
 	let workspaceProvided = false;
 	let headlessRun: CliOptions["headlessRun"];
+	let cliLocale: Locale | undefined;
+	let helpRequested = false;
 
 	for (let index = 0; index < args.length; index++) {
 		const argument = args[index];
-		if (argument === "--config-dir") {
+		if (argument === "--lang") {
+			const value = args[index + 1];
+			if (!value) throw new Error("--lang 需要语言参数 / --lang requires a language value");
+			cliLocale = parseLocale(value);
+			index++;
+		} else if (argument === "--config-dir") {
 			const value = args[index + 1];
 			if (!value) throw new Error("--config-dir 需要目录参数");
 			configDirectory = value;
@@ -41,9 +51,7 @@ function parseArgs(args: readonly string[]): CliOptions {
 			headlessRun = { modeId, request };
 			index += 2;
 		} else if (argument === "-h" || argument === "--help") {
-			console.log("用法: rdk-agent [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <用户指令>]");
-			console.log("不指定 workspace 时使用配置中的内置模板托管工作区。");
-			process.exit(0);
+			helpRequested = true;
 		} else if (argument?.startsWith("-")) {
 			throw new Error(`未知参数：${argument}`);
 		} else if (workspaceProvided) {
@@ -54,17 +62,39 @@ function parseArgs(args: readonly string[]): CliOptions {
 		}
 	}
 
-	return { workspaceRoot: workspaceRoot ? resolve(workspaceRoot) : undefined, configDirectory: resolve(configDirectory), headlessRun };
+	return {
+		workspaceRoot: workspaceRoot ? resolve(workspaceRoot) : undefined,
+		configDirectory: resolve(configDirectory),
+		headlessRun,
+		locale: cliLocale ?? parseLocale(process.env.RDK_AGENT_LANG),
+		helpRequested,
+	};
+}
+
+function printHelp(locale: Locale): void {
+	console.log(localeText(
+		locale,
+		"用法: rdk-agent [--lang <zh|en>] [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <用户指令>]",
+		"Usage: rdk-agent [--lang <zh|en>] [--config-dir <dir>] [--workspace <dir>|workspace] [--run <mode-id> <user-request>]",
+	));
+	console.log(localeText(
+		locale,
+		"不指定 workspace 时使用配置中的内置模板托管工作区。",
+		"When workspace is omitted, the managed workspace from the bundled template is used.",
+	));
 }
 
 try {
 	const options = parseArgs(process.argv.slice(2));
-	const configuration = new YamlAgentConfigurationLoader().load(options.configDirectory);
-	const workspace = new ManagedWorkspaceResolver().resolve(configuration.workspace, options.workspaceRoot);
-	if (options.headlessRun) {
-		const succeeded = await runHeadless(workspace, configuration, options.headlessRun.modeId, options.headlessRun.request);
-		process.exitCode = succeeded ? 0 : 1;
-	} else new OrchestrationApp(workspace, configuration).start();
+	if (options.helpRequested) printHelp(options.locale);
+	else {
+		const configuration = new YamlAgentConfigurationLoader().load(options.configDirectory, options.locale);
+		const workspace = new ManagedWorkspaceResolver().resolve(configuration.workspace, options.workspaceRoot);
+		if (options.headlessRun) {
+			const succeeded = await runHeadless(workspace, configuration, options.headlessRun.modeId, options.headlessRun.request);
+			process.exitCode = succeeded ? 0 : 1;
+		} else new OrchestrationApp(workspace, configuration).start();
+	}
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error));
 	process.exit(1);

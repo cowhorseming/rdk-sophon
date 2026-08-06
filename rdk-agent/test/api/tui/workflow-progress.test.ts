@@ -77,6 +77,35 @@ test("progress report makes the active loop, agent, iteration, and total progres
 	assert.match(report, /○ 2\. deploy Agent/);
 });
 
+test("progress report renders deterministic labels in English", () => {
+	const englishMode: RobotDevelopmentMode = {
+		...mode,
+		name: "Development Mode",
+		loops: [{ ...mode.loops[0]!, name: "Action Package TDD", deliverable: "action package" }],
+	};
+	const report = workflowProgressReport({
+		mode: englishMode,
+		profiles,
+		statuses: new Map([
+			["action-package", "running"],
+			["test", "succeeded"],
+			["coding", "running"],
+			["verification", "pending"],
+			["deploy", "pending"],
+		]),
+		loopIteration: { loopId: "action-package", loopName: "Action Package TDD", iteration: 2, maxIterations: 3 },
+		locale: "en",
+	});
+
+	assert.match(report, /Development Progress/);
+	assert.match(report, /Overall progress[\s\S]*0\/2 nodes · 0%/);
+	assert.match(report, /Current node  Action Package TDD · iteration 2\/3/);
+	assert.match(report, /Current Agent  coding Agent/);
+	assert.match(report, /Iteration Agent progress[\s\S]*1\/3 Agent/);
+	assert.match(report, /Execution path/);
+	assert.doesNotMatch(report, /研发工作进展|整体进度|当前节点|执行路径/);
+});
+
 test("compact progress keeps the overall and current status visible without the long execution path", () => {
 	const report = workflowProgressReport({
 		mode,

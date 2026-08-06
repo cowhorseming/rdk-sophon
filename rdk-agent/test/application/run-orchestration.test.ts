@@ -264,3 +264,34 @@ test("application forwards loaded and selected Skill events to the UI", async ()
 	});
 	assert.equal(events.find((event) => event.type === "skill-selected")?.type, "skill-selected");
 });
+
+test("English orchestration injects locale, localizes event wrappers, and preserves raw tool output", async () => {
+	let seenLocale: string | undefined;
+	const runner: AgentRunner = {
+		async run(request) {
+			seenLocale = request.locale;
+			request.onEvent({ type: "status", message: "session ready" });
+			request.onEvent({ type: "tool-start", toolName: "bash", summary: "echo test" });
+			request.onEvent({ type: "tool-end", toolName: "bash", result: "原始输出", isError: false });
+			return { summary: "application tested", outcome: "completed" };
+		},
+	};
+	const events: WorkflowEvent[] = [];
+	const result = await new RunOrchestration(runner, profiles, "en").execute({
+		mode: applicationMode,
+		request: "Wave your right hand",
+		workspaceRoot: "/tmp/rdk",
+		skillDirectory: "/tmp/skills",
+		humanInLoop: noHuman,
+		onEvent: (event) => events.push(event),
+	});
+	const agentText = events.flatMap((event) => event.type === "agent-event" ? [event.text] : []).join("");
+	const finished = events.find((event) => event.type === "workflow-finished");
+	assert.equal(result.succeeded, true);
+	assert.equal(seenLocale, "en");
+	assert.match(agentText, /\[Status\] session ready/);
+	assert.match(agentText, /\[Tool\] bash: echo test/);
+	assert.match(agentText, /\[Tool completed\] bash/);
+	assert.match(agentText, /原始输出/);
+	assert.equal(finished?.type === "workflow-finished" ? finished.detail : undefined, "Robot application test completed.");
+});

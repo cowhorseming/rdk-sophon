@@ -1,4 +1,5 @@
 import type { AgentProfile } from "../domain/agent-profile.ts";
+import type { Locale } from "./locale.ts";
 
 export interface Delivery {
 	stageId: string;
@@ -30,6 +31,7 @@ export interface AgentRunRequest {
 	expectation: AgentExpectation;
 	iteration?: number;
 	previousDeliveries: readonly Delivery[];
+	locale?: Locale;
 	onEvent: (event: AgentRuntimeEvent) => void;
 }
 

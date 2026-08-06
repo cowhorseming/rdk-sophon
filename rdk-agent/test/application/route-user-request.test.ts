@@ -41,6 +41,22 @@ test("an exact greeting is answered without invoking the classifier Agent", asyn
 	assert.match(decision.userMessage ?? "", /研发流程未启动|机器人研发模式/);
 });
 
+test("English fast-path conversation replies stay English without invoking the classifier", async () => {
+	let classifierCalls = 0;
+	const classifier: RequestIntentClassifier = {
+		async classify() {
+			classifierCalls++;
+			throw new Error("must not be called");
+		},
+	};
+	const greeting = await new RouteUserRequest(classifier, configuration, "en").execute({ request: "Hello", mode });
+	const thanks = await new RouteUserRequest(classifier, configuration, "en").execute({ request: "Thank you", mode });
+	assert.equal(classifierCalls, 0);
+	assert.match(greeting.userMessage ?? "", /robot development mode/i);
+	assert.match(thanks.userMessage ?? "", /workflow was started/i);
+	assert.doesNotMatch(`${greeting.userMessage}${thanks.userMessage}`, /[一-鿿]/u);
+});
+
 test("a mixed greeting and explicit change is routed by semantic intent instead of greeting keywords", async () => {
 	let seenRequest = "";
 	const classifier: RequestIntentClassifier = {
@@ -90,6 +106,48 @@ test("classifier failures fail closed as clarification", async () => {
 	assert.equal(decision.kind, "clarification");
 	assert.equal(decision.reasonCode, "classifier-failed");
 	assert.deepEqual(events, ["intent-classification-started", "intent-classification-failed"]);
+});
+
+test("English routing passes locale to the classifier and localizes fallback questions", async () => {
+	let seenLocale: string | undefined;
+	let seenCapability = "";
+	const classifier: RequestIntentClassifier = {
+		async classify(input) {
+			seenLocale = input.locale;
+			seenCapability = input.capabilities[0]?.description ?? "";
+			throw new Error("model unavailable");
+		},
+	};
+	const decision = await new RouteUserRequest(classifier, configuration, "en").execute({
+		request: "Handle this",
+		mode,
+	});
+	assert.equal(seenLocale, "en");
+	assert.match(seenCapability, /Deliverable:/);
+	assert.equal(decision.kind, "clarification");
+	if (decision.kind === "clarification") {
+		assert.match(decision.question, /Do you want to add, change, or fix/i);
+		assert.doesNotMatch(decision.question, /[一-鿿]/u);
+	}
+});
+
+test("low-confidence English development intent asks an English confirmation question", async () => {
+	const classifier: RequestIntentClassifier = {
+		async classify() {
+			return {
+				kind: "development",
+				confidence: 0.7,
+				normalizedRequest: "Improve the action",
+				reasonCode: "possible-change",
+			};
+		},
+	};
+	const decision = await new RouteUserRequest(classifier, configuration, "en").execute({ request: "Improve it", mode });
+	assert.equal(decision.kind, "clarification");
+	if (decision.kind === "clarification") {
+		assert.match(decision.question, /start the development workflow/i);
+		assert.doesNotMatch(decision.question, /[一-鿿]/u);
+	}
 });
 
 test("explicit development override bypasses classification", async () => {

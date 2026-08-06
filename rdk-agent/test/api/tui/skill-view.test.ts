@@ -40,3 +40,22 @@ test("/skills report includes loaded paths and the current selection", () => {
 	assert.match(report, /实际加载：servo-control \(\/config\/skills\/servo-control\/SKILL.md\)/);
 	assert.match(report, /本次选择：servo-control/);
 });
+
+test("Skill status and report render deterministic labels in English", () => {
+	assert.equal(
+		profileSkillStatus(profile, [servo], [servo], "en"),
+		"Skills: configured servo-control, lamp-control · loaded servo-control · selected servo-control",
+	);
+	assert.match(profileSkillStatus(profile, undefined, undefined, "en") ?? "", /loaded session not created · selected not selected/);
+
+	const report = skillReport(
+		[profile],
+		new Map([[profile.id, [servo]]]),
+		new Map([[profile.id, [servo]]]),
+		"en",
+	);
+	assert.match(report, /Configured: servo-control, lamp-control/);
+	assert.match(report, /Loaded: servo-control \(\/config\/skills\/servo-control\/SKILL\.md\)/);
+	assert.match(report, /Selected: servo-control/);
+	assert.doesNotMatch(report, /配置：|实际加载：|本次选择：/);
+});

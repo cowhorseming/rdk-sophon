@@ -3,6 +3,7 @@ import type { OrchestrationMode, RobotApplicationMode, RobotDevelopmentMode, Tdd
 import { DeliveryWorkflow, type WorkflowStage } from "../domain/workflow.ts";
 import type { AgentExpectation, AgentRunResult, AgentRunner, Delivery } from "../shared/agent-runner.ts";
 import type { HumanInLoop, HumanInputResponse } from "../shared/human-in-loop.ts";
+import { defaultLocale, localeText, type Locale } from "../shared/locale.ts";
 import type { WorkflowEvent } from "../shared/workflow-events.ts";
 
 export interface RunOrchestrationInput {
@@ -25,10 +26,12 @@ class HumanAbortedError extends Error {}
 export class RunOrchestration {
 	private readonly agentRunner: AgentRunner;
 	private readonly profilesById: ReadonlyMap<string, AgentProfile>;
+	private readonly locale: Locale;
 
-	constructor(agentRunner: AgentRunner, profiles: readonly AgentProfile[]) {
+	constructor(agentRunner: AgentRunner, profiles: readonly AgentProfile[], locale: Locale = defaultLocale) {
 		this.agentRunner = agentRunner;
 		this.profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+		this.locale = locale;
 	}
 
 	async execute(input: RunOrchestrationInput): Promise<RunOrchestrationResult> {
@@ -52,7 +55,11 @@ export class RunOrchestration {
 			input.onEvent({ type: "stage-status", stageId: loop.id, status: "running" });
 			try {
 				await this.runTddLoop(input, loop, deliveries);
-				const detail = `${loop.deliverable} 已通过 ${loop.name}`;
+				const detail = localeText(
+					this.locale,
+					`${loop.deliverable} 已通过 ${loop.name}`,
+					`${loop.deliverable} passed ${loop.name}`,
+				);
 				workflow.succeed(loop.id, detail);
 				input.onEvent({ type: "stage-status", stageId: loop.id, status: "succeeded", detail });
 				deliveries.push({ stageId: loop.id, summary: detail });
@@ -60,7 +67,11 @@ export class RunOrchestration {
 				const detail = error instanceof Error ? error.message : String(error);
 				workflow.fail(loop.id, detail);
 				input.onEvent({ type: "stage-status", stageId: loop.id, status: "failed", detail });
-				input.onEvent({ type: "workflow-finished", succeeded: false, detail: `${loop.name} 中止：${detail}` });
+				input.onEvent({
+					type: "workflow-finished",
+					succeeded: false,
+					detail: localeText(this.locale, `${loop.name} 中止：${detail}`, `${loop.name} stopped: ${detail}`),
+				});
 				return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 			}
 			if (loop.deploymentAgentId) {
@@ -72,7 +83,12 @@ export class RunOrchestration {
 				} catch (error) {
 					const detail = error instanceof Error ? error.message : String(error);
 					workflow.fail(loop.deploymentAgentId, detail);
-					input.onEvent({ type: "workflow-finished", succeeded: false, detail: `${this.profile(loop.deploymentAgentId).name} 中止：${detail}` });
+					const agentName = this.profile(loop.deploymentAgentId).name;
+					input.onEvent({
+						type: "workflow-finished",
+						succeeded: false,
+						detail: localeText(this.locale, `${agentName} 中止：${detail}`, `${agentName} stopped: ${detail}`),
+					});
 					return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 				}
 			}
@@ -87,7 +103,12 @@ export class RunOrchestration {
 			} catch (error) {
 				const detail = error instanceof Error ? error.message : String(error);
 				workflow.fail(deliveryAgentId, detail);
-				input.onEvent({ type: "workflow-finished", succeeded: false, detail: `${this.profile(deliveryAgentId).name} 中止：${detail}` });
+				const agentName = this.profile(deliveryAgentId).name;
+				input.onEvent({
+					type: "workflow-finished",
+					succeeded: false,
+					detail: localeText(this.locale, `${agentName} 中止：${detail}`, `${agentName} stopped: ${detail}`),
+				});
 				return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 			}
 		}
@@ -101,12 +122,24 @@ export class RunOrchestration {
 			} catch (error) {
 				const detail = error instanceof Error ? error.message : String(error);
 				workflow.fail(acceptanceAgentId, detail);
-				input.onEvent({ type: "workflow-finished", succeeded: false, detail: `真机验收中止：${detail}` });
+				input.onEvent({
+					type: "workflow-finished",
+					succeeded: false,
+					detail: localeText(this.locale, `真机验收中止：${detail}`, `Live-device acceptance stopped: ${detail}`),
+				});
 				return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 			}
 		}
 
-		input.onEvent({ type: "workflow-finished", succeeded: true, detail: "动作包 TDD、release 构建、板端发布、开发机 Skill 安装与双重真机验收均已通过。" });
+		input.onEvent({
+			type: "workflow-finished",
+			succeeded: true,
+			detail: localeText(
+				this.locale,
+				"动作包 TDD、release 构建、板端发布、开发机 Skill 安装与双重真机验收均已通过。",
+				"Action-package TDD, release build, board deployment, development-host Skill installation, and both live-device acceptance stages all passed.",
+			),
+		});
 		return { modeId: mode.id, stages: workflow.snapshot(), succeeded: true };
 	}
 
@@ -132,7 +165,11 @@ export class RunOrchestration {
 				input,
 				loop.verificationAgentId,
 				this.profile(loop.verificationAgentId).name,
-				`${loop.name} 已达到 ${loop.maxIterations} 次自动返工上限，请提供继续方向，或输入 /abort 终止。`,
+				localeText(
+					this.locale,
+					`${loop.name} 已达到 ${loop.maxIterations} 次自动返工上限，请提供继续方向，或输入 /abort 终止。`,
+					`${loop.name} reached the limit of ${loop.maxIterations} automatic revisions. Provide guidance to continue, or enter /abort to stop.`,
+				),
 				verification.feedback ?? verification.summary,
 			);
 			deliveries.push({ stageId: "human", summary: response.message });
@@ -147,12 +184,20 @@ export class RunOrchestration {
 		try {
 			const result = await this.runAgent(input, mode.agentId, "application", deliveries);
 			workflow.succeed(mode.agentId, result.summary);
-			input.onEvent({ type: "workflow-finished", succeeded: true, detail: "机器人应用效果测试完成。" });
+			input.onEvent({
+				type: "workflow-finished",
+				succeeded: true,
+				detail: localeText(this.locale, "机器人应用效果测试完成。", "Robot application test completed."),
+			});
 			return { modeId: mode.id, stages: workflow.snapshot(), succeeded: true };
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
 			workflow.fail(mode.agentId, detail);
-			input.onEvent({ type: "workflow-finished", succeeded: false, detail: `机器人应用模式中止：${detail}` });
+			input.onEvent({
+				type: "workflow-finished",
+				succeeded: false,
+				detail: localeText(this.locale, `机器人应用模式中止：${detail}`, `Robot application mode stopped: ${detail}`),
+			});
 			return { modeId: mode.id, stages: workflow.snapshot(), succeeded: false };
 		}
 	}
@@ -178,15 +223,40 @@ export class RunOrchestration {
 						expectation,
 						iteration,
 						previousDeliveries: deliveries,
+						locale: this.locale,
 						onEvent: (event) => {
 							if (event.type === "text") input.onEvent({ type: "agent-event", stageId: agentId, text: event.text });
-							else if (event.type === "status") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[状态] ${event.message}\n` });
-							else if (event.type === "tool-start") input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具] ${event.toolName}${event.summary ? `：${event.summary}` : ""}\n` });
+							else if (event.type === "status") {
+								input.onEvent({
+									type: "agent-event",
+									stageId: agentId,
+									text: localeText(this.locale, `\n[状态] ${event.message}\n`, `\n[Status] ${event.message}\n`),
+								});
+							}
+							else if (event.type === "tool-start") {
+								input.onEvent({
+									type: "agent-event",
+									stageId: agentId,
+									text: localeText(
+										this.locale,
+										`\n[工具] ${event.toolName}${event.summary ? `：${event.summary}` : ""}\n`,
+										`\n[Tool] ${event.toolName}${event.summary ? `: ${event.summary}` : ""}\n`,
+									),
+								});
+							}
 							else if (event.type === "tool-end") {
 								const visibleResult = event.isError || event.toolName === "bash" || event.toolName === "deploy"
 									? `\n${event.result.slice(-2_000)}\n`
 									: "\n";
-								input.onEvent({ type: "agent-event", stageId: agentId, text: `\n[工具完成] ${event.toolName}${event.isError ? "（失败）" : ""}${visibleResult}` });
+								input.onEvent({
+									type: "agent-event",
+									stageId: agentId,
+									text: localeText(
+										this.locale,
+										`\n[工具完成] ${event.toolName}${event.isError ? "（失败）" : ""}${visibleResult}`,
+										`\n[Tool completed] ${event.toolName}${event.isError ? " (failed)" : ""}${visibleResult}`,
+									),
+								});
 							}
 							else if (event.type === "skills-loaded") input.onEvent({ type: "skills-loaded", stageId: agentId, skills: event.skills });
 							else input.onEvent({ type: "skill-selected", stageId: agentId, skill: event.skill });
@@ -194,7 +264,17 @@ export class RunOrchestration {
 					});
 				} catch (error) {
 					const detail = error instanceof Error ? error.message : String(error);
-					const response = await this.requestHuman(input, agentId, profile.name, `${profile.name} 无法继续，请补充信息后重试，或输入 /abort 终止。`, detail);
+					const response = await this.requestHuman(
+						input,
+						agentId,
+						profile.name,
+						localeText(
+							this.locale,
+							`${profile.name} 无法继续，请补充信息后重试，或输入 /abort 终止。`,
+							`${profile.name} cannot continue. Provide more information and retry, or enter /abort to stop.`,
+						),
+						detail,
+					);
 					deliveries.push({ stageId: "human", summary: response.message });
 					continue;
 				}
@@ -204,14 +284,22 @@ export class RunOrchestration {
 						input,
 						agentId,
 						profile.name,
-						result.question ?? `${profile.name} 需要人类补充信息，或输入 /abort 终止。`,
+						result.question ?? localeText(
+							this.locale,
+							`${profile.name} 需要人类补充信息，或输入 /abort 终止。`,
+							`${profile.name} needs additional human input. Provide it, or enter /abort to stop.`,
+						),
 						result.summary,
 					);
 					deliveries.push({ stageId: "human", summary: response.message });
 					continue;
 				}
 				if (result.outcome === "revision" && expectation !== "verification") {
-					throw new Error(`${profile.name} 在 ${expectation} 阶段返回了不支持的 revision 结果`);
+					throw new Error(localeText(
+						this.locale,
+						`${profile.name} 在 ${expectation} 阶段返回了不支持的 revision 结果`,
+						`${profile.name} returned an unsupported revision result during the ${expectation} stage`,
+					));
 				}
 
 				input.onEvent({ type: "stage-status", stageId: agentId, status: result.outcome === "completed" ? "succeeded" : "failed", detail: result.feedback });
@@ -233,14 +321,18 @@ export class RunOrchestration {
 	): Promise<HumanInputResponse> {
 		input.onEvent({ type: "human-input-required", stageId, question });
 		const response = await input.humanInLoop.requestInput({ stageId, agentName, question, context });
-		if (response.action === "abort") throw new HumanAbortedError(`人类终止了 ${agentName}`);
+		if (response.action === "abort") {
+			throw new HumanAbortedError(localeText(this.locale, `人类终止了 ${agentName}`, `${agentName} was stopped by the user`));
+		}
 		input.onEvent({ type: "human-input-received", stageId, message: response.message });
 		return response;
 	}
 
 	private profile(agentId: string): AgentProfile {
 		const profile = this.profilesById.get(agentId);
-		if (!profile) throw new Error(`Agent 配置不存在：${agentId}`);
+		if (!profile) {
+			throw new Error(localeText(this.locale, `Agent 配置不存在：${agentId}`, `Agent configuration does not exist: ${agentId}`));
+		}
 		return profile;
 	}
 }

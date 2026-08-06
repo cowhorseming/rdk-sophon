@@ -217,3 +217,39 @@ test("original request is used only by the guard and is never forwarded to the s
 		"挥一下左手",
 	]);
 });
+
+test("fresh scaffold mode is a fixed tool option rather than model-controlled input", async (context) => {
+	const workspace = mkdtempSync(join(tmpdir(), "rdk-agent-fresh-scaffold-"));
+	context.after(() => rmSync(workspace, { recursive: true, force: true }));
+	mkdirSync(join(workspace, "tools"), { recursive: true });
+	writeFileSync(
+		join(workspace, "tools", "servo_action.py"),
+		"import json, sys\nfrom pathlib import Path\nPath('invocation.json').write_text(json.dumps(sys.argv[1:]), encoding='utf-8')\nprint('{}')\n",
+	);
+	const tool = createActionPackageToolDefinition(
+		workspace,
+		scaffoldProfile,
+		"Implement a feature for waving the right hand",
+		{ freshExisting: true },
+	);
+	await tool.execute("call", {
+		operation: "scaffold",
+		actionId: "wave-right-hand",
+		description: "Wave the right hand",
+		start: "right",
+		intentExamples: ["Wave the right hand"],
+	}, undefined, undefined, {} as never);
+
+	const invocation = JSON.parse(readFileSync(join(workspace, "invocation.json"), "utf8")) as string[];
+	assert.deepEqual(invocation, [
+		"new",
+		"wave-right-hand",
+		"--fresh",
+		"--description",
+		"Wave the right hand",
+		"--start",
+		"right",
+		"--intent",
+		"Wave the right hand",
+	]);
+});

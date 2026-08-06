@@ -56,6 +56,32 @@ test("skill deployment installs a verified workspace delivery outside the source
 	assert.match(result.content[0]?.type === "text" ? result.content[0].text : "", /runtimeFiles=SKILL\.md/);
 });
 
+test("deployment receipt uses the selected English locale", async (context) => {
+	const workspace = mkdtempSync(join(tmpdir(), "rdk-agent-deploy-locale-workspace-"));
+	const skillDirectory = mkdtempSync(join(tmpdir(), "rdk-agent-deploy-locale-config-"));
+	context.after(() => {
+		rmSync(workspace, { recursive: true, force: true });
+		rmSync(skillDirectory, { recursive: true, force: true });
+	});
+	const source = join(workspace, "release", "skill");
+	mkdirSync(source, { recursive: true });
+	writeFileSync(join(source, "SKILL.md"), "---\nname: demo-skill\ndescription: Demo\n---\n\n# Demo\n");
+	const profile: AgentProfile = {
+		id: "deploy",
+		name: "Deploy",
+		description: "Deploy",
+		tools: ["deploy"],
+		skills: [],
+		systemPrompt: "Deploy",
+		writePaths: [],
+		timeoutSeconds: 10,
+		deployment: { kind: "skill", source: "release/skill", skillName: "demo-skill" },
+	};
+	const tool = createDeploymentToolDefinition(workspace, skillDirectory, profile, "en");
+	const result = await tool.execute("call", {}, undefined, undefined, {} as never);
+	assert.match(result.content[0]?.type === "text" ? result.content[0].text : "", /Deployment succeeded/);
+});
+
 test("invalid skill delivery is rejected before replacing the installed Skill", async (context) => {
 	const workspace = mkdtempSync(join(tmpdir(), "rdk-agent-invalid-skill-"));
 	const config = mkdtempSync(join(tmpdir(), "rdk-agent-invalid-config-"));

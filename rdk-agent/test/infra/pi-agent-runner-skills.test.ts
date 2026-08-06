@@ -43,6 +43,7 @@ test("Pi resource loading uses the configured Skill list as a strict allowlist",
 		skillDirectory: join(directory, "skills"),
 		expectation: "application",
 		previousDeliveries: [],
+		locale: "en",
 		onEvent: () => undefined,
 	};
 	const loader = createAgentResourceLoader(request);
@@ -51,6 +52,7 @@ test("Pi resource loading uses the configured Skill list as a strict allowlist",
 
 	assert.deepEqual(loaded.map((skill) => skill.name), ["configured-skill"]);
 	assert.equal(loader.getSkills().diagnostics.length, 0);
+	assert.match(loader.getAppendSystemPrompt().join("\n"), /All user-facing prose, including summaries, feedback, and questions, must be in English/);
 	assert.equal(selectedSkillFromRead("read", { path: loaded[0]!.filePath }, directory, loaded)?.name, "configured-skill");
 	assert.equal(selectedSkillFromRead("read", { path: "README.md" }, directory, loaded), undefined);
 	assert.equal(selectedSkillFromRead("bash", { path: loaded[0]!.filePath }, directory, loaded), undefined);
@@ -65,6 +67,9 @@ test("application cannot report completion without reading a configured Skill", 
 		outcome: "needs-human",
 		question: "机器人应用 Agent 未读取任何白名单 Skill，无法证明本次用户指令经过 Skill 选择与约束。请补充用户指令后重试，或输入 /abort 终止。",
 	});
+	const english = enforceApplicationSkillSelection(completed, "application", 1, 0, "en");
+	assert.match(english.question ?? "", /did not read an allowlisted Skill/);
+	assert.doesNotMatch(english.question ?? "", /[一-鿿]/u);
 });
 
 test("any completed Skill-enabled stage gets one exact-path selection retry", () => {
@@ -77,6 +82,12 @@ test("any completed Skill-enabled stage gets one exact-path selection retry", ()
 	]);
 	assert.match(prompt, /\/config\/skills\/demo\/SKILL\.md/);
 	assert.match(prompt, /不得在业务工作区猜路径/);
+	const englishPrompt = configuredSkillSelectionRetryPrompt([
+		{ name: "demo", filePath: "/config/skills/demo/SKILL.md" },
+	], "en");
+	assert.match(englishPrompt, /Do not guess a path in the business workspace/);
+	assert.match(englishPrompt, /\/config\/skills\/demo\/SKILL\.md/);
+	assert.doesNotMatch(englishPrompt, /[一-鿿]/u);
 });
 
 test("omitting maxToolCalls keeps tool calls unlimited", () => {

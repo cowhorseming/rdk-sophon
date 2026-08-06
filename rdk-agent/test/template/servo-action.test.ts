@@ -63,6 +63,29 @@ test("action-package scaffold is idempotent across TDD revision rounds", (contex
 	assert.equal(readFileSync(actionPath, "utf8"), revisedSource);
 });
 
+test("fresh scaffold archives an existing action and recreates a red baseline", (context) => {
+	const temporary = mkdtempSync(join(tmpdir(), "rdk-agent-action-package-"));
+	context.after(() => rmSync(temporary, { recursive: true, force: true }));
+	const workspace = join(temporary, "workspace");
+	cpSync(template, workspace, { recursive: true });
+
+	const first = run(workspace, "new", "wave-right-hand", "--description", "Wave right", "--start", "right", "--intent", "Wave right");
+	assert.equal(first.status, 0, first.stderr || first.stdout);
+	const actionPath = join(workspace, "examples/plugins/servo/servo_actions/wave-right-hand/action.py");
+	const oldSource = "def run(context, params):\n    context.lift_right()\n";
+	writeFileSync(actionPath, oldSource);
+
+	const restarted = run(workspace, "new", "wave-right-hand", "--fresh", "--description", "Wave right", "--start", "right", "--intent", "Wave right");
+	assert.equal(restarted.status, 0, restarted.stderr || restarted.stdout);
+	assert.match(restarted.stdout, /"status": "scaffolded"/);
+	assert.match(restarted.stdout, /"archived"/);
+	assert.match(readFileSync(actionPath, "utf8"), /NotImplementedError/);
+	assert.equal(
+		readFileSync(join(workspace, ".rdk-agent/action-history/wave-right-hand/v1/action.py"), "utf8"),
+		oldSource,
+	);
+});
+
 test("action-package rejects direct hardware imports with a stable error code", (context) => {
 	const temporary = mkdtempSync(join(tmpdir(), "rdk-agent-action-package-"));
 	context.after(() => rmSync(temporary, { recursive: true, force: true }));
