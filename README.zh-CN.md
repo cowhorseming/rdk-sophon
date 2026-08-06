@@ -26,7 +26,7 @@
 | 3–5 分钟演示视频 | 已录制；公开 URL 待补 | 视频位置与最终复核要求见本文第 12 节 |
 | 补充 PPT / 海报 | 已完成 | [中文 12 张幻灯片路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm 部署与优化方案 | 已完成 | 客户端配置、受控实验、指标与基准方法见本文第 8–9 节 |
-| AMD 服务器与性能证明 | **待参赛者补充** | Radeon GPU、ROCm、vLLM、模型精度，以及基线与优化配置实测结果仍待采集 |
+| AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均可离线重算。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
 | 验证证据 | 已于 2026-08-05 采集 | 本文第 11 节与[原始脱敏日志](submission/zh/evidence/verification-2026-08-05.md) |
 | 正式比赛文案 | 英文版为准 | 仓库根目录[英文 README](README.md) |
 
@@ -578,8 +578,9 @@ Wave the left side once.
 
 - `cargo fmt --all -- --check` 报告了已有格式差异，因此本提交没有把 Rust 格式检查描述为通过。
 - 本次快照没有把完整 `scripts/full_test.sh` 流水线描述为一次完整运行；组成阶段是分别运行和验证的。
-- 客户端模型配置只证明模型选择，不证明服务器端 GPU、ROCm、vLLM、模型 revision 或量化方式。
-- 服务器侧 Radeon/ROCm/vLLM/精度证据和性能基准仍待采集。
+- 客户端模型配置只证明模型选择，不证明 **80B Agent 后端**服务器端的 GPU、ROCm、vLLM、模型 revision 或量化方式。
+- **80B Agent 后端**侧的 Radeon/ROCm/vLLM/精度证据和性能基准仍待采集。
+- 但**本团队自训练的模型**（`Qwen3-32B-Agentic-SFT-r1-v3`）这些项均已佐证且可复现：GPU `gfx1100`、ROCm 7.2.1、torch 2.9.1+rocm7.2.0、adapter SHA-256 `4dcee691…f20bf`、NF4 4-bit 量化，以及在该主机实测的基线/优化 A/B（用户可见 TTFT p50 17.41 s → 8.26 s，峰值 VRAM 27.99 → 28.06 GB，88/88 输出逐字节一致）。见[模型侧索引](submission/zh/MODEL_TRACK.md)；`results.json` 由 benchmark 在 Radeon 实机生成，非手工誊写。
 - 自动化结果只证明软件契约和命令链路，实体动作质量仍需人工观察。
 - 公开证据省略了 MAC 地址、凭据和私有基础设施细节。
 
