@@ -1,5 +1,7 @@
 # RDK Agent
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 > From natural-language requirements to governed robot capabilities on RDK X5.
 
 RDK Agent is a privately deployed, multi-agent platform for developing and operating robot capabilities on an RDK X5. State and device control remain local; model inference can use a participant-controlled private endpoint. A developer describes a robot behavior in natural language, and specialized agents transform it into a tested, validated, deployable, and reusable capability.
