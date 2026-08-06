@@ -166,3 +166,34 @@ test("headless application mode labels input as a user instruction without singl
 	assert.doesNotMatch(output, /\[test\] (?:running|succeeded)/);
 	assert.doesNotMatch(output, /工作进展|整体进度|当前节点/);
 });
+
+test("headless application mode renders deterministic wrappers in English and preserves Agent text", async () => {
+	let output = "";
+	const agentRunner: AgentRunner = {
+		async run(request) {
+			request.onEvent({ type: "text", text: "raw Agent output\n" });
+			return { summary: "application completed", outcome: "completed" };
+		},
+	};
+	const englishMode: RobotApplicationMode = {
+		...applicationMode,
+		name: "Robot Application Mode",
+	};
+	const applicationConfiguration: AgentConfiguration = {
+		...configuration,
+		locale: "en",
+		modes: [mode, englishMode],
+	};
+
+	const succeeded = await runHeadless(workspace, applicationConfiguration, englishMode.id, "Stand up", {
+		agentRunner,
+		write: (text) => { output += text; },
+	});
+
+	assert.equal(succeeded, true);
+	assert.match(output, /RDK Agent · Robot Application Mode/);
+	assert.match(output, /User request: Stand up/);
+	assert.match(output, /raw Agent output/);
+	assert.match(output, /Acceptance passed:/);
+	assert.doesNotMatch(output, /用户指令：|验收通过：/);
+});

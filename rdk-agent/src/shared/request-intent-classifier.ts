@@ -1,4 +1,5 @@
 import type { DevelopmentCapability, RequestIntentDecision } from "../domain/development-intent.ts";
+import type { Locale } from "./locale.ts";
 
 export interface RequestIntentClassifierInput {
 	request: string;
@@ -6,6 +7,7 @@ export interface RequestIntentClassifierInput {
 	developmentScope: string;
 	capabilities: readonly DevelopmentCapability[];
 	conversationContext: readonly string[];
+	locale?: Locale;
 }
 
 /** A no-tool semantic router. It must not read or mutate the development workspace. */

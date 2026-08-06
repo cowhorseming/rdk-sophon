@@ -1,5 +1,6 @@
 import { styleText } from "node:util";
 import type { StageStatus } from "../../domain/workflow.ts";
+import { defaultLocale, localeText, type Locale } from "../../shared/locale.ts";
 
 type StyleFormat = Parameters<typeof styleText>[0];
 
@@ -26,8 +27,16 @@ export function stageMarker(status: StageStatus): string {
 	return tuiStyle.pending("○");
 }
 
-export function agentStartBanner(agentName: string, startedAt: number, forceColor = false): string {
-	return renderStyle(["bold", "cyanBright"], `▶▶ AGENT 开始 · ${agentName} · ${formatClock(startedAt)}`, forceColor);
+export function agentStartBanner(
+	agentName: string,
+	startedAt: number,
+	forceColor = false,
+	locale: Locale = defaultLocale,
+): string {
+	const banner = locale === "en"
+		? `▶▶ AGENT STARTED · ${agentName} · ${formatClock(startedAt, locale)}`
+		: `▶▶ AGENT 开始 · ${agentName} · ${formatClock(startedAt, locale)}`;
+	return renderStyle(["bold", "cyanBright"], banner, forceColor);
 }
 
 export function agentEndBanner(
@@ -36,11 +45,20 @@ export function agentEndBanner(
 	finishedAt: number,
 	startedAt?: number,
 	forceColor = false,
+	locale: Locale = defaultLocale,
 ): string {
-	const elapsed = startedAt === undefined ? "" : ` · 用时 ${formatDuration(finishedAt - startedAt)}`;
+	const elapsed = startedAt === undefined
+		? ""
+		: localeText(
+			locale,
+			` · 用时 ${formatDuration(finishedAt - startedAt, locale)}`,
+			` · elapsed ${formatDuration(finishedAt - startedAt, locale)}`,
+		);
 	const marker = status === "succeeded" ? "✓✓" : "✗✗";
-	const label = status === "succeeded" ? "完成" : "失败";
-	const banner = `${marker} AGENT ${label} · ${agentName} · ${formatClock(finishedAt)}${elapsed}`;
+	const label = status === "succeeded"
+		? localeText(locale, "完成", "COMPLETED")
+		: localeText(locale, "失败", "FAILED");
+	const banner = `${marker} AGENT ${label} · ${agentName} · ${formatClock(finishedAt, locale)}${elapsed}`;
 	return renderStyle(["bold", status === "succeeded" ? "greenBright" : "redBright"], banner, forceColor);
 }
 
@@ -49,13 +67,13 @@ export function agentLifecycleLogEntry(banner: string): string {
 	return `\n\n${banner}\n\n`;
 }
 
-function formatClock(timestamp: number): string {
-	return new Date(timestamp).toLocaleTimeString("zh-CN", { hour12: false });
+function formatClock(timestamp: number, locale: Locale): string {
+	return new Date(timestamp).toLocaleTimeString(locale === "en" ? "en-GB" : "zh-CN", { hour12: false });
 }
 
-function formatDuration(milliseconds: number): string {
+function formatDuration(milliseconds: number, locale: Locale): string {
 	const seconds = Math.max(0, Math.round(milliseconds / 1_000));
-	if (seconds < 60) return `${seconds}秒`;
+	if (seconds < 60) return localeText(locale, `${seconds}秒`, `${seconds}s`);
 	const minutes = Math.floor(seconds / 60);
-	return `${minutes}分${seconds % 60}秒`;
+	return localeText(locale, `${minutes}分${seconds % 60}秒`, `${minutes}m ${seconds % 60}s`);
 }

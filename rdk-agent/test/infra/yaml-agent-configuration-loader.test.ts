@@ -47,6 +47,7 @@ modes:
 	);
 
 	const configuration = new YamlAgentConfigurationLoader().load(directory);
+	assert.equal(configuration.locale, "zh-CN");
 	assert.equal(configuration.profiles[0]?.id, "author");
 	assert.deepEqual(configuration.profiles[0]?.tools, ["read", "write"]);
 	assert.deepEqual(configuration.profiles[0]?.skills, ["test-skill"]);
@@ -69,6 +70,70 @@ modes:
 	assert.equal(configuration.modes[0]?.type, "robot-development");
 	if (configuration.modes[0]?.type === "robot-development") {
 		assert.deepEqual(configuration.modes[0].acceptanceAgentIds, []);
+	}
+});
+
+test("selects English configuration metadata with per-field Chinese fallback", (context) => {
+	const directory = mkdtempSync(join(tmpdir(), "rdk-agent-config-locale-"));
+	context.after(() => rmSync(directory, { recursive: true, force: true }));
+	writeFileSync(
+		join(directory, "agents.yaml"),
+		`version: 2
+defaultMode: development
+intake:
+  developmentScope: 中文研发范围
+  developmentScopeEn: English development scope
+agents:
+  - id: author
+    name: 中文 Agent
+    nameEn: English Agent
+    description: 中文描述
+    tools: []
+    skills: []
+    systemPrompt: Test
+modes:
+  - id: development
+    name: 中文模式
+    nameEn: English Mode
+    type: robot-development
+    loops:
+      - id: localized-loop
+        name: 中文循环
+        nameEn: English Loop
+        deliverable: 中文交付物
+        testAgent: author
+        codingAgent: author
+        verificationAgent: author
+        maxIterations: 2
+      - id: fallback-loop
+        name: 回退循环
+        deliverable: 中文交付物二
+        deliverableEn: English Deliverable
+        testAgent: author
+        codingAgent: author
+        verificationAgent: author
+        maxIterations: 2
+`,
+	);
+
+	const loader = new YamlAgentConfigurationLoader();
+	const chinese = loader.load(directory);
+	assert.equal(chinese.locale, "zh-CN");
+	assert.equal(chinese.intake.developmentScope, "中文研发范围");
+	assert.equal(chinese.profiles[0]?.name, "中文 Agent");
+	assert.equal(chinese.modes[0]?.name, "中文模式");
+
+	const english = loader.load(directory, "en");
+	assert.equal(english.locale, "en");
+	assert.equal(english.intake.developmentScope, "English development scope");
+	assert.equal(english.profiles[0]?.name, "English Agent");
+	assert.equal(english.profiles[0]?.description, "中文描述");
+	assert.equal(english.modes[0]?.name, "English Mode");
+	if (english.modes[0]?.type === "robot-development") {
+		assert.equal(english.modes[0].loops[0]?.name, "English Loop");
+		assert.equal(english.modes[0].loops[0]?.deliverable, "中文交付物");
+		assert.equal(english.modes[0].loops[1]?.name, "回退循环");
+		assert.equal(english.modes[0].loops[1]?.deliverable, "English Deliverable");
 	}
 });
 
@@ -167,6 +232,25 @@ test("bundled robot application mode loads the servo control skill", () => {
 	assert.match(application?.systemPrompt ?? "", /动作式用户指令即已授权执行该动作一次/);
 	assert.match(application?.systemPrompt ?? "", /不得只做帮助检查就返回 completed/);
 	assert.equal(configuration.modes.find((mode) => mode.id === "robot-application")?.type, "robot-application");
+});
+
+test("bundled English metadata covers intake, agents, modes, loops and deliverables", () => {
+	const configuration = new YamlAgentConfigurationLoader().load(join(import.meta.dirname, "../../config"), "en");
+	assert.equal(configuration.locale, "en");
+	assert.match(configuration.intake.developmentScope, /current development workflow/i);
+	for (const profile of configuration.profiles) {
+		assert.doesNotMatch(profile.name, /[一-龥]/u, `${profile.id} is missing nameEn`);
+		assert.doesNotMatch(profile.description, /[一-龥]/u, `${profile.id} is missing descriptionEn`);
+	}
+	for (const mode of configuration.modes) {
+		assert.doesNotMatch(mode.name, /[一-龥]/u, `${mode.id} is missing nameEn`);
+		if (mode.type === "robot-development") {
+			for (const loop of mode.loops) {
+				assert.doesNotMatch(loop.name, /[一-龥]/u, `${loop.id} is missing nameEn`);
+				assert.doesNotMatch(loop.deliverable, /[一-龥]/u, `${loop.id} is missing deliverableEn`);
+			}
+		}
+	}
 });
 
 test("bundled development workflow uses action-package TDD and deterministic release delivery", () => {

@@ -33,3 +33,17 @@ test("rejects malformed, unknown, or incomplete classifier output", () => {
 		assert.throws(() => parseIntentClassifierResult(output), { name: "Error" }, output);
 	}
 });
+
+test("English classifier values and parse failures remain English without changing the marker", () => {
+	assert.deepEqual(
+		parseIntentClassifierResult(
+			'RDK_INTENT_RESULT: {"kind":"clarification","confidence":0.5,"question":"Should I change the action?","reasonCode":"ambiguous"}',
+			"en",
+		),
+		{ kind: "clarification", confidence: 0.5, question: "Should I change the action?", reasonCode: "ambiguous" },
+	);
+	assert.throws(
+		() => parseIntentClassifierResult("missing marker", "en"),
+		(error: unknown) => error instanceof Error && /returned no structured result/.test(error.message) && !/[一-鿿]/u.test(error.message),
+	);
+});

@@ -1,5 +1,6 @@
 import type { AgentProfile } from "../domain/agent-profile.ts";
 import type { OrchestrationMode } from "../domain/orchestration-mode.ts";
+import type { Locale } from "./locale.ts";
 
 export interface ManagedTemplateWorkspaceConfiguration {
 	kind: "managed-template";
@@ -30,8 +31,9 @@ export interface AgentConfiguration {
 	defaultModeId: string;
 	workspace: WorkspaceConfiguration;
 	intake: RequestIntakeConfiguration;
+	locale?: Locale;
 }
 
 export interface AgentConfigurationLoader {
-	load(configDirectory: string): AgentConfiguration;
+	load(configDirectory: string, locale?: Locale): AgentConfiguration;
 }

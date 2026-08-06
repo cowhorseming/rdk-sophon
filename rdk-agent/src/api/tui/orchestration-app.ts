@@ -18,6 +18,7 @@ import { inspectDevelopmentWorkspace } from "../../infra/workspace-preflight.ts"
 import type { AgentConfiguration } from "../../shared/agent-configuration.ts";
 import type { AgentSkillInfo } from "../../shared/agent-runner.ts";
 import type { HumanInputRequest, HumanInputResponse } from "../../shared/human-in-loop.ts";
+import { defaultLocale, localeText, type Locale } from "../../shared/locale.ts";
 import type { RequestRoutingEvent } from "../../shared/request-intent-classifier.ts";
 import type { WorkflowEvent } from "../../shared/workflow-events.ts";
 import { adjacentModeId, modeSwitchDirection } from "./mode-navigation.ts";
@@ -49,6 +50,7 @@ export class OrchestrationApp {
 	private readonly workspaceRoot: string;
 	private readonly workspace: ResolvedWorkspace;
 	private readonly configuration: AgentConfiguration;
+	private readonly locale: Locale;
 	private readonly terminal = new ProcessTerminal();
 	private readonly tui = new TUI(this.terminal);
 	private readonly header = new Text("", 1, 0);
@@ -75,14 +77,22 @@ export class OrchestrationApp {
 		this.workspace = workspace;
 		this.workspaceRoot = workspace.root;
 		this.configuration = configuration;
-		this.log = workspace.created ? `已从内置模板初始化${workspace.description}。\n` : "";
+		this.locale = configuration.locale ?? defaultLocale;
+		this.log = workspace.created
+			? localeText(
+				this.locale,
+				`已从内置模板初始化${workspaceDescription(workspace, this.locale)}。\n`,
+				`Initialized the managed workspace from the built-in template: ${workspace.root}.\n`,
+			)
+			: "";
 		this.selectedModeId = configuration.defaultModeId;
 		this.statuses = new Map();
 		this.resetStatuses();
-		this.runOrchestration = new RunOrchestration(new PiAgentRunner(), configuration.profiles);
+		this.runOrchestration = new RunOrchestration(new PiAgentRunner(), configuration.profiles, this.locale);
 		this.routeUserRequest = new RouteUserRequest(
-			new PiRequestIntentClassifier(this.workspaceRoot, configuration.intake.timeoutSeconds),
+			new PiRequestIntentClassifier(this.workspaceRoot, configuration.intake.timeoutSeconds, this.locale),
 			configuration.intake,
+			this.locale,
 		);
 		this.editor.onSubmit = (value) => void this.submit(value);
 		this.tui.addInputListener((data) => {
@@ -139,7 +149,10 @@ export class OrchestrationApp {
 			if (request === "/abort") {
 				this.pendingIntent = undefined;
 				this.phase = "idle";
-				this.log += "\n已取消本次研发意图确认，研发流程未启动。\n";
+				this.log += this.text(
+					"\n已取消本次研发意图确认，研发流程未启动。\n",
+					"\nDevelopment intent confirmation canceled; the development workflow was not started.\n",
+				);
 				this.refresh();
 				return;
 			}
@@ -160,13 +173,15 @@ export class OrchestrationApp {
 			return;
 		}
 		if (request === "/skills") {
-			this.log += `${skillReport(this.activeProfiles(this.mode()), this.loadedSkills, this.selectedSkills)}\n`;
+			this.log += `${skillReport(this.activeProfiles(this.mode()), this.loadedSkills, this.selectedSkills, this.locale)}\n`;
 			this.editor.setText("");
 			this.refresh();
 			return;
 		}
 		if (request === "/workspace") {
-			this.log += `当前工作区：${this.workspace.description}\n来源：${this.workspace.kind === "managed" ? "rdk-agent 内置版本化模板；无需下载 rdk-sophon 源码" : "用户显式提供的外部源码"}\n`;
+			this.log += this.locale === "en"
+				? `Current workspace: ${workspaceDescription(this.workspace, this.locale)}\nSource: ${this.workspace.kind === "managed" ? "rdk-agent's built-in versioned template; no rdk-sophon source checkout required" : "external source explicitly provided by the user"}\n`
+				: `当前工作区：${workspaceDescription(this.workspace, this.locale)}\n来源：${this.workspace.kind === "managed" ? "rdk-agent 内置版本化模板；无需下载 rdk-sophon 源码" : "用户显式提供的外部源码"}\n`;
 			this.editor.setText("");
 			this.refresh();
 			return;
@@ -175,13 +190,18 @@ export class OrchestrationApp {
 			const modeId = request.slice(6).trim();
 			const mode = this.configuration.modes.find((candidate) => candidate.id === modeId);
 			this.editor.setText("");
-			if (!mode) this.log += `未知模式：${modeId}。输入 /modes 查看可用模式。\n`;
+			if (!mode) {
+				this.log += this.text(
+					`未知模式：${modeId}。输入 /modes 查看可用模式。\n`,
+					`Unknown mode: ${modeId}. Enter /modes to list available modes.\n`,
+				);
+			}
 			else this.selectMode(mode.id);
 			this.refresh();
 			return;
 		}
 		if (request === "/develop") {
-			this.log += "用法：/develop <用户指令>\n";
+			this.log += this.text("用法：/develop <用户指令>\n", "Usage: /develop <user request>\n");
 			this.editor.setText("");
 			this.refresh();
 			return;
@@ -200,7 +220,10 @@ export class OrchestrationApp {
 		const selectedMode = this.mode();
 		if (selectedMode.type !== "robot-development") {
 			if (forceDevelopment) {
-				this.log += "当前不是机器人研发模式；请先用 /mode robot-development 切换模式。\n";
+				this.log += this.text(
+					"当前不是机器人研发模式；请先用 /mode robot-development 切换模式。\n",
+					"The current mode is not robot development. Switch modes first with /mode robot-development.\n",
+				);
 				this.editor.disableSubmit = false;
 				this.refresh();
 				return;
@@ -211,8 +234,14 @@ export class OrchestrationApp {
 
 		this.phase = "classifying";
 		this.editor.disableSubmit = true;
-		if (conversationContext.length === 0) this.log = `用户指令：${request}\n`;
-		else this.log += `\n[意图确认补充] ${conversationContext.at(-1)}\n`;
+		if (conversationContext.length === 0) {
+			this.log = this.text(`用户指令：${request}\n`, `User request: ${request}\n`);
+		} else {
+			this.log += this.text(
+				`\n[意图确认补充] ${conversationContext.at(-1)}\n`,
+				`\n[Intent clarification] ${conversationContext.at(-1)}\n`,
+			);
+		}
 		this.refresh();
 		let decision: RoutedUserRequest;
 		try {
@@ -228,26 +257,37 @@ export class OrchestrationApp {
 			decision = {
 				kind: "clarification",
 				confidence: 0,
-				question: "意图识别暂时不可用。你是否要启动研发流程并修改机器人动作能力？",
+				question: this.text(
+					"意图识别暂时不可用。你是否要启动研发流程并修改机器人动作能力？",
+					"Intent classification is temporarily unavailable. Do you want to start the development workflow and modify the robot's motion capabilities?",
+				),
 				reasonCode: "routing-failed",
 			};
-			this.log += `\n[意图识别异常] ${detail}\n`;
+			this.log += this.text(`\n[意图识别异常] ${detail}\n`, `\n[Intent classification error] ${detail}\n`);
 		}
 
 		if (decision.kind === "development") {
-			this.log += `\n[输入识别] 已确认该用户指令需要启动研发流程 · 置信度 ${formatConfidence(decision.confidence)}\n`;
-			await this.runWorkflow(selectedMode, authorizedDevelopmentRequest(request, conversationContext));
+			this.log += this.text(
+				`\n[输入识别] 已确认该用户指令需要启动研发流程 · 置信度 ${formatConfidence(decision.confidence)}\n`,
+				`\n[Input classification] Confirmed that this user request requires the development workflow · confidence ${formatConfidence(decision.confidence)}\n`,
+			);
+			await this.runWorkflow(selectedMode, authorizedDevelopmentRequest(request, conversationContext, this.locale));
 			return;
 		}
 		if (decision.kind === "conversation") {
-			this.log += `\n[输入识别] 非研发对话 · ${decision.userMessage ?? "研发流程未启动。"}\n`;
+			this.log += this.locale === "en"
+				? `\n[Input classification] Non-development conversation · ${decision.userMessage ?? "The development workflow was not started."}\n`
+				: `\n[输入识别] 非研发对话 · ${decision.userMessage ?? "研发流程未启动。"}\n`;
 			this.phase = "idle";
 			this.editor.disableSubmit = false;
 			this.refresh();
 			return;
 		}
 		if (decision.kind === "unsupported-development") {
-			this.log += `\n[输入识别] 当前研发流程不支持：${decision.reason}\n研发流程未启动。\n`;
+			this.log += this.text(
+				`\n[输入识别] 当前研发流程不支持：${decision.reason}\n研发流程未启动。\n`,
+				`\n[Input classification] Unsupported by the current development workflow: ${decision.reason}\nThe development workflow was not started.\n`,
+			);
 			this.phase = "idle";
 			this.editor.disableSubmit = false;
 			this.refresh();
@@ -257,7 +297,10 @@ export class OrchestrationApp {
 		this.pendingIntent = { request, context: [...conversationContext] };
 		this.phase = "awaiting-intent";
 		this.editor.disableSubmit = false;
-		this.log += `\n[需要确认研发意图] ${decision.question}\n输入补充信息后按 Enter，或输入 /abort 取消。\n`;
+		this.log += this.text(
+			`\n[需要确认研发意图] ${decision.question}\n输入补充信息后按 Enter，或输入 /abort 取消。\n`,
+			`\n[Development intent confirmation required] ${decision.question}\nEnter more information and press Enter, or enter /abort to cancel.\n`,
+		);
 		this.refresh();
 	}
 
@@ -267,7 +310,9 @@ export class OrchestrationApp {
 			if (problem) {
 				this.phase = "idle";
 				this.editor.disableSubmit = false;
-				this.log = `开发工作区校验失败。\n当前 workspace：${problem.root}\n缺少：${problem.missingPaths.join(", ")}${problem.suggestedRoot ? `\n检测到正确项目：${problem.suggestedRoot}\n请退出后执行：rdk-agent --workspace ${problem.suggestedRoot}` : ""}\n`;
+				this.log = this.locale === "en"
+					? `Development workspace validation failed.\nCurrent workspace: ${problem.root}\nMissing: ${problem.missingPaths.join(", ")}${problem.suggestedRoot ? `\nDetected the expected project at: ${problem.suggestedRoot}\nExit and run: rdk-agent --workspace ${problem.suggestedRoot}` : ""}\n`
+					: `开发工作区校验失败。\n当前 workspace：${problem.root}\n缺少：${problem.missingPaths.join(", ")}${problem.suggestedRoot ? `\n检测到正确项目：${problem.suggestedRoot}\n请退出后执行：rdk-agent --workspace ${problem.suggestedRoot}` : ""}\n`;
 				this.refresh();
 				return;
 			}
@@ -276,7 +321,7 @@ export class OrchestrationApp {
 		this.phase = "orchestrating";
 		this.editor.disableSubmit = true;
 		this.resetStatuses();
-		this.log += `\n用户指令：${request}\n\n`;
+		this.log += this.text(`\n用户指令：${request}\n\n`, `\nUser request: ${request}\n\n`);
 		this.refresh();
 		try {
 			await this.runOrchestration.execute({
@@ -296,8 +341,15 @@ export class OrchestrationApp {
 	}
 
 	private handleRoutingEvent(event: RequestRoutingEvent): void {
-		if (event.type === "intent-classification-started") this.log += "\n[输入识别] 意图分类 Agent 正在判断……\n";
-		if (event.type === "intent-classification-failed") this.log += `\n[输入识别失败] ${event.detail}\n`;
+		if (event.type === "intent-classification-started") {
+			this.log += this.text(
+				"\n[输入识别] 意图分类 Agent 正在判断……\n",
+				"\n[Input classification] The intent-classification Agent is evaluating the request…\n",
+			);
+		}
+		if (event.type === "intent-classification-failed") {
+			this.log += this.text(`\n[输入识别失败] ${event.detail}\n`, `\n[Input classification failed] ${event.detail}\n`);
+		}
 		this.refresh();
 	}
 
@@ -310,12 +362,20 @@ export class OrchestrationApp {
 			this.statuses.set(event.stageId, event.status);
 			if (showLifecycle && profile && event.status === "running" && previous !== "running") {
 				this.agentStartedAt.set(event.stageId, now);
-				this.log += agentLifecycleLogEntry(agentStartBanner(profile.name, now));
+				this.log += agentLifecycleLogEntry(agentStartBanner(profile.name, now, false, this.locale));
 			} else if (showLifecycle && profile && (event.status === "succeeded" || event.status === "failed") && previous === "running") {
-				this.log += agentLifecycleLogEntry(agentEndBanner(profile.name, event.status, now, this.agentStartedAt.get(event.stageId)));
+				this.log += agentLifecycleLogEntry(agentEndBanner(
+					profile.name,
+					event.status,
+					now,
+					this.agentStartedAt.get(event.stageId),
+					false,
+					this.locale,
+				));
 				this.agentStartedAt.delete(event.stageId);
 			} else if (showLifecycle && !profile && event.status === "running" && previous !== "running") {
-				this.log += `\n\n${tuiStyle.accent(`>>> 进入工作节点：${workflowStageLabel(this.mode(), this.configuration.profiles, event.stageId)}`)}\n\n`;
+				const stageName = workflowStageLabel(this.mode(), this.configuration.profiles, event.stageId);
+				this.log += `\n\n${tuiStyle.accent(this.text(`>>> 进入工作节点：${stageName}`, `>>> Entering workflow node: ${stageName}`))}\n\n`;
 			}
 			if (showLifecycle && event.detail) this.log += `\n[${event.stageId}] ${event.detail}\n`;
 		}
@@ -330,22 +390,31 @@ export class OrchestrationApp {
 				}
 			}
 			this.loopIteration = event;
-			this.log += `\n\n${tuiStyle.warning(`[${event.loopName}] 第 ${event.iteration}/${event.maxIterations} 次迭代`)}\n\n`;
+			this.log += `\n\n${tuiStyle.warning(this.text(
+				`[${event.loopName}] 第 ${event.iteration}/${event.maxIterations} 次迭代`,
+				`[${event.loopName}] Iteration ${event.iteration}/${event.maxIterations}`,
+			))}\n\n`;
 		}
 		if (event.type === "agent-event") this.log += event.text;
 		if (event.type === "skills-loaded") {
 			this.loadedSkills.set(event.stageId, event.skills);
-			this.log += `\n[Skill 已加载] ${event.skills.map((skill) => skill.name).join(", ") || "无"}\n`;
+			this.log += this.locale === "en"
+				? `\n[Skills loaded] ${event.skills.map((skill) => skill.name).join(", ") || "None"}\n`
+				: `\n[Skill 已加载] ${event.skills.map((skill) => skill.name).join(", ") || "无"}\n`;
 		}
 		if (event.type === "skill-selected") {
 			const selected = this.selectedSkills.get(event.stageId) ?? [];
 			if (!selected.some((skill) => skill.name === event.skill.name)) selected.push(event.skill);
 			this.selectedSkills.set(event.stageId, selected);
-			this.log += `\n[Skill 已选择] ${event.skill.name}\n`;
+			this.log += this.text(`\n[Skill 已选择] ${event.skill.name}\n`, `\n[Skill selected] ${event.skill.name}\n`);
 		}
-		if (event.type === "human-input-received") this.log += `\n[人类输入] ${event.message}\n`;
+		if (event.type === "human-input-received") {
+			this.log += this.text(`\n[人类输入] ${event.message}\n`, `\n[Human input] ${event.message}\n`);
+		}
 		if (event.type === "workflow-finished") {
-			const finished = `${event.succeeded ? "验收通过" : "流程中止"}：${event.detail}`;
+			const finished = this.locale === "en"
+				? `${event.succeeded ? "Acceptance passed" : "Workflow stopped"}: ${event.detail}`
+				: `${event.succeeded ? "验收通过" : "流程中止"}：${event.detail}`;
 			this.log += `\n\n${event.succeeded ? tuiStyle.succeeded(finished) : tuiStyle.failed(finished)}\n`;
 		}
 		this.refresh();
@@ -357,43 +426,66 @@ export class OrchestrationApp {
 		const showWorkflowProgress = shouldDisplayWorkflowProgress(mode, workflowVisible);
 		const phaseStatus = mode.type !== "robot-development"
 			? ""
-			: showWorkflowProgress
-				? workflowProgressReport({
-					mode,
-					profiles: this.configuration.profiles,
-					statuses: this.statuses,
-					loopIteration: this.loopIteration,
-					compact: this.terminal.rows < 32 || this.terminal.columns < 80,
-				})
-				: this.phase === "classifying"
-					? "输入识别  ▶ 意图分类 Agent 正在判断；研发流程尚未启动。"
-					: this.phase === "awaiting-intent"
-						? "输入识别  △ 等待确认；研发流程尚未启动。"
-						: "输入用户指令后会先辨识意图；只有明确要求研发的用户指令才启动工作流。";
-		this.header.setText(tuiStyle.title(`RDK Agent Orchestrator · ${mode.name} · ${this.workspace.kind === "managed" ? "托管工程" : "外部工程"}`));
+				: showWorkflowProgress
+					? workflowProgressReport({
+						mode,
+						profiles: this.configuration.profiles,
+						statuses: this.statuses,
+						loopIteration: this.loopIteration,
+						compact: this.terminal.rows < 32 || this.terminal.columns < 80,
+						locale: this.locale,
+					})
+					: this.phase === "classifying"
+						? this.text(
+							"输入识别  ▶ 意图分类 Agent 正在判断；研发流程尚未启动。",
+							"Input classification  ▶ The intent-classification Agent is evaluating the request; the development workflow has not started.",
+						)
+						: this.phase === "awaiting-intent"
+							? this.text(
+								"输入识别  △ 等待确认；研发流程尚未启动。",
+								"Input classification  △ Waiting for confirmation; the development workflow has not started.",
+							)
+							: this.text(
+								"输入用户指令后会先辨识意图；只有明确要求研发的用户指令才启动工作流。",
+								"Input is classified first; the workflow starts only for an explicit development request.",
+							);
+		const workspaceLabel = this.workspace.kind === "managed"
+			? this.text("托管工程", "Managed Project")
+			: this.text("外部工程", "External Project");
+		this.header.setText(tuiStyle.title(`RDK Agent Orchestrator · ${mode.name} · ${workspaceLabel}`));
 		this.stages.setText(
 			mode.type === "robot-development" && !showWorkflowProgress
 				? this.activeProfiles(mode).map((profile: AgentProfile) => this.profileStatus(profile)).join("\n")
 				: "",
 		);
-		this.transcript.setText(this.log || "请输入用户指令后按 Enter 开始执行。");
+		this.transcript.setText(this.log || this.text("请输入用户指令后按 Enter 开始执行。", "Enter a user request and press Enter to begin."));
 		this.progress.setText(phaseStatus);
 		this.footer.setText(
 			this.humanWaiter
-				? "等待人类输入 · Enter 继续 · /abort 终止"
+				? this.text("等待人类输入 · Enter 继续 · /abort 终止", "Waiting for human input · Enter to continue · /abort to stop")
 				: this.phase === "classifying"
-					? "正在辨识输入；意图分类 Agent 无工具和工作区写权限。"
+					? this.text(
+						"正在辨识输入；意图分类 Agent 无工具和工作区写权限。",
+						"Classifying input; the intent-classification Agent has no tools or workspace write access.",
+					)
 					: this.phase === "awaiting-intent"
-						? "等待研发意图确认 · Enter 补充 · /abort 取消"
+						? this.text(
+							"等待研发意图确认 · Enter 补充 · /abort 取消",
+							"Waiting for development intent confirmation · Enter to add details · /abort to cancel",
+						)
 						: this.phase === "orchestrating"
-							? "正在执行；日志区可滚动查看。"
-							: `模式：${mode.id} · Shift+Tab 切换${mode.type === "robot-development" ? " · /develop <用户指令> 强制研发" : ""} · /workspace · /skills · /modes · /mode <id> · /quit`,
+							? this.text("正在执行；日志区可滚动查看。", "Running; scroll the log area to review output.")
+							: this.locale === "en"
+								? `Mode: ${mode.id} · Shift+Tab to switch${mode.type === "robot-development" ? " · /develop <user request> to force development" : ""} · /workspace · /skills · /modes · /mode <id> · /quit`
+								: `模式：${mode.id} · Shift+Tab 切换${mode.type === "robot-development" ? " · /develop <用户指令> 强制研发" : ""} · /workspace · /skills · /modes · /mode <id> · /quit`,
 		);
 		this.tui.requestRender();
 	}
 
 	private waitForHuman(request: HumanInputRequest): Promise<HumanInputResponse> {
-		this.log += `\n[需要人类接入] ${request.agentName}\n问题：${request.question}\n上下文：${request.context}\n`;
+		this.log += this.locale === "en"
+			? `\n[Human input required] ${request.agentName}\nQuestion: ${request.question}\nContext: ${request.context}\n`
+			: `\n[需要人类接入] ${request.agentName}\n问题：${request.question}\n上下文：${request.context}\n`;
 		this.editor.disableSubmit = false;
 		this.refresh();
 		return new Promise((resolve) => {
@@ -404,7 +496,9 @@ export class OrchestrationApp {
 
 	private mode(): OrchestrationMode {
 		const mode = this.configuration.modes.find((candidate) => candidate.id === this.selectedModeId);
-		if (!mode) throw new Error(`模式配置不存在：${this.selectedModeId}`);
+		if (!mode) {
+			throw new Error(this.text(`模式配置不存在：${this.selectedModeId}`, `Mode configuration not found: ${this.selectedModeId}`));
+		}
 		return mode;
 	}
 
@@ -415,9 +509,13 @@ export class OrchestrationApp {
 
 	private profileStatus(profile: AgentProfile): string {
 		const statusValue = this.statuses.get(profile.id) ?? "pending";
-		const status = `${stageMarker(statusValue)} ${profile.name}：${profile.description}`;
-		const skillStatus = profileSkillStatus(profile, this.loadedSkills.get(profile.id), this.selectedSkills.get(profile.id));
+		const status = `${stageMarker(statusValue)} ${profile.name}${this.locale === "en" ? ": " : "："}${profile.description}`;
+		const skillStatus = profileSkillStatus(profile, this.loadedSkills.get(profile.id), this.selectedSkills.get(profile.id), this.locale);
 		return skillStatus ? `${status}\n  ${skillStatus}` : status;
+	}
+
+	private text(chinese: string, english: string): string {
+		return localeText(this.locale, chinese, english);
 	}
 
 	private switchMode(direction: -1 | 1): void {
@@ -430,7 +528,7 @@ export class OrchestrationApp {
 		this.selectedModeId = modeId;
 		this.lastWorkflowVisible = false;
 		this.resetStatuses();
-		this.log += `已切换到 ${this.mode().name}。\n`;
+		this.log += this.text(`已切换到 ${this.mode().name}。\n`, `Switched to ${this.mode().name}.\n`);
 	}
 
 	private resetStatuses(): void {
@@ -452,7 +550,19 @@ function formatConfidence(confidence: number): string {
 	return `${Math.round(confidence * 100)}%`;
 }
 
-function authorizedDevelopmentRequest(request: string, conversationContext: readonly string[]): string {
+function authorizedDevelopmentRequest(
+	request: string,
+	conversationContext: readonly string[],
+	locale: Locale = defaultLocale,
+): string {
 	if (conversationContext.length === 0) return request;
-	return [request, ...conversationContext.map((message) => `用户澄清：${message}`)].join("\n");
+	const clarificationLabel = localeText(locale, "用户澄清：", "User clarification: ");
+	return [request, ...conversationContext.map((message) => `${clarificationLabel}${message}`)].join("\n");
+}
+
+function workspaceDescription(workspace: ResolvedWorkspace, locale: Locale): string {
+	if (locale === "en") {
+		return `${workspace.kind === "managed" ? "Built-in template managed workspace" : "External source workspace"} ${workspace.root}`;
+	}
+	return workspace.description;
 }

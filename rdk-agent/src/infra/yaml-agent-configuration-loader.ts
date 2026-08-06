@@ -16,11 +16,12 @@ import type {
 	RequestIntakeConfiguration,
 	WorkspaceConfiguration,
 } from "../shared/agent-configuration.ts";
+import { defaultLocale, type Locale } from "../shared/locale.ts";
 
 type UnknownRecord = Record<string, unknown>;
 
 export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
-	load(configDirectory: string): AgentConfiguration {
+	load(configDirectory: string, locale: Locale = defaultLocale): AgentConfiguration {
 		const resolvedDirectory = resolve(configDirectory);
 		const configPath = join(resolvedDirectory, "agents.yaml");
 		if (!existsSync(configPath)) throw new Error(`Agent 配置不存在：${configPath}`);
@@ -32,18 +33,18 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			throw new Error("agents.yaml 至少需要配置一个 Agent");
 		}
 
-		const profiles = root.agents.map((value, index) => this.profile(value, index));
+		const profiles = root.agents.map((value, index) => this.profile(value, index, locale));
 		const ids = profiles.map((profile) => profile.id);
 		if (new Set(ids).size !== ids.length) throw new Error("agents.yaml 中的 Agent id 不能重复");
 		const profileIds = new Set(ids);
 		if (!Array.isArray(root.modes) || root.modes.length === 0) throw new Error("agents.yaml 至少需要配置一个模式");
-		const modes = root.modes.map((value, index) => this.mode(value, index, profileIds));
+		const modes = root.modes.map((value, index) => this.mode(value, index, profileIds, locale));
 		const modeIds = modes.map((mode) => mode.id);
 		if (new Set(modeIds).size !== modeIds.length) throw new Error("agents.yaml 中的模式 id 不能重复");
 		const defaultModeId = this.string(root.defaultMode, "defaultMode");
 		if (!modeIds.includes(defaultModeId)) throw new Error(`defaultMode 引用了不存在的模式：${defaultModeId}`);
 		const workspace = this.workspace(root.workspace, resolvedDirectory);
-		const intake = this.intake(root.intake);
+		const intake = this.intake(root.intake, locale);
 
 		const skillDirectory = join(resolvedDirectory, "skills");
 		for (const profile of profiles) {
@@ -53,10 +54,10 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			}
 		}
 
-		return { configDirectory: resolvedDirectory, skillDirectory, profiles, modes, defaultModeId, workspace, intake };
+		return { configDirectory: resolvedDirectory, skillDirectory, profiles, modes, defaultModeId, workspace, intake, locale };
 	}
 
-	private intake(value: unknown): RequestIntakeConfiguration {
+	private intake(value: unknown, locale: Locale): RequestIntakeConfiguration {
 		if (value === undefined) {
 			return {
 				autoStartConfidence: 0.9,
@@ -69,9 +70,13 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 			? 0.9
 			: this.probability(raw.autoStartConfidence, "intake.autoStartConfidence");
 		const timeoutSeconds = this.optionalPositiveInteger(raw.timeoutSeconds, "intake.timeoutSeconds", 30);
-		const developmentScope = raw.developmentScope === undefined
+		const chineseDevelopmentScope = raw.developmentScope === undefined
 			? "只有用户指令明确要求新增、修改、修复、测试或部署当前机器人能力时，才启动受支持的研发流程。"
 			: this.string(raw.developmentScope, "intake.developmentScope");
+		const englishDevelopmentScope = raw.developmentScopeEn === undefined
+			? undefined
+			: this.string(raw.developmentScopeEn, "intake.developmentScopeEn");
+		const developmentScope = locale === "en" ? englishDevelopmentScope ?? chineseDevelopmentScope : chineseDevelopmentScope;
 		return { autoStartConfidence, timeoutSeconds, developmentScope };
 	}
 
@@ -94,11 +99,11 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		return { kind, id, version, templateDirectory, requiredPaths };
 	}
 
-	private mode(value: unknown, index: number, profileIds: ReadonlySet<string>): OrchestrationMode {
+	private mode(value: unknown, index: number, profileIds: ReadonlySet<string>, locale: Locale): OrchestrationMode {
 		const label = `modes[${index}]`;
 		const raw = this.record(value, label);
 		const id = this.identifier(raw.id, `${label}.id`);
-		const name = this.string(raw.name, `${label}.name`);
+		const name = this.localizedString(raw, "name", label, locale);
 		const type = this.string(raw.type, `${label}.type`);
 		if (type === "robot-application") {
 			const agentId = this.identifier(raw.agent, `${label}.agent`);
@@ -107,7 +112,7 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		}
 		if (type !== "robot-development") throw new Error(`${label}.type 不支持：${type}`);
 		if (!Array.isArray(raw.loops) || raw.loops.length === 0) throw new Error(`${label}.loops 至少需要一个 TDD 循环`);
-		const loops = raw.loops.map((loop, loopIndex) => this.loop(loop, `${label}.loops[${loopIndex}]`, profileIds));
+		const loops = raw.loops.map((loop, loopIndex) => this.loop(loop, `${label}.loops[${loopIndex}]`, profileIds, locale));
 		const loopIds = loops.map((loop) => loop.id);
 		if (new Set(loopIds).size !== loopIds.length) throw new Error(`${label}.loops 的 id 不能重复`);
 		const acceptanceAgentIds = this.optionalStringArray(raw.acceptanceAgents, `${label}.acceptanceAgents`).map((agentId, agentIndex) => {
@@ -131,7 +136,7 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		return { id, name, type, loops, deliveryAgentIds, acceptanceAgentIds };
 	}
 
-	private loop(value: unknown, label: string, profileIds: ReadonlySet<string>): TddLoopDefinition {
+	private loop(value: unknown, label: string, profileIds: ReadonlySet<string>, locale: Locale): TddLoopDefinition {
 		const raw = this.record(value, label);
 		const testAgentId = this.identifier(raw.testAgent, `${label}.testAgent`);
 		const codingAgentId = this.identifier(raw.codingAgent, `${label}.codingAgent`);
@@ -145,8 +150,8 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		if (deploymentAgentId) this.requireAgent(deploymentAgentId, `${label}.deploymentAgent`, profileIds);
 		return {
 			id: this.identifier(raw.id, `${label}.id`),
-			name: this.string(raw.name, `${label}.name`),
-			deliverable: this.string(raw.deliverable, `${label}.deliverable`),
+			name: this.localizedString(raw, "name", label, locale),
+			deliverable: this.localizedString(raw, "deliverable", label, locale),
 			testAgentId,
 			codingAgentId,
 			verificationAgentId,
@@ -155,7 +160,7 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		};
 	}
 
-	private profile(value: unknown, index: number): AgentProfile {
+	private profile(value: unknown, index: number, locale: Locale): AgentProfile {
 		const label = `agents[${index}]`;
 		const raw = this.record(value, label);
 		const id = this.identifier(raw.id, `${label}.id`);
@@ -176,8 +181,8 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 		}
 		return {
 			id,
-			name: this.string(raw.name, `${label}.name`),
-			description: this.string(raw.description, `${label}.description`),
+			name: this.localizedString(raw, "name", label, locale),
+			description: this.localizedString(raw, "description", label, locale),
 			tools,
 			skills: this.stringArray(raw.skills, `${label}.skills`),
 			systemPrompt: this.string(raw.systemPrompt, `${label}.systemPrompt`),
@@ -345,6 +350,15 @@ export class YamlAgentConfigurationLoader implements AgentConfigurationLoader {
 	private string(value: unknown, label: string): string {
 		if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} 必须是非空字符串`);
 		return value.trim();
+	}
+
+	private localizedString(raw: UnknownRecord, key: string, label: string, locale: Locale): string {
+		const base = this.string(raw[key], `${label}.${key}`);
+		const englishKey = `${key}En`;
+		const english = raw[englishKey] === undefined
+			? undefined
+			: this.string(raw[englishKey], `${label}.${englishKey}`);
+		return locale === "en" ? english ?? base : base;
 	}
 
 	private stringArray(value: unknown, label: string): readonly string[] {
