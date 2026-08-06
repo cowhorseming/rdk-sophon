@@ -32,7 +32,7 @@ Current delivery status:
 | Complete source and README | Complete | This monorepo; subsystem details are in the [`rdk-agent` README](rdk-agent/README.md) and [`rdk-sophon` README](rdk-sophon/README.md) |
 | Demo video, 3-5 minutes | Complete; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Supplementary presentation | Complete | [12-slide PowerPoint deck](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
-| AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included below |
+| AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included in Sections 8–9 |
 | AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all recomputable offline. Agent backend side: vLLM host, model revision, and precision still to be attached |
 | Verification evidence | Captured on 2026-08-05 | [Raw verification record](submission/en/evidence/verification-2026-08-05.md) |
 
@@ -143,6 +143,8 @@ RDK Agent -> private OpenAI-compatible endpoint -> vLLM -> ROCm -> AMD Radeon GP
 
 ### 5.1 Robot Development Mode and Intent Gate
 
+Robot Development Mode sends supported requests through the intent gate and multi-agent TDD loop, then builds a release, deploys it to the RDK X5, installs the generated Skill, and performs controlled acceptance checks.
+
 Exact greetings and acknowledgements are answered deterministically. Other development input is classified in a short model session with no tools, Skills, project context, or filesystem writes. Only a high-confidence request inside the supported action-package scope starts development. In normal use, enter the request directly; `/develop` is only an explicit human override when intent classification must be bypassed.
 
 ### 5.2 Action Package TDD
@@ -196,7 +198,7 @@ The workflow pauses for human input when it encounters ambiguity, an invalid str
 
 ### 6.5 Local Device Telemetry and Dynamic Execution
 
-RDK X5 state collection covers temperature, CPU, memory, disk, network, and BPU state. Dynamic action packages are locally discoverable and removable without recompiling the Rust CLI.
+`probe-daemon` provides on-demand snapshots and telemetry covering temperature, CPU, memory, disk, network, and BPU state. Dynamic plugin commands use exact argument vectors rather than `sh -c`. Robot action packages are discovered from a local registry and can be removed without recompiling the Rust CLI.
 
 ### 6.6 Track 2 Capability Matrix
 
@@ -341,7 +343,7 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 | Peak VRAM/utilization | Evidence pending |
 | End-to-end agent workflow latency | Evidence pending |
 
-No unmeasured value should be changed from `Evidence pending` to a number. Before judging, attach redacted server output, the exact vLLM launch command, model revision, precision or quantization setting, container digest if used, warm-up policy, and a screenshot of the participant-controlled Radeon Cloud instance without credentials.
+This project does not fabricate AMD performance data. No unmeasured value should be changed from `Evidence pending` to a number. Before judging, attach redacted server output, the exact vLLM launch command, model revision, precision or quantization setting, container digest if used, warm-up policy, and a screenshot of the participant-controlled Radeon Cloud instance without credentials.
 
 ## 10. Installation, deployment, and reproduction
 
@@ -420,6 +422,13 @@ cargo build --release --workspace
 
 Expected evidence for the submitted snapshot: 62 tests pass, Clippy succeeds with warnings denied, and the release workspace builds. Some end-to-end tests bind local TCP or Unix sockets and must run in an environment that permits loopback socket binding.
 
+For day-to-day development, the aggregate Rust script can also be run from the Rust subproject:
+
+```sh
+cd rdk-sophon
+./scripts/full_test.sh
+```
+
 The repository's `scripts/full_test.sh` pipeline was not recorded as a single run for this snapshot. Its constituent check, Clippy, test, and release-build stages were run separately and passed. A separate `cargo fmt --all -- --check` reported existing formatting differences; formatting is not part of `full_test.sh`.
 
 ### 10.5 Inspect the TUI without moving hardware
@@ -454,6 +463,13 @@ The submitted evidence captured `pong: true`, a live state snapshot, and the `se
 
 ### 10.7 Advanced Deployment Variants
 
+The integrated deployment entry point lives under `rdk-agent`, but it orchestrates deliverables owned by both subprojects:
+
+- `rdk-sophon` on the board: aarch64 binaries such as `probe-daemon`, configuration, and systemd services.
+- `rdk-agent` on the board: MagicBox servo application scripts, standalone action packages with a local registry, and the plugin manifest.
+- `rdk-sophon` on the development host: the native-architecture `sophonctl` client.
+- `rdk-agent` on the development host: the TUI, Agent/Skill configuration, and development sandbox.
+
 The default command in Section 10.3 installs the complete stack. For an existing environment, the same installer can update only the board or only the development host:
 
 ```sh
@@ -471,9 +487,11 @@ export RDK_BOARD_IP=192.0.2.10 # Documentation-only address; replace with the bo
   --board-address "$RDK_BOARD_IP:7777"
 ```
 
+For deeper installation paths and parameters, see the [`rdk-agent` subsystem documentation](rdk-agent/README.md) and [`rdk-sophon` subsystem documentation](rdk-sophon/README.md).
+
 ### 10.8 Configure private AMD Radeon inference
 
-The dedicated service must listen on `0.0.0.0:8000` when using the competition's Model API routing. Example service shape:
+Use a participant-controlled Radeon Cloud instance with a compatible ROCm stack and a dedicated OpenAI-compatible vLLM service. The service must listen on `0.0.0.0:8000` when using the competition's Model API routing. Example service shape:
 
 ```sh
 export MODEL_PATH_OR_ID=/path/to/model-or-hub-id
@@ -577,30 +595,26 @@ Evidence was captured on 2026-08-05. The [raw verification record](submission/en
 | Rust Clippy with warnings denied | Passed |
 | Rust release workspace build | Passed |
 | Live RDK X5 ping | `pong: true` |
+| Live RDK X5 state | 8 CPU usage entries, 1500 MHz core frequency; 7,424,344,064 bytes memory total and 3,550,343,168 bytes used |
+| RDK X5 temperature | DDR 55.113 °C; CPU 54.38 °C |
 | Dynamic plugin discovery | `servo` plugin found |
-
-Sanitized live RDK X5 capture:
-
-```text
-board timestamp: 2026-08-05T11:02:17Z
-CPU: 8 usage entries; reported core frequency 1500 MHz
-memory: 7,424,344,064 bytes total; 3,550,343,168 bytes used
-thermal-ddr: 55.113 C
-thermal-cpu: 54.38 C
-plugin: servo - MagicBox servo posture control
-```
-
-MAC addresses and private infrastructure details are intentionally omitted.
+| Client model routing | Provider `amd`, model `Qwen3-Next-80B-A3B-Instruct`, OpenAI-compatible Chat Completions |
 
 ![Repository verification snapshot](submission/en/assets/test-evidence.png)
 
 ![Sanitized live RDK X5 evidence](submission/en/assets/board-evidence.png)
 
-The Rust formatting check is not presented as passing: `cargo fmt --all -- --check` reported existing formatting differences. The evidence also does not describe the complete `scripts/full_test.sh` pipeline as green.
+Evidence boundaries:
 
-The private Pi client was verified to select provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` through OpenAI-compatible Chat Completions. For **that vLLM agent backend**, this repository snapshot does **not** independently attest the server-side Radeon GPU model, ROCm/HIP version, vLLM version or launch command, model revision, precision/quantization, client TTFT and decode throughput, server utilization, VRAM, or profiler results. The submission does not invent those figures.
+- `cargo fmt --all -- --check` reported existing formatting differences, so this submission does not describe the Rust formatting check as passing.
+- This snapshot does not describe the complete `scripts/full_test.sh` pipeline as one complete run; its constituent stages were run and verified separately.
+- The client model configuration proves model selection only; it does not prove the **80B agent backend** server-side GPU, ROCm, vLLM, model revision, or quantization.
+- Radeon/ROCm/vLLM/precision evidence and performance benchmarks for the **80B agent backend** remain to be captured.
+- For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`), those facts are attested and reproducible: GPU `gfx1100`, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, adapter SHA-256 `4dcee691…f20bf`, NF4 4-bit quantization, and a baseline-versus-optimized A/B measured on that host (user-visible TTFT p50 17.41 s → 8.26 s, peak VRAM 27.99 → 28.06 GB, 88/88 outputs byte-identical). See the [model track index](submission/en/MODEL_TRACK.md); `results.json` is generated by the benchmark on the Radeon host rather than transcribed by hand.
+- Automated results prove the software contract and command path only; physical motion quality still requires human observation.
+- Public evidence omits MAC addresses, credentials, and private infrastructure details.
 
-For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`) those figures are attested and reproducible: GPU `gfx1100`, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, adapter SHA-256 `4dcee691…f20bf`, NF4 4-bit quantization, and a baseline-versus-optimized A/B measured on that host (user-visible TTFT p50 17.41 s → 8.26 s, peak VRAM 27.99 → 28.06 GB, 88/88 outputs byte-identical). See the [model track index](submission/en/MODEL_TRACK.md); `results.json` is generated by the benchmark on the Radeon host rather than transcribed by hand.
+This submission does not expose credentials, present development-host Mach-O binaries as RDK X5 deliverables, equate command success with proven physical motion quality, or report estimated AMD performance data as measured results.
 
 ## 12. Demo video
 
@@ -611,6 +625,8 @@ For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`) those figur
 **Local master:** `submission/en/amd-hackathon-2026-07.mp4`
 
 **Media check:** 3:07.2, 1920x1080, H.264 video with AAC audio, 174,000,121 bytes (about 165.9 MiB).
+
+**Status:** The video meets the 3-5 minute requirement, and both public playback links are available.
 
 **Recommended PR label:** `Demo video - 3-5 minutes`
 
@@ -645,6 +661,8 @@ The recording satisfies the required 3-5 minute duration. On 2026-08-06, the Bil
 - Workflow and human-input state are not persisted across process restarts.
 - Model runtime configuration is global rather than selected per agent profile.
 - Server-side Radeon/ROCm/vLLM proof and measured optimization results are still required.
+- The HTTP/WS adapter's default daemon socket still needs to be aligned with `/run/probe-daemon/probe.sock`.
+- GPIO permissions required by `Hobot.GPIO` for the unprivileged `probe` service user still need confirmation on the final device.
 - Physical motion quality requires human observation.
 
 These are roadmap items, not completed features.
@@ -666,25 +684,19 @@ The governing rules score 100 base points plus 20 optional points. The submissio
 
 Primary attachments were validated on 2026-08-06:
 
-| Deliverable | File | SHA-256 |
+| Deliverable | Status or file | SHA-256 |
 | --- | --- | --- |
-| Project specification | [RDK_Agent_Project_Specification.pdf](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) | `f77ff42aa2ebd58a015664dfe1e5d135d334c11607c511d53fafc09a7e4949ac` |
-| Pitch deck | [RDK_Agent_Track2_Pitch_Deck.pptx](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `807e1711d3e14d536b5704f8510120a1c1a614cebb9902e945d4026b570461ce` |
-| Demo video | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
-
-The delivery also includes:
-
-- Complete TypeScript and Rust source trees with lockfiles.
-- This English competition README and a Chinese localized reference.
-- Architecture, workflow, board-evidence, test-evidence, and Sophon concept images.
-- A sanitized AMD model-provider example and benchmark script.
-- The verified local demo-video master plus its public-URL placeholder and review list.
-- Raw verification evidence and final submission review items.
+| Project specification | Complete; readable, unencrypted 12-page A4 [PDF](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) with no forms or JavaScript | `f77ff42aa2ebd58a015664dfe1e5d135d334c11607c511d53fafc09a7e4949ac` |
+| Pitch deck | Complete; structurally valid 12-slide [PPTX](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) with speaker notes and no rendered overflow | `807e1711d3e14d536b5704f8510120a1c1a614cebb9902e945d4026b570461ce` |
+| Demo video | Complete; 3:07.2, 1080p, H.264/AAC; [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) and [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) verified | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
+| Complete TypeScript and Rust source | Complete; lockfiles included | Final submission revision |
+| Architecture, workflow, board, and test evidence diagrams | Complete | PNG and editable SVG included |
+| Sanitized AMD configuration and benchmark script | Complete | Server-side measured evidence pending |
 
 Validation recorded for the current attachments:
 
-- The PDF is a readable, unencrypted 12-page A4 document with no forms or JavaScript.
-- The PPTX archive is structurally valid, contains 12 slides and speaker-note source blocks, and passed rendered overflow inspection.
+- The PDF is readable and unencrypted; the PPTX archive is structurally valid.
+- All current local Markdown links resolve.
 - The editable SVG diagrams are valid XML.
 - The benchmark utility and example JSON configuration pass syntax validation.
 - The public-facing submission sources contained no detected common credential pattern, private tunnel URL, or board-private IP address at validation time.
@@ -692,6 +704,8 @@ Validation recorded for the current attachments:
 Evidence integrity matters: this submission does not expose credentials, does not present development-host Mach-O binaries as RDK X5 deliverables, does not treat a successful command as proof of physical motion quality, and does not report estimated AMD performance as measured data.
 
 ## 16. Final submission checklist
+
+The current materials record the deadline as **2026-08-06 23:59 (UTC+8, Beijing/Singapore time)**. The participant or repository owner must complete the following items before submission.
 
 ### 16.1 Identity, eligibility, and PR
 
@@ -733,3 +747,5 @@ Evidence integrity matters: this submission does not expose credentials, does no
 - [ ] Open the PDF and PPTX on a second machine.
 - [ ] Ensure no `Evidence pending` item has been replaced with an unmeasured estimate.
 - [ ] Review the complete worktree and explicitly approve commit and publication.
+
+Until these items are complete, the remaining owner-provided inputs are: **the team or participant name, redacted Radeon/ROCm/vLLM/model precision and benchmark evidence, and final submission/publication approval**.

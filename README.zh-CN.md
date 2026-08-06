@@ -1,48 +1,69 @@
 # RDK Agent — AMD AI DevMaster Track 2
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 > 将自然语言需求转化为 RDK X5 上经过测试、可部署、可复用且受治理的机器人能力。
 
-本文档是项目的完整中文说明，供团队审阅、中文讲解和演示准备使用。面向比赛评审与 Pull Request 的正式版本以仓库根目录的[英文 README](README.md)为准；如中英文表述存在差异，应以英文版本为准。
+RDK Agent 是一个私有化部署的多智能体平台，用于在 RDK X5 上开发和运行机器人能力。设备状态与控制保留在本地，模型推理可以使用由参赛者控制的私有端点。开发者用自然语言描述机器人行为，多个专业智能体会把它转化为经过测试、验证、可部署且可复用的能力。
+
+![RDK Agent 概念封面](submission/zh/assets/rdk-agent-hero.png)
+
+> 封面是由本项目生成的概念插图，不是本次提交硬件实物的照片。
+
+本文档是 AMD AI DevMaster Track 2 参赛说明的中文本地化版本，供团队审阅、中文讲解和演示准备使用。面向比赛评审与 Pull Request 的正式版本以仓库根目录的[英文 README](README.md)为准。
+
+## 0. Track 2 提交状态速览
 
 | 项目 | 内容 |
 | --- | --- |
 | 参赛赛道 | Track 2 — Development and Local Deployment of Private AI Agents（私有 AI 智能体的开发与本地部署） |
 | 应用名称 | RDK Agent |
-| 源码仓库 | `https://github.com/cowhorseming/rdk-sophon` |
 | 团队 / 参赛者 | `<TEAM OR PARTICIPANT NAME>` |
+| 源码仓库 | <https://github.com/cowhorseming/rdk-sophon> |
 | 演示视频 | [B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云 MP4 备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Pull Request 标题 | `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` |
+| 正式截止时间 | 2026-08-06 23:59（UTC+8，北京/新加坡时间） |
 
-![RDK Agent 概念封面](submission/zh/assets/rdk-agent-hero.png)
-
-> 封面是由本项目生成的概念插图，不是本次提交硬件实物的照片。真实设备与测试证据见后文。
-
-## 0. Track 2 提交状态速览
+当前交付状态：
 
 | 比赛要求 | 当前状态 | 本文档或附件 |
 | --- | --- | --- |
-| 项目说明书 | 已完成 | 本文档与[中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) |
+| 项目说明书 | 已完成 | 本文档与[中文 12 页项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) |
 | 完整源代码与 README | 已完成 | 本 monorepo；两个子系统的深层说明见 [`rdk-agent`](rdk-agent/README.md) 与 [`rdk-sophon`](rdk-sophon/README.md) 文档 |
 | 3–5 分钟演示视频 | 已完成；两个公开地址均已验证 | [B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | 补充 PPT / 海报 | 已完成 | [中文 12 张幻灯片路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm 部署与优化方案 | 已完成 | 客户端配置、受控实验、指标与基准方法见本文第 8–9 节 |
 | AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均可离线重算。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
 | 验证证据 | 已于 2026-08-05 采集 | 本文第 11 节与[原始脱敏日志](submission/zh/evidence/verification-2026-08-05.md) |
-| 正式比赛文案 | 英文版为准 | 仓库根目录[英文 README](README.md) |
 
-正式提交前，材料所有者仍需补齐：准确的团队或参赛者名称、脱敏且可复现的 AMD 服务器及性能证据，以及对最终 commit / 发布的明确批准。当前材料记录的截止时间为 **2026-08-06 23:59（UTC+8，北京/新加坡时间）**。
+正式提交前，参赛者必须提供：
+
+1. 准确的已登记团队名称或参赛者名称。
+2. 来自参赛者控制实例的、经过脱敏且可复现的 Radeon GPU、ROCm、vLLM、模型 revision、精度/量化和基准证据。
+3. 对最终 worktree 的复核，以及提交和发布前的明确批准。
 
 ## 1. 执行摘要
 
-RDK Agent 是一个私有化部署的多智能体平台，用于在 RDK X5 上开发和运行机器人能力。设备状态与控制链路保留在本地，模型推理可以使用由参赛者控制的私有端点。开发者只需用自然语言描述机器人行为，系统便会依次完成测试设计、实现、可执行验证、发布构建、开发板部署、Skill 安装和受控硬件验收，将需求转化为可独立打包、部署和移除的能力。
+RDK Agent 是一个面向 RDK 机器人的私有多智能体开发与运行平台。开发者用自然语言描述行为，多个专业智能体随后设计测试、只实现有边界的动作入口、验证可执行证据、构建确定性 release、部署到开发板、安装为可复用 Skill，并执行受控的 CLI 与自然语言验收检查。本次提交的动作包路径当前面向 MagicBox 舵机运行时中不带参数的 `rdk-servo-action/v1` 动作。
 
-本次提交当前聚焦 MagicBox 舵机运行时，并仅支持不带运行时参数的 `rdk-servo-action/v1` 动作。它解决的是一个具体且常见的机器人开发问题：即便一个简单行为，也会横跨自然语言意图、Python 硬件逻辑、测试、命令行集成、远程部署、Skill 元数据和实体验收。人工交接难以稳定复现，而通用编码智能体在接触真实硬件前也需要更严格的边界。
+项目解决一个具体的机器人开发问题：即使很小的行为，也会跨越自然语言意图、Python 硬件逻辑、测试、命令行集成、远程部署、Skill 元数据和实体验收。人工交接难以复现，而通用编码智能体在接触真实硬件前需要更严格的控制。
 
-RDK Agent 将模型驱动的推理与确定性的交付、设备执行分离。智能体受到工具、Skill、文件系统、超时和沙箱边界的共同约束；确定性脚本负责脚手架、验证、发布结构、哈希和原子部署；RDK X5 通过 `sophonctl` 与 `probe-daemon` 提供稳定的控制和遥测契约。
+RDK Agent 将模型驱动的推理与确定性交付、设备执行分离。智能体在工具、Skill、文件系统、超时和沙箱边界内工作。确定性脚本控制脚手架、验证、release 结构、哈希和原子部署。RDK X5 通过 `sophonctl` 与 `probe-daemon` 提供稳定的控制和遥测契约。
+
+仓库包含两个可独立构建和部署的系统：
+
+| 目录 | 技术栈 | 职责 |
+| --- | --- | --- |
+| `rdk-agent/` | TypeScript、Pi SDK | TUI/headless 应用、意图路由、多智能体 TDD、受限工具、Skill 选择与安装、确定性交付适配器、部署和 Human-in-the-Loop 恢复。 |
+| `rdk-sophon/` | Rust | RDK X5 `probe-daemon`、`sophonctl`、硬件状态采集、JSON-RPC、遥测、告警、命令策略与审计、传输和动态插件。 |
+
+两个子项目不共享 Cargo 或 npm workspace，也没有内部代码依赖。它们的集成契约是 `sophonctl` CLI 与板端 JSON-RPC 协议，因此任一目录未来都可以迁移到独立仓库，而无需改变另一系统的架构。
 
 ## 2. 为什么叫“智子”（Sophon）？
 
-开发板侧子系统 `rdk-sophon` 的名称借鉴了《三体》中的“智子”（sophon）概念。小说描绘了一个被派往地球、承担观察和通信任务的先进信使。本项目将这一文学意象重新解释为透明、由设备所有者控制的工程模式：把轻量的 `probe-daemon` 部署到 RDK X5 上，观察设备状态，并通过 `sophonctl` 充当 `rdk-agent` 与硬件能力之间受治理的通信桥梁。
+开发板侧子系统 `rdk-sophon` 的名称借鉴了《三体》中的“智子”（sophon）概念。小说描绘了一个被派往地球、承担观察和通信任务的先进信使。
+
+本项目将这一科幻意象重新解释为透明、由设备所有者控制的工程模式：把轻量的 `probe-daemon` 部署到 RDK X5 上，观察设备状态，并通过 `sophonctl` 充当 `rdk-agent` 与硬件能力之间受治理的通信桥梁。
 
 | 文学隐喻 | `rdk-sophon` 中的工程实现 |
 | --- | --- |
@@ -88,45 +109,33 @@ RDK Agent 将模型驱动的推理与确定性的交付、设备执行分离。�
 
 ![端到端架构](submission/zh/assets/architecture.png)
 
-仓库采用 monorepo 组织，但包含两个可独立构建、测试和发布的系统：
-
-| 组件 | 技术栈 | 职责 |
-| --- | --- | --- |
-| `rdk-agent` | TypeScript | TUI/headless 应用，负责意图路由、多智能体编排、受限工具、Skill 选择、确定性交付适配器和 human-in-the-loop 处理。 |
-| `sophonctl` | Rust | 开发主机上的稳定命令契约，用于访问开发板状态、插件和动作。 |
-| `probe-daemon` | Rust | 运行在 RDK X5 上的服务，负责 RPC 分发、状态采集、遥测、告警、命令策略、审计和动态插件。 |
-| 舵机插件与动作包 | Python / 本地清单 | 开发板侧能力运行时，包含本地元数据和可独立移除的动作包。 |
-| 私有模型服务器 | vLLM / ROCm | 目标部署在参赛者控制的 AMD Radeon Cloud 实例上，通过 OpenAI-compatible 边界提供模型推理。 |
-
-仓库主要目录：
-
-```text
-rdk-sophon/
-├── rdk-agent/       TypeScript 多智能体 TUI 与确定性交付工具
-├── rdk-sophon/      Rust 设备平台、probe-daemon 与 sophonctl
-└── submission/      Track 2 双语材料、附件、图像与原始证据
-```
-
-`rdk-agent` 不链接 `rdk-sophon` 的 Rust crate。它通过开发主机上安装的 `sophonctl` 连接板端 `probe-daemon`，保持两套系统的构建、发布和未来拆仓独立。
-
 ```text
 开发主机                                             RDK X5
 
 用户 -> RDK Agent TUI / headless runner
           |-- 意图门控
-          |-- 动作包 TDD
-          |-- 离线 Podman 测试
-          |-- 确定性构建与部署
+          |-- 动作包 TDD：测试 -> 编码 -> 验证
+          |-- 确定性构建与部署工具
+          |-- 离线 Podman 测试沙箱
           `-- 生成的 Skills
                     |
-                 sophonctl ---- TCP 7777 ----> probe-daemon
-                                                   |-- 硬件遥测
-                                                   `-- 舵机插件与动作包
+                 sophonctl -------- TCP 7777 --------> probe-daemon
+                                                        |-- 硬件采集器
+                                                        |-- 遥测与告警
+                                                        `-- 舵机插件 -> 动作包
 
-RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
+RDK Agent -> 私有 OpenAI-compatible 端点 -> vLLM -> ROCm -> AMD Radeon GPU
 ```
 
-模型运行时与设备运行时同样相互分离：模型推理只提出边界明确的工作，确定性工具和开发板契约负责约束真正写入或执行的内容。比赛结束后，`rdk-agent/` 与 `rdk-sophon/` 都可以整体迁移为独立仓库；它们不共享 Cargo/Node workspace，也不共享内部代码依赖，唯一集成契约是 `sophonctl` CLI 与板端 RPC 接口。
+| 组件 | 职责 |
+| --- | --- |
+| `rdk-agent` | TypeScript TUI/headless 应用、意图路由、多智能体编排、受限工具、Skill 选择、确定性交付适配器和 Human-in-the-Loop 处理。 |
+| `sophonctl` | 开发主机上的稳定命令契约，用于访问开发板状态、插件和动作。 |
+| `probe-daemon` | 运行在 RDK X5 上的 Rust 服务，负责 RPC 分发、状态采集、遥测、告警、命令策略、审计和动态插件。 |
+| 舵机插件与动作包 | 开发板侧 Python 能力运行时，包含本地元数据和可独立移除的动作包。 |
+| 私有模型服务器 | 参赛者控制的 AMD Radeon Cloud 实例上运行、通过 Pi 配置选择的 OpenAI-compatible ROCm 推理端点。 |
+
+`rdk-agent` 不链接 Rust crate。它调用已安装的 `sophonctl` 客户端，后者通过 TCP 7777 与 `probe-daemon` 通信。模型推理只提出有边界的工作，确定性工具和开发板契约负责约束真正写入或执行的内容。模型选择被隔离在 Pi SDK Session adapter 后，因此私有 OpenAI-compatible 服务器可以替换其他提供方，而无需修改工作流或设备代码。
 
 ## 5. 两种运行模式与五节点工作流
 
@@ -150,7 +159,14 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 ### 5.3 确定性五节点交付
 
-验证完成后进入五个有序交付节点：
+验证完成后，会运行四个有序交付阶段：
+
+1. **开发板 Release 部署智能体**调用确定性构建工具并以原子方式发布 release。
+2. **Skill 安装智能体**在开发主机上安装生成的运行时 Skill。
+3. **CLI 硬件验收智能体**通过 `sophonctl` 执行一次新能力。
+4. **自然语言 Skill 验收智能体**使用原始需求选择已安装的 Skill，并再次执行同一能力。
+
+因此，五个可见的开发节点是：
 
 1. 动作包 TDD：测试智能体 → 编码智能体 → 验证智能体。
 2. 开发板发布部署：确定性构建并以原子方式发布 release。
@@ -174,7 +190,7 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 ### 6.3 权限和隐私控制
 
-每个智能体都有工具 allowlist、Skill allowlist、写入路径 allowlist、超时和沙箱策略。开发测试在禁用网络的 Podman 容器中运行，使用只读 workspace 和资源限制；测试环境不会挂载凭据或主机 home 目录。
+每个智能体都有工具 allowlist、Skill allowlist、写入路径 allowlist、超时和沙箱策略。开发测试在禁用网络的 Podman 容器中运行，使用只读 workspace 和资源限制；测试环境不会挂载凭据或主机 home 目录。确定性的左右方向一致性检查、可执行证据门控和原子部署在变更发生前提供进一步控制。
 
 ### 6.4 Human-in-the-Loop 恢复
 
@@ -182,7 +198,7 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 ### 6.5 本地设备遥测与动态执行
 
-`probe-daemon` 为按需查询和遥测提供单次状态快照。动态插件命令使用精确的参数向量，而不是 `sh -c`。机器人动作包从本地注册表中发现，无需重新构建 Rust CLI 即可移除。
+`probe-daemon` 为按需查询和遥测提供单次状态快照，覆盖温度、CPU、内存、磁盘、网络和 BPU 状态。动态插件命令使用精确的参数向量，而不是 `sh -c`。机器人动作包从本地注册表中发现，无需重新构建 Rust CLI 即可移除。
 
 ### 6.6 Track 2 能力矩阵
 
@@ -226,7 +242,7 @@ Prompt 不是唯一控制措施。文件工具验证路径，Bash 工具拒绝�
 
 Pi SDK 是唯一负责解析模型提供方的层，领域代码和应用代码不依赖特定模型。每个阶段都会创建隔离的内存会话，并在运行时报告所选 provider 和 model。
 
-参赛目标部署是在由参赛者控制的 AMD Radeon Cloud 实例上运行专用 vLLM 服务：
+Track 2 的目标部署是在由参赛者控制的 AMD Radeon Cloud 实例上运行专用 vLLM 服务。模型进程计划通过 ROCm 在该 AMD Radeon GPU 实例上运行；共享公共模型 API 不得成为唯一的核心推理链路。
 
 ```text
 RDK Agent -> OpenAI-compatible 私有端点 -> vLLM -> ROCm -> AMD Radeon GPU
@@ -253,6 +269,8 @@ RDK Agent -> OpenAI-compatible 私有端点 -> vLLM -> ROCm -> AMD Radeon GPU
 Track 2 的核心推理链路目标，是在参赛者控制的 Radeon Cloud 上运行专用 vLLM 服务，模型进程在 AMD Radeon GPU 上通过 ROCm 执行，`rdk-agent` 通过 OpenAI-compatible 服务边界访问它。共享公共模型 API 不应成为唯一的核心推理链路。
 
 ### 9.2 已实现的软件层推理控制
+
+应用已经减少了不必要的模型工作：
 
 - 完全匹配的问候和确认消息绕过模型推理。
 - 意图分类使用不含工具、Skill 和项目上下文的短时会话。
@@ -293,7 +311,8 @@ Track 2 的核心推理链路目标，是在参赛者控制的 Radeon Cloud 上�
 
 - 客户端 TTFT 的 p50 和 p95。
 - 解码输出速度（tokens/s）。
-- 请求总延迟和端到端工作流耗时。
+- 请求总延迟。
+- 端到端工作流耗时。
 - 峰值 VRAM 与 GPU 利用率。
 - 仅在目标环境有可靠计数器时记录功率或能耗。
 - 使用相同提示词时的正确响应率与验收通过率。
@@ -307,7 +326,7 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
   --output submission/zh/evidence/amd-endpoint-benchmark.json
 ```
 
-报告包含端点 host，但不包含 scheme、path 或 key。如果 host 也会暴露私有基础设施，应在公开前删除或哈希化。
+报告包含端点 host，但不包含 scheme、path 或 key。如果 host 也会暴露私有基础设施，应在公开前删除或哈希化。应使用相同的 prompt 集合测试基线和优化配置，报告 p50 与 p95，而不是只报告最快请求，并结合服务器利用率和 profiler 证据解释客户端结果。
 
 ### 9.5 当前证据状态
 
@@ -318,12 +337,13 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 | ROCm/HIP 版本 | 证据待补（Evidence pending）。 |
 | 专用 vLLM 服务器版本与配置 | 证据待补（Evidence pending）。 |
 | 模型 revision 与精度/量化 | 证据待补（Evidence pending）。 |
+| 本地 `/v1/models` 响应 | 证据待补（Evidence pending）。 |
 | 基线与优化后 TTFT | 证据待补（Evidence pending）。 |
 | 基线与优化后解码吞吐量 | 证据待补（Evidence pending）。 |
 | 峰值 VRAM 与利用率 | 证据待补（Evidence pending）。 |
 | 智能体工作流端到端延迟 | 证据待补（Evidence pending）。 |
 
-本项目不会编造 AMD 性能数据。任何未经测量的项目都不得从 `Evidence pending` 改为具体数值。
+本项目不会编造 AMD 性能数据。任何未经测量的项目都不得从 `Evidence pending` 改为具体数值。评审前应附上脱敏服务器输出、确切的 vLLM 启动命令、模型 revision、精度或量化设置、使用容器时的容器 digest、预热策略，以及不包含凭据且能证明参赛者控制 Radeon Cloud 实例的截图。
 
 ## 10. 安装、部署与复现
 
@@ -340,11 +360,26 @@ rdk-sophon/
 
 ### 10.2 前置条件
 
-- Node.js 22.19 或更高版本。
-- npm。
+开发主机：
+
+- macOS 或 Linux 开发主机。
+- Node.js 22.19 或更高版本，以及 npm。
 - 包含 Cargo 的 Rust 工具链。
 - 机器人开发模式所需的 Podman；安装脚本会准备固定的 `docker.io/library/python:3.12-slim` 镜像。
-- macOS 或 Linux 开发主机。
+- 用于部署的 RDK X5 SSH 访问权限。
+
+RDK X5：
+
+- 运行在 aarch64 上的 Ubuntu；部署流程已在 Ubuntu 22.04 上验证。
+- 用于安装的 `systemd` 和 root 权限。
+- SSH 主机别名 `x5-root`，或传给部署脚本的替代名称。
+- MagicBox 运行时所需的 Python 3，以及 `Hobot.GPIO` 所需的设备权限。
+
+私有 AMD 推理：
+
+- 具备兼容 ROCm 技术栈的 AMD Radeon GPU 环境。
+- 由参赛者控制的专用 OpenAI-compatible vLLM 服务。
+- 上文链接的脱敏 Pi 模型配置。
 
 ### 10.3 一键安装
 
@@ -374,6 +409,8 @@ npm run check
 npm test
 ```
 
+本次提交快照的预期证据：TypeScript 检查成功，134 项测试通过。
+
 Rust：
 
 ```sh
@@ -383,6 +420,8 @@ cargo clippy --workspace -- -D warnings
 cargo build --release --workspace
 ```
 
+本次提交快照的预期证据：62 项测试通过，拒绝警告的 Clippy 检查成功，release workspace 构建成功。部分端到端测试会绑定本地 TCP 或 Unix 套接字，必须在允许绑定回环套接字的环境中运行。
+
 日常开发也可以从 Rust 子项目运行聚合脚本：
 
 ```sh
@@ -390,9 +429,11 @@ cd rdk-sophon
 ./scripts/full_test.sh
 ```
 
-部分 Rust 端到端测试会绑定本地 TCP 或 Unix 套接字，应在允许绑定回环套接字的环境中运行。本次提交快照分别执行并通过了前述测试、Clippy 和 release 构建，但没有把 `scripts/full_test.sh` 描述为一次完整通过的流水线；`cargo fmt --all -- --check` 仍报告已有格式差异。
+本次快照没有把仓库的 `scripts/full_test.sh` 流水线记录为一次完整运行；其中的检查、Clippy、测试和 release 构建阶段分别运行并通过。单独执行的 `cargo fmt --all -- --check` 报告已有格式差异；格式检查不属于 `full_test.sh`。
 
 ### 10.5 在不移动硬件的情况下检查 TUI
+
+一键安装完成后，启动已经安装的应用：
 
 ```sh
 rdk-agent
@@ -418,14 +459,9 @@ sophonctl --board x5 state
 sophonctl --board x5 plugins list
 ```
 
+本次提交证据于 2026-08-05 采集到 `pong=true`、实机状态快照和 `servo` 插件。
+
 ### 10.7 高级部署选项
-
-RDK X5 前置条件：
-
-- 运行 Ubuntu 的 aarch64 设备并使用 `systemd`。
-- 安装所需的 root 权限。
-- SSH 主机别名 `x5-root`，或传给脚本的替代主机。
-- MagicBox 运行时所需的 Python 3 和设备权限。
 
 集成部署入口位于 `rdk-agent`，但会编排两个子项目的交付物：
 
@@ -441,20 +477,21 @@ export RDK_BOARD_IP=192.0.2.10 # 文档示例地址，请替换为开发板实�
 
 # 只部署板端：rdk-sophon 服务端 + rdk-agent 舵机运行文件
 ./rdk-agent/deploy/install-rdk-agent-stack.sh \
-  --board-only --ssh-host x5-root --board-address "$RDK_BOARD_IP:7777"
+  --board-only \
+  --ssh-host x5-root \
+  --board-address "$RDK_BOARD_IP:7777"
 
 # 只部署开发主机：sophonctl + rdk-agent TUI + Podman 研发沙箱
 ./rdk-agent/deploy/install-rdk-agent-stack.sh \
-  --development-only --board-address "$RDK_BOARD_IP:7777"
+  --development-only \
+  --board-address "$RDK_BOARD_IP:7777"
 ```
 
 更深的安装路径与参数说明见 [`rdk-agent` 子系统文档](rdk-agent/README.md)和 [`rdk-sophon` 子系统文档](rdk-sophon/README.md)。
 
 ### 10.8 配置私有 AMD Radeon 推理
 
-使用参赛者控制、配备兼容 ROCm 技术栈的 Radeon Cloud 实例，并运行专用 OpenAI-compatible vLLM 服务。比赛专用 Model API 路由要求服务监听 `0.0.0.0:8000`。
-
-服务启动示例：
+使用参赛者控制、配备兼容 ROCm 技术栈的 Radeon Cloud 实例，并运行专用 OpenAI-compatible vLLM 服务。比赛专用 Model API 路由要求服务监听 `0.0.0.0:8000`。服务启动示例：
 
 ```sh
 export MODEL_PATH_OR_ID=/path/to/model-or-hub-id
@@ -531,8 +568,6 @@ rdk-agent
 
 ### 10.12 预期输出
 
-预期输出：
-
 - TypeScript 与 Rust workspace 测试报告。
 - TUI 阶段进度和工具/Skill 事件。
 - 带确定性元数据与哈希的动作包 release。
@@ -543,8 +578,6 @@ rdk-agent
 
 ### 10.13 故障排查边界
 
-已知故障排查边界：
-
 - Rust E2E 测试若因绑定 `127.0.0.1` 出现 `Operation not permitted`，应在允许绑定回环套接字的环境中重跑。
 - 使用 HTTP 或 WebSocket adapter 时，应显式传入 `/run/probe-daemon/probe.sock`，直到源码默认值与 daemon 配置对齐。
 - 真实舵机动作失败时，检查非特权 `probe` 服务用户的 GPIO 权限。
@@ -552,7 +585,7 @@ rdk-agent
 
 ## 11. 已验证证据与边界
 
-完整的脱敏命令输出保存在[原始验证日志](submission/zh/evidence/verification-2026-08-05.md)。证据采集于 **2026-08-05**：
+证据采集于 2026-08-05。[原始验证日志](submission/zh/evidence/verification-2026-08-05.md)包含经过脱敏的命令记录。
 
 | 范围 | 结果 |
 | --- | --- |
@@ -562,7 +595,7 @@ rdk-agent
 | Rust Clippy（`-D warnings`） | 通过 |
 | Rust workspace release 构建 | 通过 |
 | RDK X5 实机 ping | `pong=true` |
-| RDK X5 实机状态 | CPU 8 个 usage 条目、核心频率 1500 MHz；内存总计 7,424,344,064 bytes、已用 3,550,343,168 bytes |
+| RDK X5 实机状态 | 8 个 CPU usage 条目、核心频率 1500 MHz；内存总计 7,424,344,064 bytes、已用 3,550,343,168 bytes |
 | RDK X5 温度 | DDR 55.113 °C；CPU 54.38 °C |
 | 动态插件发现 | 已找到 `servo — MagicBox 舵机姿态控制` |
 | 客户端模型路由 | provider `amd`，模型 `Qwen3-Next-80B-A3B-Instruct`，OpenAI-compatible Chat Completions |
@@ -575,7 +608,7 @@ rdk-agent
 
 - `cargo fmt --all -- --check` 报告了已有格式差异，因此本提交没有把 Rust 格式检查描述为通过。
 - 本次快照没有把完整 `scripts/full_test.sh` 流水线描述为一次完整运行；组成阶段是分别运行和验证的。
-- 客户端模型配置只证明模型选择，不证明 **80B Agent 后端**服务器端的 GPU、ROCm、vLLM、模型 revision 或量化方式。
+- 客户端模型配置只证明模型选择；它不证明 **80B Agent 后端**服务器端的 GPU、ROCm、vLLM、模型 revision 或量化方式。
 - **80B Agent 后端**侧的 Radeon/ROCm/vLLM/精度证据和性能基准仍待采集。
 - 但**本团队自训练的模型**（`Qwen3-32B-Agentic-SFT-r1-v3`）这些项均已佐证且可复现：GPU `gfx1100`、ROCm 7.2.1、torch 2.9.1+rocm7.2.0、adapter SHA-256 `4dcee691…f20bf`、NF4 4-bit 量化，以及在该主机实测的基线/优化 A/B（用户可见 TTFT p50 17.41 s → 8.26 s，峰值 VRAM 27.99 → 28.06 GB，88/88 输出逐字节一致）。见[模型侧索引](submission/zh/MODEL_TRACK.md)；`results.json` 由 benchmark 在 Radeon 实机生成，非手工誊写。
 - 自动化结果只证明软件契约和命令链路，实体动作质量仍需人工观察。
@@ -594,6 +627,8 @@ rdk-agent
 **媒体检查：** 3 分 07.2 秒、1920x1080、H.264 视频与 AAC 音频、174,000,121 字节（约 165.9 MiB）。
 
 **状态：** 视频时长符合 3–5 分钟要求，主、备两个公开地址均已提供。
+
+**推荐 PR 标签：** `Demo video - 3-5 minutes`
 
 2026-08-06 外网检查中，B 站页面返回 HTTP 200，百度云端点对 Range 请求返回 HTTP 206 与 `video/mp4`。165.9 MiB 本地母版不进入普通 Git；交付使用上面的双公网地址。
 
@@ -649,15 +684,14 @@ rdk-agent
 
 交付包于 **2026-08-06** 完成结构和可读性检查：
 
-| 交付物 | 状态 | SHA-256 |
+| 交付物 | 状态或文件 | SHA-256 |
 | --- | --- | --- |
-| [中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | 已完成；12 页 A4、可读、未加密，不包含表单或 JavaScript | `d99f78fc2be72c3032df2cc5915870c134d0c0897f819c684e9bde56c371a72e` |
-| [中文路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | 已完成；12 张幻灯片，结构有效，含演讲者备注并通过渲染溢出检查 | `b67ce13cc099480ea9c6a47f882380e81f209005d80fd2f79cf538edcc2ac976` |
-| 演示视频：[B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) | 已完成；3:07.2、1080p、H.264/AAC；两个公开地址均已验证 | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
+| 项目说明书 | 已完成；12 页 A4、可读、未加密且不包含表单或 JavaScript 的[中文 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | `d99f78fc2be72c3032df2cc5915870c134d0c0897f819c684e9bde56c371a72e` |
+| 路演 PPT | 已完成；结构有效、包含演讲者备注且渲染无溢出的 12 张幻灯片[中文 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `b67ce13cc099480ea9c6a47f882380e81f209005d80fd2f79cf538edcc2ac976` |
+| 演示视频 | 已完成；3:07.2、1080p、H.264/AAC；[B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/)和[百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd)均已验证 | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
 | 完整 TypeScript 与 Rust 源代码 | 已完成；包含 lockfile | 以最终提交 revision 为准 |
 | 架构、工作流、开发板和测试证据图 | 已完成 | 包含 PNG 与可编辑 SVG |
 | AMD 脱敏配置与基准脚本 | 已完成 | 服务器侧实测证据待补 |
-| 演示视频 | 已录制并完成媒体检查 | B 站主地址与百度云备用地址均已登记 |
 
 已执行的交付完整性检查：
 
@@ -666,6 +700,8 @@ rdk-agent
 - 面向公众的材料中未检测到常见凭据模式、私有隧道 URL 或开发板内网 IP。
 - 可编辑 SVG 图表是有效 XML。
 - 基准测试脚本与示例 JSON 配置通过语法验证。
+
+证据完整性非常重要：本提交不会暴露凭据，不会把开发主机上的 Mach-O 二进制描述为 RDK X5 交付物，不会把命令成功等同于实体动作质量得到证明，也不会把估算的 AMD 性能数据当作实测数据报告。
 
 ## 16. 最终提交检查清单
 
@@ -707,7 +743,7 @@ rdk-agent
 - [ ] 确认视频时长约为 3–5 分钟，并展示真实 CLI/TUI 操作、两种运行模式、开发板只读证据、实际 Radeon/ROCm 推理和最终实体动作。
 - [ ] 确认视频不包含凭据或私有基础设施信息。
 - [ ] 可选：用录制视频中的高质量真实画面替换概念封面或占位图。
-- [ ] 复制到官方比赛仓库后，重新检查相对链接和敏感信息。
+- [ ] 在最终源码冻结后以及复制到官方比赛仓库后，重新检查链接、secret、私有 URL、token、key 和个人数据。
 - [ ] 在另一台计算机上打开 PDF 与 PPTX。
 - [ ] 确保没有用未经测量的估算值替换任何 `Evidence pending` 项。
 - [ ] 复核当前 worktree；只有在仓库所有者明确确认后才提交和发布。
