@@ -1,4 +1,4 @@
-# RDK Agent
+# RDK Agent — AMD AI DevMaster Track 2
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -12,7 +12,7 @@ RDK Agent is a privately deployed, multi-agent platform for developing and opera
 
 This English README is the authoritative competition-facing description for the AMD AI DevMaster Track 2 submission. The [Chinese README](README.zh-CN.md) is a localized reference for team review, presentation, and demo preparation; it does not replace the English competition copy.
 
-## Track 2 submission at a glance
+## 0. Track 2 submission at a glance
 
 | Field | Value |
 | --- | --- |
@@ -42,7 +42,7 @@ Before final submission, the participant must provide:
 2. Redacted, reproducible Radeon GPU, ROCm, vLLM, model revision, precision/quantization, and benchmark evidence from the participant-controlled instance.
 3. A final review of the worktree and explicit approval before commit and publication.
 
-## Executive summary
+## 1. Executive summary
 
 RDK Agent is a private multi-agent development and operation platform for RDK robots. A developer describes a behavior in natural language. Specialized agents then design tests, implement only the bounded action entry point, verify executable evidence, construct a deterministic release, deploy it to the board, install it as a reusable Skill, and perform controlled CLI and natural-language acceptance checks. The submitted action-package path currently targets parameterless `rdk-servo-action/v1` actions for the MagicBox servo runtime.
 
@@ -59,7 +59,7 @@ The repository contains two independently buildable and deployable systems:
 
 The two subprojects share no Cargo or npm workspace and no internal code dependency. Their integration contract is the `sophonctl` CLI and the board-side JSON-RPC protocol, so either directory can later move to an independent repository without changing the other system's architecture.
 
-## Why “Sophon”? - The naming story
+## 2. Why “Sophon”? - The naming story
 
 The board-side subsystem `rdk-sophon` takes its name from the sophon (智子) in *The Three-Body Problem*. In the novel, an extraordinarily advanced messenger is sent across space to Earth, where it can observe human activity and sustain communication with its origin.
 
@@ -79,9 +79,9 @@ The ethical and operational direction is intentionally different from covert fic
 
 > This is a project-created AI-generated conceptual illustration. No official artwork or assets from the novel or its adaptations are used. The name is a literary allusion used only to explain an internal code name. This independent project is not endorsed by or affiliated with the work's author, publishers, rights holders, or screen adaptations.
 
-## Target users and application scenarios
+## 3. Target users and application scenarios
 
-### Robot application developers
+### 3.1 Robot application developers
 
 A developer can request a new self-contained robot action without manually coordinating test files, control code, plugin registration, Skill documentation, deployment, and acceptance.
 
@@ -93,19 +93,19 @@ Create a new action that moves its left side once.
 
 The system preserves the original request throughout the workflow. If generated metadata, paths, or hardware calls reverse the requested side, a deterministic guard rejects the change before it is written.
 
-### Robotics educators and prototype teams
+### 3.2 Robotics educators and prototype teams
 
 The visible Test -> Code -> Verify loop makes agentic robot development inspectable. Offline tests use fakes and mocks; the model does not need direct GPIO access to develop a capability.
 
-### RDK X5 operators
+### 3.3 RDK X5 operators
 
 The same platform provides read-only inspection for temperature, CPU, memory, disk, network, BPU, and dynamic plugins. It distinguishes a successful command path from human confirmation that physical motion was correct.
 
-### Reusable private robot capabilities
+### 3.4 Reusable private robot capabilities
 
 Validated capabilities become local Skills. Robot Application Mode can select an installed Skill from natural language and execute one mapped action without reopening the development workflow.
 
-## System architecture
+## 4. System architecture and repository boundaries
 
 ![End-to-end architecture](submission/en/assets/architecture.png)
 
@@ -137,15 +137,15 @@ RDK Agent -> private OpenAI-compatible endpoint -> vLLM -> ROCm -> AMD Radeon GP
 
 `rdk-agent` does not link against the Rust crates. It invokes the installed `sophonctl` client, which communicates with `probe-daemon` over TCP port 7777. Model inference proposes bounded work; deterministic tools and the board contract govern what is written or executed. Model selection is isolated behind the Pi SDK session adapter, so a private OpenAI-compatible server can replace another provider without changing workflow or device code.
 
-## Agent architecture and workflow
+## 5. Two operating modes and five-node workflow
 
 ![Five-node development workflow](submission/en/assets/workflow.png)
 
-### Intent gate
+### 5.1 Robot Development Mode and Intent Gate
 
-Exact greetings and acknowledgements are answered deterministically. Other development input is classified in a short model session with no tools, Skills, project context, or filesystem writes. Only a high-confidence request inside the supported action-package scope starts development. `/develop` is an explicit human override.
+Exact greetings and acknowledgements are answered deterministically. Other development input is classified in a short model session with no tools, Skills, project context, or filesystem writes. Only a high-confidence request inside the supported action-package scope starts development. In normal use, enter the request directly; `/develop` is only an explicit human override when intent classification must be bypassed.
 
-### Action Package TDD
+### 5.2 Action Package TDD
 
 The bounded TDD loop has three specialized roles:
 
@@ -155,7 +155,7 @@ The bounded TDD loop has three specialized roles:
 
 Failed verification restarts the full Test -> Code -> Verify loop. After three unsuccessful iterations, the workflow pauses for human guidance rather than silently continuing.
 
-### Deterministic delivery
+### 5.3 Deterministic Five-Node Delivery
 
 After verification, four ordered delivery stages run:
 
@@ -172,22 +172,33 @@ The five visible development nodes are therefore:
 4. CLI Hardware Acceptance.
 5. Natural-Language Skill Acceptance.
 
-### Robot Application Mode
+### 5.4 Robot Application Mode
 
 Application Mode has a separate single-agent path. Capability questions remain read-only. An imperative request authorizes one mapped action. The tool layer enforces this distinction even if model text is incorrect.
 
-## Core capabilities and Track 2 fit
+## 6. Core capabilities and Track 2 fit
 
-- Tool calling through stage-specific, bounded operations such as scaffold, validate, build, and deploy.
-- Multi-step planning through ordered handoffs from intent routing to TDD, release, deployment, Skill installation, and two acceptance paths.
-- Per-agent tool, Skill, write-path, timeout, and sandbox boundaries.
-- Human-in-the-loop recovery for ambiguity, invalid results, tool errors, and exhausted revision budgets; `/abort` stops a blocked run.
-- Offline, network-disabled Podman tests with a read-only workspace and resource limits; credentials and host home directories are not mounted.
-- Deterministic left/right consistency checks before mutation.
-- Executable-evidence gates that reject unsupported claims of successful verification.
-- Atomic board deployment with staged validation, backup, and rollback.
-- RDK X5 collection for temperature, CPU, memory, disk, network, and BPU state.
-- Dynamic action packages discoverable and removable without recompiling the Rust CLI.
+### 6.1 Tool Calling
+
+Each agent receives only the tools needed for its current stage. Custom tools provide bounded operations such as scaffolding, validation, building, and deployment instead of unrestricted script execution.
+
+### 6.2 Multi-Step Planning and Task Execution
+
+The domain workflow enforces ordered handoffs from intent routing through TDD, release, deployment, Skill installation, and two acceptance paths. A later stage starts only after its prerequisites succeed.
+
+### 6.3 Permission and Privacy Controls
+
+Each agent has tool, Skill, write-path, timeout, and sandbox boundaries. Development tests run in a network-disabled Podman container with a read-only workspace and resource limits; credentials and host home directories are not mounted. Deterministic left/right consistency checks, executable-evidence gates, and atomic deployment add further controls before mutation.
+
+### 6.4 Human-in-the-Loop Recovery
+
+The workflow pauses for human input when it encounters ambiguity, an invalid structured result, a model or tool error, or an exhausted revision budget. `/abort` stops a blocked run.
+
+### 6.5 Local Device Telemetry and Dynamic Execution
+
+RDK X5 state collection covers temperature, CPU, memory, disk, network, and BPU state. Dynamic action packages are locally discoverable and removable without recompiling the Rust CLI.
+
+### 6.6 Track 2 Capability Matrix
 
 The Track 2 rules list five agent capabilities and require at least two. This project claims only capabilities implemented in the repository:
 
@@ -199,33 +210,33 @@ The Track 2 rules list five agent capabilities and require at least two. This pr
 | Local multi-turn memory | Partial | In-memory sessions and human follow-up exist; persistent cross-run memory is not implemented and is not counted. |
 | Permission/privacy mechanism | Implemented at the agent/tool layer | Allowlists, offline sandbox, read-only mounts, evidence gates, and explicit action/query separation. Transport authentication and normal-path per-action approval remain roadmap items. |
 
-## Safety and reliability design
+## 7. Safety and reliability design
 
-### Safety below the prompt layer
+### 7.1 Safety below the prompt layer
 
 Prompt instructions are not the only control. File tools validate paths, Bash rejects file mutation and unsafe command forms, action-package tooling validates structure and semantics, and hardware actions are unavailable to development agents.
 
-### Direction-consistency guard
+### 7.2 Direction-consistency guard
 
 When the original request explicitly identifies left, right, or both sides, the action ID, metadata, intent examples, directory, and Python bridge calls must agree. Conflicts fail with stable code `ACTION-DIRECTION-001` before mutation.
 
-### Executable evidence gate
+### 7.3 Executable evidence gate
 
 A textual `passed` result is insufficient. The runner records whether the Verification Agent actually executed Bash and whether the final check succeeded. Missing or failed evidence changes the result to revision.
 
-### Deterministic contract validation
+### 7.4 Deterministic contract validation
 
 The action-package format rejects imports, dynamic execution, private controller access, runtime parameters, asynchronous entry points, and coupling to test-spy fields. Release structure and metadata are generated by scripts rather than free-form model output.
 
-### Atomic deployment
+### 7.5 Atomic deployment
 
 Deployment uploads to staging, validates files and hashes, takes a backup, replaces the target, and restores the backup when a post-swap step fails.
 
-### Honest physical acceptance
+### 7.6 Honest physical acceptance
 
 Automated checks prove the command path and software contract. They do not prove that physical motion looked correct. Final motion remains a human-observed acceptance boundary.
 
-## Model and private AMD deployment
+## 8. Model and private AMD deployment
 
 The Pi SDK is the only layer that resolves a model provider. Domain and application code are model-independent. Each stage creates an isolated in-memory session and reports the selected provider and model at runtime.
 
@@ -249,9 +260,13 @@ The current private client configuration selects:
 
 The real endpoint and API key are intentionally excluded. The public [sanitized Pi model configuration](submission/en/config/pi-models.amd-rocm.example.json) reads the key from an environment variable. This client configuration proves model routing only; it does not prove GPU type, ROCm version, serving backend, model revision, precision, or quantization.
 
-## AMD Radeon and ROCm optimization
+## 9. AMD Radeon and ROCm optimization and evidence
 
-### Implemented inference-work reduction
+### 9.1 Compliance Target
+
+The Track 2 core inference path is intended to use a participant-controlled, dedicated vLLM service on Radeon Cloud. The model process runs on an AMD Radeon GPU through ROCm, and `rdk-agent` reaches it through an OpenAI-compatible service boundary. A shared public model API must not be the only core inference path.
+
+### 9.2 Implemented Software-Level Inference Controls
 
 The application already reduces unnecessary model work:
 
@@ -265,7 +280,19 @@ The application already reduces unnecessary model work:
 
 These controls reduce tokens, context growth, and variability regardless of accelerator. They are not substitutes for measured GPU optimization.
 
-### Controlled optimization matrix
+### 9.3 Server Evidence Required Before Final Submission
+
+Capture and redact the following evidence from the participant-controlled Radeon instance:
+
+1. GPU product and driver information from `rocm-smi`.
+2. ROCm/HIP versions from `rocminfo` and PyTorch.
+3. The vLLM version and exact launch command.
+4. The model repository, revision, and served model name.
+5. Precision or quantization configuration.
+6. The local `/v1/models` response.
+7. A credential-free screenshot proving control of the Radeon Cloud instance.
+
+### 9.4 Controlled Optimization Matrix
 
 Hold prompts, output limits, software revision, and correctness criteria constant. Change one variable at a time.
 
@@ -299,7 +326,7 @@ node submission/en/scripts/benchmark-openai-compatible.mjs \
 
 The report contains the endpoint host for traceability but no scheme, path, or key. Remove or hash the host as well if it reveals private infrastructure. Run the same prompt set against baseline and tuned configurations, report p50 and p95 rather than only the fastest request, and interpret client results alongside server utilization and profiler evidence.
 
-### AMD evidence boundary
+### 9.5 Current Evidence Status
 
 | Item | Status |
 | --- | --- |
@@ -316,11 +343,11 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 No unmeasured value should be changed from `Evidence pending` to a number. Before judging, attach redacted server output, the exact vLLM launch command, model revision, precision or quantization setting, container digest if used, warm-up policy, and a screenshot of the participant-controlled Radeon Cloud instance without credentials.
 
-## Reproduce, run, and deploy
+## 10. Installation, deployment, and reproduction
 
 The following path separates development-host verification, read-only RDK X5 checks, full deployment, private AMD inference, and physical-action acceptance. Evaluators can run the local checks and read-only board checks without moving the robot.
 
-### Repository layout
+### 10.1 Repository layout
 
 ```text
 rdk-sophon/
@@ -329,14 +356,14 @@ rdk-sophon/
 └── submission/      Competition attachments, evidence, configuration, and scripts
 ```
 
-### Prerequisites
+### 10.2 Prerequisites
 
 Development host:
 
 - macOS or Linux.
 - Node.js 22.19 or newer and npm.
 - Rust toolchain with Cargo.
-- Podman and a pre-pulled `docker.io/library/python:3.12-slim` image for Robot Development Mode.
+- Podman for Robot Development Mode; the installer prepares the fixed `docker.io/library/python:3.12-slim` image.
 - SSH access to the RDK X5 for deployment.
 
 RDK X5:
@@ -352,21 +379,25 @@ Private AMD inference:
 - A participant-controlled, dedicated OpenAI-compatible vLLM service.
 - The sanitized Pi model configuration linked above.
 
-### Install dependencies
+### 10.3 One-Click Installation
 
-From the repository root:
+Clone the repository, then run the integrated installer from the repository root:
 
 ```sh
-cd rdk-agent
-npm ci
+git clone https://github.com/cowhorseming/rdk-sophon.git
+cd rdk-sophon
 
-cd ../rdk-sophon
-cargo build --workspace
+export RDK_BOARD_IP=192.0.2.10 # Documentation-only address; replace with the board IP.
+./rdk-agent/deploy/install-rdk-agent-stack.sh \
+  --ssh-host x5-root \
+  --board-address "$RDK_BOARD_IP:7777"
 ```
 
-The Rust workspace uses `Cargo.lock`; Cargo resolves the pinned dependency graph during the first build.
+This single entry point installs the RDK X5 services and servo runtime, builds and installs the development-host `sophonctl`, prepares the Podman sandbox, and installs the `rdk-agent` TUI. It invokes npm and Cargo internally; evaluators do not need to run separate dependency-install commands. It finishes with read-only integration checks and does not move the robot.
 
-### Safe local verification
+### 10.4 Optional Source-Level Verification
+
+The following commands are for contributors who want to verify the source tree; they are not installation steps.
 
 TypeScript:
 
@@ -391,41 +422,27 @@ Expected evidence for the submitted snapshot: 62 tests pass, Clippy succeeds wit
 
 The repository's `scripts/full_test.sh` pipeline was not recorded as a single run for this snapshot. Its constituent check, Clippy, test, and release-build stages were run separately and passed. A separate `cargo fmt --all -- --check` reported existing formatting differences; formatting is not part of `full_test.sh`.
 
-### Inspect the TUI without moving hardware
+### 10.5 Inspect the TUI without moving hardware
 
-From the repository root:
+After one-click installation, start the installed application:
 
 ```sh
-cd rdk-agent
-npm start -- --workspace "$PWD/config/templates/magicbox-servo"
+rdk-agent
 ```
 
-Use only inspection commands:
+The TUI starts in Robot Application Mode. Press `Shift+Tab` to cycle between Robot Application Mode and Robot Development Mode, and confirm the selected mode in the status bar. For a safe UI inspection, do not submit a robot action; use only read-only inspection commands:
 
 ```text
 /modes
-/mode robot-development
 /skills
 /workspace
 ```
 
 Do not submit an imperative robot request during a safe UI inspection. The default mode is Robot Application Mode, where an imperative request authorizes one mapped action.
 
-### Configure the RDK X5 client
+### 10.6 Verify the RDK X5 Client
 
-Create `~/.rdk-sophon/config.toml` on the development host:
-
-```toml
-[default]
-host = "192.0.2.10:7777" # Documentation-only address; replace with the board address.
-timeout = 30
-
-[boards.x5]
-host = "192.0.2.10:7777" # Documentation-only address; replace with the board address.
-timeout = 30
-```
-
-Then run only read-only checks:
+The one-click installer writes the `x5` board address supplied through `--board-address` to `~/.rdk-sophon/config.toml`. Verify the installed client with read-only checks:
 
 ```sh
 sophonctl --board x5 ping
@@ -435,22 +452,13 @@ sophonctl --board x5 plugins list
 
 The submitted evidence captured `pong: true`, a live state snapshot, and the `servo` plugin on 2026-08-05.
 
-### Deploy the complete stack
+### 10.7 Advanced Deployment Variants
 
-From the repository root:
-
-```sh
-export RDK_BOARD_IP=192.0.2.10 # Documentation-only address; replace with the board address.
-./rdk-agent/deploy/install-rdk-agent-stack.sh \
-  --ssh-host x5-root \
-  --board-address "$RDK_BOARD_IP:7777"
-```
-
-This deploys board binaries and configuration, the servo plugin/runtime, development-host `sophonctl`, and the RDK Agent application/configuration. It performs read-only integration checks after installation.
-
-Deployment-only variants:
+The default command in Section 10.3 installs the complete stack. For an existing environment, the same installer can update only the board or only the development host:
 
 ```sh
+export RDK_BOARD_IP=192.0.2.10 # Documentation-only address; replace with the board IP.
+
 # Board services and servo runtime only
 ./rdk-agent/deploy/install-rdk-agent-stack.sh \
   --board-only \
@@ -463,7 +471,7 @@ Deployment-only variants:
   --board-address "$RDK_BOARD_IP:7777"
 ```
 
-### Configure private AMD Radeon inference
+### 10.8 Configure private AMD Radeon inference
 
 The dedicated service must listen on `0.0.0.0:8000` when using the competition's Model API routing. Example service shape:
 
@@ -500,7 +508,7 @@ Select the model in `~/.pi/agent/settings.json`:
 
 Do not publish the live endpoint or key. Redact secrets and user-specific tunnel names from screenshots and logs.
 
-### Capture server-side AMD evidence
+### 10.9 Capture server-side AMD evidence
 
 Run equivalent commands inside the participant-controlled Radeon instance and save redacted output:
 
@@ -514,36 +522,33 @@ curl http://127.0.0.1:8000/v1/models
 
 Also record the exact vLLM launch command, model repository and revision, served model name, precision or quantization setting, container digest if used, and warm-up policy.
 
-### Run Robot Development Mode
+### 10.10 Run Robot Development Mode
 
-Start the TUI:
+Start the installed TUI:
 
 ```sh
-cd rdk-agent
-npm start
+rdk-agent
 ```
 
-Then run:
+Press `Shift+Tab` until the status bar shows Robot Development Mode, then enter the development request directly as normal conversation:
 
 ```text
-/mode robot-development
-/develop Create a new action that waves the left side once.
+Create a new action that waves the left side once.
 ```
 
-Observe the five delivery nodes. The final two acceptance stages may move real hardware. Keep the robot clear of people and obstacles and be prepared to abort.
+The intent gate recognizes a supported, high-confidence development request and starts the five-node workflow automatically. `/develop <request>` exists only as a manual override to bypass intent classification; it is not required in this normal path. The final two acceptance stages may move real hardware. Keep the robot clear of people and obstacles and be prepared to abort.
 
-### Run Robot Application Mode
+### 10.11 Run Robot Application Mode
 
-After the Skill is installed:
+After the Skill is installed, press `Shift+Tab` until the status bar shows Robot Application Mode, then enter the action request directly:
 
 ```text
-/mode robot-application
 Wave the left side once.
 ```
 
 An imperative request authorizes one mapped action. A successful command path does not by itself prove that physical motion was correct; record a human observation separately.
 
-### Expected outputs
+### 10.12 Expected outputs
 
 - Test reports for the TypeScript and Rust workspaces.
 - TUI stage progress and tool/Skill events.
@@ -553,14 +558,14 @@ An imperative request authorizes one mapped action. A successful command path do
 - One CLI and one natural-language acceptance invocation.
 - Redacted Radeon/ROCm/vLLM environment evidence and benchmark JSON.
 
-### Troubleshooting boundaries
+### 10.13 Troubleshooting boundaries
 
 - If Rust end-to-end tests fail with `Operation not permitted` while binding `127.0.0.1`, run them outside a restricted sandbox.
 - If HTTP or WebSocket adapters are used, explicitly pass `/run/probe-daemon/probe.sock` until their source defaults are aligned with daemon configuration.
 - If a real servo action fails, verify GPIO permissions for the unprivileged `probe` service user.
 - If the model is unavailable, verify provider/model selection, the private endpoint, and the API-key environment variable without printing the key.
 
-## Verification evidence and boundary
+## 11. Verified evidence and boundary
 
 Evidence was captured on 2026-08-05. The [raw verification record](submission/en/evidence/verification-2026-08-05.md) contains the sanitized command transcript.
 
@@ -597,7 +602,7 @@ The private Pi client was verified to select provider `amd` and model `Qwen3-Nex
 
 For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`) those figures are attested and reproducible: GPU `gfx1100`, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, adapter SHA-256 `4dcee691…f20bf`, NF4 4-bit quantization, and a baseline-versus-optimized A/B measured on that host (user-visible TTFT p50 17.41 s → 8.26 s, peak VRAM 27.99 → 28.06 GB, 88/88 outputs byte-identical). See the [model track index](submission/en/MODEL_TRACK.md); `results.json` is generated by the benchmark on the Radeon host rather than transcribed by hand.
 
-## Demo video
+## 12. Demo video
 
 **Primary playback:** [Bilibili - BV1t3up6iEhy](https://www.bilibili.com/video/BV1t3up6iEhy/)
 
@@ -611,7 +616,7 @@ For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`) those figur
 
 The recording satisfies the required 3-5 minute duration. On 2026-08-06, the Bilibili page returned HTTP 200 and the Baidu Cloud endpoint returned HTTP 206 with `video/mp4` for a range request. The 165.9 MiB local master is intentionally excluded from ordinary Git because both public delivery links are available.
 
-Suggested 3-5 minute chapter list:
+### 12.1 Suggested 3-5 minute chapter list
 
 | Time | Content | Required evidence |
 | --- | --- | --- |
@@ -624,7 +629,7 @@ Suggested 3-5 minute chapter list:
 | 4:15-4:40 | Safety and value | Allowlists, offline tests, evidence gate, and direction guard. |
 | 4:40-5:00 | Closing | Source, reproducibility, and project value. |
 
-Privacy review:
+### 12.2 Video privacy review
 
 - Blur or crop API keys, SSH keys, private URLs, email addresses, MAC addresses, and unnecessary internal IP addresses.
 - Do not show `~/.pi/agent/auth.json` or a private `apiKey` value.
@@ -632,7 +637,7 @@ Privacy review:
 - Distinguish the generated cover illustration from real hardware footage.
 - Distinguish command-path success from a human observation of physical motion.
 
-## Current limitations and roadmap
+## 13. Current limitations and roadmap
 
 - Persistent local multi-turn memory and local RAG are not implemented.
 - Normal-path human approval before every real action is not implemented; an imperative application request authorizes one action.
@@ -644,7 +649,7 @@ Privacy review:
 
 These are roadmap items, not completed features.
 
-## Track 2 rubric map
+## 14. Track 2 rubric map
 
 The governing rules score 100 base points plus 20 optional points. The submission maps its evidence as follows:
 
@@ -657,7 +662,7 @@ The governing rules score 100 base points plus 20 optional points. The submissio
 | Radeon inference optimization | Implemented inference-work reduction plus a reproducible runtime benchmark plan; measured results remain required. |
 | Optional Radeon Cloud Model API optimization | A dedicated Model API path is designed; any quantization or precision claim must be backed by the final server configuration and comparison. |
 
-## Deliverables and validation
+## 15. Deliverables and integrity
 
 Primary attachments were validated on 2026-08-06:
 
@@ -686,9 +691,9 @@ Validation recorded for the current attachments:
 
 Evidence integrity matters: this submission does not expose credentials, does not present development-host Mach-O binaries as RDK X5 deliverables, does not treat a successful command as proof of physical motion quality, and does not report estimated AMD performance as measured data.
 
-## Final submission checklist
+## 16. Final submission checklist
 
-Identity, eligibility, and PR:
+### 16.1 Identity, eligibility, and PR
 
 - [ ] Replace every `<TEAM OR PARTICIPANT NAME>` placeholder with the exact Luma team name, or the participant's legal name if no team name was registered.
 - [x] Provide and verify both the Bilibili primary video URL and Baidu Cloud backup URL.
@@ -698,7 +703,7 @@ Identity, eligibility, and PR:
 - [ ] Use the title `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` and keep competition-facing copy in English.
 - [ ] Confirm the source and all submitted links are publicly readable.
 
-Source and verification:
+### 16.2 Source and verification
 
 - [x] Complete `rdk-agent` and `rdk-sophon` sources and dependency lockfiles are present.
 - [x] TypeScript check and 134 tests passed.
@@ -709,7 +714,7 @@ Source and verification:
 - [ ] Decide whether to add a repository-level LICENSE after owner review; Cargo metadata currently declares MIT but no root license file exists.
 - [ ] Exclude ignored local `target/` and `node_modules/` directories from the competition copy.
 
-Required AMD evidence:
+### 16.3 Required AMD evidence
 
 - [ ] Attach a redacted Radeon Cloud instance screenshot.
 - [ ] Capture Radeon GPU product, ROCm/HIP version, vLLM version, and the exact launch command.
@@ -719,7 +724,7 @@ Required AMD evidence:
 - [ ] Report p50/p95 TTFT, decode throughput, end-to-end time, peak VRAM, utilization, and correctness.
 - [ ] Keep raw and redacted evidence with the submitted project; never publish the endpoint credential or API key.
 
-Demo and integrity:
+### 16.4 Demo and integrity
 
 - [ ] Confirm the video is approximately 3-5 minutes and shows real CLI/TUI operation, both operating modes, read-only board evidence, actual Radeon/ROCm inference, and the final physical action.
 - [ ] Confirm the video contains no credentials or private infrastructure details.

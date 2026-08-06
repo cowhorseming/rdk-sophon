@@ -17,7 +17,7 @@
 
 > 封面是由本项目生成的概念插图，不是本次提交硬件实物的照片。真实设备与测试证据见后文。
 
-## Track 2 提交状态速览
+## 0. Track 2 提交状态速览
 
 | 比赛要求 | 当前状态 | 本文档或附件 |
 | --- | --- | --- |
@@ -132,11 +132,13 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 ![五节点开发工作流](submission/zh/assets/workflow.png)
 
-### 5.1 机器人开发模式
+### 5.1 机器人开发模式与意图门控
 
 机器人开发模式将支持范围内的需求送入意图门控和多智能体 TDD 循环，然后构建发布包、部署到 RDK X5、安装生成的 Skill，并执行受控验收检查。
 
-对于完全匹配的问候和确认语，系统会直接以确定性方式作答。其他开发输入由一个短时模型会话分类；该会话没有工具、Skill、项目上下文和文件系统写权限。只有处于受支持动作包范围内且置信度较高的请求才会启动开发流程，`/develop` 则是明确的人工覆盖指令。
+对于完全匹配的问候和确认语，系统会直接以确定性方式作答。其他开发输入由一个短时模型会话分类；该会话没有工具、Skill、项目上下文和文件系统写权限。只有处于受支持动作包范围内且置信度较高的请求才会启动开发流程。正常使用时直接输入自然语言需求即可；`/develop` 只是在确实需要跳过意图分类时使用的人工覆盖指令。
+
+### 5.2 动作包 TDD
 
 动作包 TDD 使用有界循环：
 
@@ -146,6 +148,8 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 验证失败会重新开始完整的“测试 → 编码 → 验证”循环。连续三轮未成功后，工作流会暂停并请求人工指导，而不会静默继续。
 
+### 5.3 确定性五节点交付
+
 验证完成后进入五个有序交付节点：
 
 1. 动作包 TDD：测试智能体 → 编码智能体 → 验证智能体。
@@ -154,25 +158,25 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 4. CLI 硬件验收：通过 `sophonctl` 执行一次新能力。
 5. 自然语言 Skill 验收：使用原始需求选择已安装的 Skill，并再次执行同一能力。
 
-### 5.2 机器人应用模式
+### 5.4 机器人应用模式
 
 机器人应用模式采用独立的单智能体路径。对于能力问题，系统保持只读；对于用户明确提出的祈使式请求，系统会授权执行一次已映射动作。即使模型文本出现错误，工具层仍会强制执行查询与动作的边界。
 
-## 6. 核心能力
+## 6. 核心能力与 Track 2 契合度
 
 ### 6.1 工具调用
 
 每个智能体只获得当前阶段所需的工具。自定义工具提供脚手架、验证、构建和部署等有边界的操作，而不是不受限制的脚本执行。
 
-### 6.2 多步骤规划与任务执行
+### 6.2 多步骤规划和任务执行
 
 领域工作流强制执行有序交接，覆盖意图路由、TDD、发布、部署、Skill 安装和两条验收路径。只有前置阶段成功后，后续阶段才会启动。
 
-### 6.3 权限与隐私控制
+### 6.3 权限和隐私控制
 
 每个智能体都有工具 allowlist、Skill allowlist、写入路径 allowlist、超时和沙箱策略。开发测试在禁用网络的 Podman 容器中运行，使用只读 workspace 和资源限制；测试环境不会挂载凭据或主机 home 目录。
 
-### 6.4 Human-in-the-loop 恢复
+### 6.4 Human-in-the-Loop 恢复
 
 遇到歧义、模型或工具错误、无效结构化结果或耗尽修订预算时，工作流会暂停并请求人工输入。`/abort` 可以终止被阻塞的运行。
 
@@ -180,7 +184,7 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 `probe-daemon` 为按需查询和遥测提供单次状态快照。动态插件命令使用精确的参数向量，而不是 `sh -c`。机器人动作包从本地注册表中发现，无需重新构建 Rust CLI 即可移除。
 
-### 6.6 赛道能力矩阵
+### 6.6 Track 2 能力矩阵
 
 Track 2 规则列出五种智能体能力，并要求至少实现两种。本项目只声明仓库中已经实现的能力：
 
@@ -214,7 +218,7 @@ Prompt 不是唯一控制措施。文件工具验证路径，Bash 工具拒绝�
 
 部署流程先上传到 staging 区，验证文件和哈希，创建备份，再替换目标；如果替换后的步骤失败，则恢复备份。
 
-### 7.6 实体验收边界
+### 7.6 诚实的实体验收边界
 
 自动化检查可以证明命令链路和软件契约，但不会声称实体动作的视觉效果正确。最终动作效果仍需人工观察验收。
 
@@ -323,32 +327,44 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 
 ## 10. 安装、部署与复现
 
-### 10.1 开发主机前置条件
+以下流程区分开发主机验证、RDK X5 只读检查、完整部署、私有 AMD 推理和实体动作验收。评审者无需移动机器人即可运行本地检查和开发板只读检查。
+
+### 10.1 仓库结构
+
+```text
+rdk-sophon/
+├── rdk-agent/       TypeScript 多智能体 TUI 与交付工具
+├── rdk-sophon/      Rust 设备平台与 sophonctl
+└── submission/      比赛附件、证据、配置与脚本
+```
+
+### 10.2 前置条件
 
 - Node.js 22.19 或更高版本。
 - npm。
 - 包含 Cargo 的 Rust 工具链。
-- Podman，以及为机器人开发模式预先拉取的 `docker.io/library/python:3.12-slim` 镜像。
+- 机器人开发模式所需的 Podman；安装脚本会准备固定的 `docker.io/library/python:3.12-slim` 镜像。
 - macOS 或 Linux 开发主机。
 
-克隆仓库并安装依赖：
+### 10.3 一键安装
+
+克隆仓库后，在仓库根目录运行集成安装脚本：
 
 ```sh
 git clone https://github.com/cowhorseming/rdk-sophon.git
 cd rdk-sophon
 
-cd rdk-agent
-npm ci
-
-cd ../rdk-sophon
-cargo build --workspace
+export RDK_BOARD_IP=192.0.2.10 # 文档示例地址，请替换为开发板实际 IP。
+./rdk-agent/deploy/install-rdk-agent-stack.sh \
+  --ssh-host x5-root \
+  --board-address "$RDK_BOARD_IP:7777"
 ```
 
-Rust workspace 使用 `Cargo.lock`；Cargo 会在首次构建时解析已经锁定的依赖关系图。
+这一个入口会完成 RDK X5 服务与舵机运行时部署、开发主机 `sophonctl` 的构建安装、Podman 沙箱准备和 `rdk-agent` TUI 安装。脚本会在内部调用 npm 与 Cargo，评审者无需再手动执行依赖安装命令。脚本最后只执行只读联调检查，不会移动机器人。
 
-### 10.2 安全的本地验证
+### 10.4 可选的源码级验证
 
-以下命令块均以仓库根目录为起点。
+以下命令只供需要验证源码树的贡献者使用，不属于安装步骤；所有命令块均以仓库根目录为起点。
 
 TypeScript：
 
@@ -376,39 +392,25 @@ cd rdk-sophon
 
 部分 Rust 端到端测试会绑定本地 TCP 或 Unix 套接字，应在允许绑定回环套接字的环境中运行。本次提交快照分别执行并通过了前述测试、Clippy 和 release 构建，但没有把 `scripts/full_test.sh` 描述为一次完整通过的流水线；`cargo fmt --all -- --check` 仍报告已有格式差异。
 
-### 10.3 在不移动硬件的情况下检查 TUI
+### 10.5 在不移动硬件的情况下检查 TUI
 
 ```sh
-cd rdk-agent
-npm start -- --workspace "$PWD/config/templates/magicbox-servo"
+rdk-agent
 ```
 
-安全 UI 检查只使用：
+TUI 默认进入机器人应用模式。同时按下 `Shift+Tab` 可在机器人应用模式和机器人开发模式之间循环切换，当前模式会显示在状态栏中。安全 UI 检查不要提交机器人动作，只使用只读查看命令：
 
 ```text
 /modes
-/mode robot-development
 /skills
 /workspace
 ```
 
 不要在安全 UI 检查中提交命令式机器人请求；机器人应用模式会把命令式请求视为执行一次已映射动作的授权。
 
-### 10.4 配置 RDK X5 客户端
+### 10.6 验证 RDK X5 客户端
 
-在开发主机创建 `~/.rdk-sophon/config.toml`：
-
-```toml
-[default]
-host = "192.0.2.10:7777" # 文档示例地址，请替换为开发板实际地址。
-timeout = 30
-
-[boards.x5]
-host = "192.0.2.10:7777" # 文档示例地址，请替换为开发板实际地址。
-timeout = 30
-```
-
-随后可以安全运行只读检查：
+一键安装脚本会把通过 `--board-address` 传入的 `x5` 开发板地址写入 `~/.rdk-sophon/config.toml`。使用以下只读命令验证已安装的客户端：
 
 ```sh
 sophonctl --board x5 ping
@@ -416,7 +418,7 @@ sophonctl --board x5 state
 sophonctl --board x5 plugins list
 ```
 
-### 10.5 一键部署完整技术栈
+### 10.7 高级部署选项
 
 RDK X5 前置条件：
 
@@ -432,7 +434,7 @@ RDK X5 前置条件：
 - `rdk-sophon` 开发主机：本机架构的 `sophonctl` 客户端。
 - `rdk-agent` 开发主机：TUI、Agent/Skill 配置与研发沙箱。
 
-从仓库根目录按目标选择：
+第 10.3 节的默认命令会安装完整技术栈。已有环境需要局部更新时，可使用同一个脚本只部署板端或只部署开发主机：
 
 ```sh
 export RDK_BOARD_IP=192.0.2.10 # 文档示例地址，请替换为开发板实际 IP。
@@ -444,15 +446,11 @@ export RDK_BOARD_IP=192.0.2.10 # 文档示例地址，请替换为开发板实�
 # 只部署开发主机：sophonctl + rdk-agent TUI + Podman 研发沙箱
 ./rdk-agent/deploy/install-rdk-agent-stack.sh \
   --development-only --board-address "$RDK_BOARD_IP:7777"
-
-# 同时部署板端和开发主机
-./rdk-agent/deploy/install-rdk-agent-stack.sh \
-  --ssh-host x5-root --board-address "$RDK_BOARD_IP:7777"
 ```
 
-部署脚本会安装开发板二进制与配置、舵机插件与运行时、开发主机上的 `sophonctl`，以及 RDK Agent 应用和配置；完成后执行只读集成检查。更深的安装路径与参数说明见 [`rdk-agent` 子系统文档](rdk-agent/README.md)和 [`rdk-sophon` 子系统文档](rdk-sophon/README.md)。
+更深的安装路径与参数说明见 [`rdk-agent` 子系统文档](rdk-agent/README.md)和 [`rdk-sophon` 子系统文档](rdk-sophon/README.md)。
 
-### 10.6 配置私有 AMD Radeon 推理
+### 10.8 配置私有 AMD Radeon 推理
 
 使用参赛者控制、配备兼容 ROCm 技术栈的 Radeon Cloud 实例，并运行专用 OpenAI-compatible vLLM 服务。比赛专用 Model API 路由要求服务监听 `0.0.0.0:8000`。
 
@@ -491,7 +489,7 @@ export RDK_AMD_MODEL_API_KEY
 
 不要公开真实端点或密钥。截图与日志必须遮盖密钥和用户专属隧道名称。
 
-### 10.7 采集 AMD 服务器侧证据
+### 10.9 采集 AMD 服务器侧证据
 
 在参赛者控制的 Radeon 实例中执行等效命令，并保存脱敏输出：
 
@@ -505,36 +503,33 @@ curl http://127.0.0.1:8000/v1/models
 
 还需记录确切的 vLLM 启动命令、模型 revision、精度或量化设置、容器 digest（如果使用容器）和预热策略。
 
-### 10.8 运行机器人开发模式
+### 10.10 运行机器人开发模式
 
-启动 TUI：
+启动已经安装的 TUI：
 
 ```sh
-cd rdk-agent
-npm start
+rdk-agent
 ```
 
-然后执行：
+同时按下 `Shift+Tab`，直到状态栏显示机器人开发模式，然后像正常对话一样直接输入研发需求：
 
 ```text
-/mode robot-development
-/develop Create a new action that waves the left side once.
+创建一个让左侧挥动一次的新动作。
 ```
 
-观察五个交付节点。最后两个验收阶段可能会移动真实硬件，必须确保机器人周围没有人员或障碍物，并做好随时中止的准备。
+意图门控会识别处于支持范围内且置信度较高的研发需求，并自动启动五节点工作流。`/develop <需求>` 只是在需要跳过意图分类时使用的人工覆盖入口，正常流程不需要它。最后两个验收阶段可能会移动真实硬件，必须确保机器人周围没有人员或障碍物，并做好随时中止的准备。
 
-### 10.9 运行机器人应用模式
+### 10.11 运行机器人应用模式
 
-安装 Skill 后：
+安装 Skill 后，同时按下 `Shift+Tab`，直到状态栏显示机器人应用模式，然后直接输入动作需求：
 
 ```text
-/mode robot-application
-Wave the left side once.
+让左侧挥动一次。
 ```
 
 命令式请求会授权执行一个已经映射的动作。命令链路成功本身不能证明物理动作正确，应另行记录人工观察结果。
 
-### 10.10 预期输出与故障排查
+### 10.12 预期输出
 
 预期输出：
 
@@ -545,6 +540,8 @@ Wave the left side once.
 - `sophonctl` 状态与插件输出。
 - 一次 CLI 验收调用和一次自然语言验收调用。
 - 脱敏后的 Radeon/ROCm/vLLM 环境证据与基准 JSON。
+
+### 10.13 故障排查边界
 
 已知故障排查边界：
 
@@ -674,7 +671,7 @@ Wave the left side once.
 
 当前材料记录的截止时间为 **2026-08-06 23:59（UTC+8，北京/新加坡时间）**。提交前仍需由参赛者或仓库所有者完成以下事项。
 
-### 16.1 必填与参赛资格
+### 16.1 身份、参赛资格与 PR
 
 - [ ] 将所有 `<TEAM OR PARTICIPANT NAME>` 替换为准确的 Luma 团队名；未登记团队名时填写参赛者法定姓名。
 - [x] 提供并验证 B 站主视频地址与百度云备用地址。
@@ -684,23 +681,32 @@ Wave the left side once.
 - [ ] 使用 PR 标题 `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent`。
 - [ ] 保持 PR 描述和比赛评审材料为英文，并确认源代码及链接可公开访问。
 
-### 16.2 必需的 AMD 证据
+### 16.2 源代码与验证
+
+- [x] 完整的 `rdk-agent`、`rdk-sophon` 源代码和依赖锁文件均已包含。
+- [x] TypeScript 静态检查与 134 项测试均已通过。
+- [x] Rust workspace 的 62 项测试、拒绝警告的 Clippy 检查和 release 构建均已通过。
+- [ ] 如时间允许，修复现有 Rust 格式差异并重跑 `cargo fmt --all -- --check`。
+- [ ] 对齐 HTTP/WS 默认 daemon socket，或在演示命令中显式传入 `/run/probe-daemon/probe.sock`。
+- [ ] 验证非特权 `probe` 服务用户具有 `Hobot.GPIO` 所需权限。
+- [ ] 决定是否添加仓库级 LICENSE；当前 Cargo 元数据声明 MIT，但仓库根目录没有许可证文件。
+- [ ] 不把本地 `target/` 或 `node_modules/` 复制到比赛目录。
+
+### 16.3 必需的 AMD 证据
 
 - [ ] 附上经脱敏的 Radeon Cloud 实例截图。
 - [ ] 采集 AMD Radeon GPU 型号与 ROCm/HIP 版本。
 - [ ] 采集 vLLM 版本、确切启动命令和本地 `/v1/models` 响应。
 - [ ] 记录模型 revision、served model name 和精度/量化方式。
 - [ ] 用随附脚本分别测试基线与优化配置。
-- [ ] 报告 p50/p95 TTFT、解码吞吐量、端到端耗时与峰值 VRAM。
+- [ ] 报告 p50/p95 TTFT、解码吞吐量、端到端耗时、峰值 VRAM、利用率与正确率。
 - [ ] 保存原始与脱敏证据，且绝不公开端点凭据或 API key。
 
-### 16.3 技术与材料复核
+### 16.4 演示与完整性
 
-- [ ] 如时间允许，修复现有 Rust 格式差异并重跑 `cargo fmt --all -- --check`。
-- [ ] 对齐 HTTP/WS 默认 daemon socket，或在演示命令中显式传入 `/run/probe-daemon/probe.sock`。
-- [ ] 验证非特权 `probe` 服务用户具有 `Hobot.GPIO` 所需权限。
-- [ ] 决定是否添加仓库级 LICENSE；当前 Cargo 元数据声明 MIT，但仓库根目录没有许可证文件。
-- [ ] 不把本地 `target/` 或 `node_modules/` 复制到比赛目录。
+- [ ] 确认视频时长约为 3–5 分钟，并展示真实 CLI/TUI 操作、两种运行模式、开发板只读证据、实际 Radeon/ROCm 推理和最终实体动作。
+- [ ] 确认视频不包含凭据或私有基础设施信息。
+- [ ] 可选：用录制视频中的高质量真实画面替换概念封面或占位图。
 - [ ] 复制到官方比赛仓库后，重新检查相对链接和敏感信息。
 - [ ] 在另一台计算机上打开 PDF 与 PPTX。
 - [ ] 确保没有用未经测量的估算值替换任何 `Evidence pending` 项。
