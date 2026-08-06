@@ -26,7 +26,18 @@ Base vs SFT, same frozen held-out Test, same service stack, temperature=0, model
 
 Cost disclosed: SFT generates ≈2.1× the tokens and latency of Base.
 
-## Result 2 — inference on that model, optimized on Radeon
+## Result 2 — that difference decides whether a real task completes
+
+The number above is agreement with frozen references. Put both models behind the real `rdk-agent` five-node workflow on a live RDK X5, change nothing but the model, and request the same capability (`wave-right-hand`):
+
+| | Base | SFT |
+| --- | --- | --- |
+| Workflow nodes completed | 3 / 5 (60%) | **5 / 5 (100%)** |
+| Outcome | stalled at CLI live acceptance; terminated after 14 min 25 s | **accepted** in 4 min 04 s |
+
+Base did not crash. It returned a result the acceptance node could not parse — `Agent 的结构化结果无法解析` — which is precisely the capability the strict tool-call metric measures. The offline number is the mechanism behind the live outcome. Physical displacement is still left to human visual confirmation, and this is one task per arm rather than a sampled success rate; both limits are stated in [`model/AGENT_E2E.en.md`](../../model/AGENT_E2E.en.md).
+
+## Result 3 — inference on that model, optimized on Radeon
 
 Same base, same adapter, same GPU, temperature=0, 88 trials per arm. Baseline is the unmodified production inference path:
 

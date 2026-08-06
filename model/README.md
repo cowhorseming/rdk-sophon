@@ -75,13 +75,14 @@ python3 ../../recompute_ab.py \
 | `model/serving/` | 服务端原件(证据同哈希)+ serve.sh + 依赖 | Tier 1:自己把它跑起来 |
 | `benchmark/` | 冻结重放评测器 + sealed 运行证据 | SFT 比 base 强多少、代价几何 |
 | `data/releases/…/agentic/test.jsonl` | historically held-out 冻结 Test(评测后公开) | 评测输入,SHA `d1e1856b…5e283`,供评委独立重评分 |
+| [`AGENT_E2E.md`](AGENT_E2E.md) | 真实 agent 工作流在 RDK X5 实机上的端到端运行,SFT vs Base | SFT 5/5 节点验收通过;Base 停在 3/5 |
 | `radeon-optimization/qwen3-32b-agentic-sft/` | **本模型**在 gfx1100 上的推理优化 + 实机 A/B | 用户可见 TTFT 2.11×,输出逐字节一致 |
 | `radeon-optimization/qwen3-next-80b/` | Qwen3-Next-80B 单卡部署优化(独立案例) | decode +34%,可离线重算 |
 | `EVIDENCE_MAP.md` | claim → 证据文件 → 哈希 总索引 | 全仓一张地图 |
 
 ## 边界(公开表述以此为准)
 
-重放一致性衡量的是与 historically held-out 教师轨迹的合同一致,**不等于** Agent 端到端成功、板端执行或物理效果;后者必须由当次 Agent、`sophonctl` 与板端观察共同证明。Test 在评测完成后为复现而公开,不应再作为未来无污染评测集使用。评测前缀为确定性有序前缀而非随机抽样,不含 promoted controlled-actuation 任务。训练数据含 848 条带标记的 promoted 样本(一行过滤器可回退,详见数据集 README)。训练代码为 fail-closed 已验证快照,硬绑定原主机与环境；完整历史训练证据固定在 tag [`model-evidence-full-20260806`](https://github.com/wm19999/rdk-sophon/tree/model-evidence-full-20260806/model/examples/qwen3-32b-training)。
+重放一致性衡量的是与 historically held-out 教师轨迹的合同一致,**不等于** Agent 端到端成功、板端执行或物理效果;后者必须由当次 Agent、`sophonctl` 与板端观察共同证明——该证明即 [`AGENT_E2E.md`](AGENT_E2E.md),其为每臂一次运行而非抽样成功率,且物理位移仍留待人类目视确认。Test 在评测完成后为复现而公开,不应再作为未来无污染评测集使用。评测前缀为确定性有序前缀而非随机抽样,不含 promoted controlled-actuation 任务。训练数据含 848 条带标记的 promoted 样本(一行过滤器可回退,详见数据集 README)。训练代码为 fail-closed 已验证快照,硬绑定原主机与环境；完整历史训练证据固定在 tag [`model-evidence-full-20260806`](https://github.com/wm19999/rdk-sophon/tree/model-evidence-full-20260806/model/examples/qwen3-32b-training)。
 
 ## 许可说明
 

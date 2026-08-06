@@ -43,6 +43,15 @@
 | 代价如实披露 | `RESULTS.md` Observed cost | SFT 延迟/token ≈ 2.1×;final-text 严格相等两臂均 0(不宣称语义正确性) |
 | 独立重评分 | `benchmark/recompute_ab.py` + Test + Base/SFT raw | 从公开输入与逐回合响应重建参考并逐项比对 `summary.json` |
 
+## 端到端 Agent 实机运行(RDK X5)
+
+| Claim | 证据 | 关键哈希/数字 |
+|---|---|---|
+| 离线差距决定长程任务能否跑完 | `AGENT_E2E.md` + `assets/agent-e2e-sft-vs-base.png` | 同 agent、同板、同任务,仅切换模型:SFT 5/5 节点验收通过,用时 4 分 04 秒;Base 停在 3/5,14 分 25 秒后被终止 |
+| Base 的失败方式与预测一致 | 同截图中的失败文本 | `Agent 的结构化结果无法解析` —— 验收节点无法解析结构化结果,而这正是 SFT 所针对的能力 |
+| 无静默换模型 | 同截图中的运行横幅 | `模型: d-robotics-glm/Qwen3-32B-Agentic-SFT-r1-v3`、`模型回退: 无` |
+| 不宣称物理动作 | 同次运行中 Agent 自己的报告 | 退出码 0 仅证明命令链路成功,不证明物理位移正确;仍需人类目视确认 |
+
 ## Radeon 推理优化
 
 | Claim | 证据 | 关键哈希/数字 |

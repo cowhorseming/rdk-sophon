@@ -55,6 +55,17 @@ cat model/served-model-manifest.json   # Identity chain + service timeline + beh
 
 Boundary: there was a time window in which the Base service answered under the SFT model alias (faithfully recorded in the evidence). When verifying service identity, inspect both the response `model` field and `/health`; see `model/serving/README.md` for the integration interface.
 
+## 3.5 Does that difference actually finish a task?
+
+The metrics above are agreement with frozen references. Put the same two models behind the real `rdk-agent` workflow on a live RDK X5, change nothing but the model, and ask for the same capability:
+
+| | Base | SFT |
+| --- | --- | --- |
+| Workflow nodes completed | 3 / 5 (60%) | **5 / 5 (100%)** |
+| Outcome | stalled at CLI live acceptance; operator terminated after 14 min 25 s | **accepted** in 4 min 04 s |
+
+Base did not crash — it produced a result the acceptance node could not parse (`Agent 的结构化结果无法解析`), which is exactly the capability the strict tool-call metric measures. The offline number is the mechanism behind the live outcome, not a separate claim. Full run detail, including what is *not* proven: [AGENT_E2E.en.md](AGENT_E2E.en.md).
+
 ## 4. Radeon Inference Optimization
 
 ### 4.1 Main 32B agent model (the model this repository is about)

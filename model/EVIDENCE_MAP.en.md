@@ -43,6 +43,15 @@ The repository-wide canonical evidence index. Each row is an independently verif
 | Costs are disclosed faithfully | Observed cost in `RESULTS.md` | SFT latency/tokens ≈ 2.1×; strict final-text equality is 0 for both arms (no claim of semantic correctness) |
 | Independent re-scoring | `benchmark/recompute_ab.py` + Test + Base/SFT raw | Rebuilds references from public inputs and per-turn responses, then checks each item against `summary.json` |
 
+## End-to-End Agent Run (Live RDK X5)
+
+| Claim | Evidence | Key Hashes/Numbers |
+|---|---|---|
+| The offline gap decides whether a long-horizon task completes | `AGENT_E2E.en.md` + `assets/agent-e2e-sft-vs-base.png` | Same agent, same board, same task, model swapped: SFT 5/5 nodes accepted in 4 min 04 s; Base stalls at 3/5 and is terminated after 14 min 25 s |
+| Base fails in the predicted way | Failure text in the same screenshot | `Agent 的结构化结果无法解析` — the acceptance node cannot parse the structured result, which is precisely the capability the SFT targets |
+| No silent model substitution | Run banner in the same screenshot | `模型: d-robotics-glm/Qwen3-32B-Agentic-SFT-r1-v3`, `模型回退: 无` |
+| Physical motion is not claimed | Agent's own report in the same run | 退出码 0 仅证明命令链路成功,不证明物理位移正确;仍需人类目视确认 |
+
 ## Radeon Inference Optimization
 
 | Claim | Evidence | Key Hashes/Numbers |
