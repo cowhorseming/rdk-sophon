@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import type { AgentProfile } from "../../src/domain/agent-profile.ts";
-import { WorkspaceWritePolicy, assertApplicationShellAllowed, assertReadOnlyShell, scopedAgentTools } from "../../src/infra/scoped-agent-tools.ts";
+import {
+	WorkspaceWritePolicy,
+	assertApplicationShellAllowed,
+	assertNewCapabilityTestBaseline,
+	assertReadOnlyShell,
+	scopedAgentTools,
+} from "../../src/infra/scoped-agent-tools.ts";
 
 test("workspace write policy only accepts files matching the agent allowlist", () => {
 	const policy = new WorkspaceWritePolicy("/tmp/workspace", ["rdk-agent/config/skills/*/SKILL.md"]);
@@ -32,9 +38,43 @@ test("Python test allowlist excludes files owned by the CLI loop", () => {
 test("agent bash policy allows tests but blocks shell file mutation", () => {
 	assert.doesNotThrow(() => assertReadOnlyShell("python3 -m unittest discover -s tests"));
 	assert.doesNotThrow(() => assertReadOnlyShell("rg wave-hands examples/plugins/servo | head"));
+	assert.doesNotThrow(() => assertReadOnlyShell("ls -1 missing.json 2>/dev/null"));
 	assert.throws(() => assertReadOnlyShell("printf x > tests/result.txt"), /策略拒绝/);
+	assert.throws(() => assertReadOnlyShell("printf x 2>/tmp/result.txt"), /策略拒绝/);
 	assert.throws(() => assertReadOnlyShell("sed -i '' s/a/b/ file"), /策略拒绝/);
 	assert.throws(() => assertReadOnlyShell("git checkout -- file"), /策略拒绝/);
+	assert.throws(
+		() => assertReadOnlyShell("printf x > tests/result.txt", "en"),
+		(error: unknown) => error instanceof Error && /read-only checks.*command rejected/i.test(error.message) && !/[一-鿿]/u.test(error.message),
+	);
+});
+
+test("new-capability unittest is blocked before launch until this session scaffolds it", () => {
+	const command = "python3 -m unittest discover -s examples/plugins/servo/servo_actions/wave-right-hand/tests -v";
+	const state = { scaffoldSucceeded: false };
+	assert.throws(
+		() => assertNewCapabilityTestBaseline(command, {
+			expectation: "test",
+			userRequest: "Implement a feature for waving the right hand",
+			iteration: 1,
+			locale: "en",
+			testBaseline: state,
+		}),
+		(error: unknown) => error instanceof Error && /before launch.*historical state/i.test(error.message) && !/[一-鿿]/u.test(error.message),
+	);
+	assert.doesNotThrow(() => assertNewCapabilityTestBaseline(command, {
+		expectation: "test",
+		userRequest: "Fix the existing right-hand wave action",
+		iteration: 1,
+		testBaseline: state,
+	}));
+	state.scaffoldSucceeded = true;
+	assert.doesNotThrow(() => assertNewCapabilityTestBaseline(command, {
+		expectation: "test",
+		userRequest: "Implement a feature for waving the right hand",
+		iteration: 1,
+		testBaseline: state,
+	}));
 });
 
 test("read-only application requests cannot invoke robot action commands", () => {
@@ -48,6 +88,10 @@ test("read-only application requests cannot invoke robot action commands", () =>
 	assert.throws(() => assertApplicationShellAllowed("ssh x5-root python3 servo.py", "application", query), /命令被拒绝/);
 	assert.doesNotThrow(() => assertApplicationShellAllowed("sophonctl servo shake-ears", "application", "摇一下耳朵"));
 	assert.doesNotThrow(() => assertApplicationShellAllowed("sophonctl servo shake-ears", "coding", query));
+	assert.throws(
+		() => assertApplicationShellAllowed("sophonctl servo shake-ears", "application", "Show available actions", "en"),
+		/read-only.*command rejected/i,
+	);
 });
 
 test("action-package tooling fails closed without the original user request context", () => {

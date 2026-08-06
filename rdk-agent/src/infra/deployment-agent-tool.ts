@@ -6,6 +6,7 @@ import { Type } from "typebox";
 import { parse } from "yaml";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { AgentProfile, SkillDeploymentPlan, SshDeploymentPlan } from "../domain/agent-profile.ts";
+import { defaultLocale, localeText, type Locale } from "../shared/locale.ts";
 
 interface ProcessResult {
 	stdout: string;
@@ -212,6 +213,7 @@ export function createDeploymentToolDefinition(
 	workspaceRoot: string,
 	skillDirectory: string,
 	profile: AgentProfile,
+	locale: Locale = defaultLocale,
 ): ToolDefinition<any, any, any> {
 	const plan = profile.deployment;
 	if (!plan) throw new Error(`${profile.id} 未配置 deployment`);
@@ -226,7 +228,13 @@ export function createDeploymentToolDefinition(
 			const receipt = plan.kind === "ssh"
 				? await deploySsh(workspaceRoot, plan, signal)
 				: await deploySkill(workspaceRoot, skillDirectory, plan);
-			return { content: [{ type: "text", text: `部署成功\n${receipt}` }], details: undefined };
+			return {
+				content: [{
+					type: "text",
+					text: `${localeText(locale, "部署成功", "Deployment succeeded")}\n${receipt}`,
+				}],
+				details: undefined,
+			};
 		},
 	};
 }

@@ -29,7 +29,7 @@ function request(expectation: AgentExpectation): AgentRunRequest {
 	};
 }
 
-test("test-agent prompt treats one expected red run as a completed delivery", () => {
+test("test-agent prompt requires an initial target-behavior red run for new capabilities", () => {
 	const prompt = new AgentPromptBuilder().build(request("test"));
 	assert.doesNotMatch(prompt, /^\/skill:/);
 	assert.match(prompt, /Agent ID：stage/);
@@ -41,7 +41,8 @@ test("test-agent prompt treats one expected red run as a completed delivery", ()
 	assert.match(prompt, /不得拿上一个循环的测试文件冒充当前阶段测试/);
 	assert.match(prompt, /当前 Agent 的唯一任务（优先级最高）/);
 	assert.match(prompt, /工具层允许写入的唯一路径范围：tests\/\*\.ts/);
-	assert.match(prompt, /因缺少目标功能而失败是有效红测/);
+	assert.match(prompt, /必须创建本轮新脚手架并先得到因目标行为未实现而失败的有效红测/);
+	assert.match(prompt, /测试在实现前直接通过.*意外绿测/);
 	assert.match(prompt, /导入、测试收集、fixture、路径或 mock 配置失败永远不是有效红测/);
 	assert.match(prompt, /工具调用上限为 6 次/);
 	assert.match(prompt, /RDK_AGENT_RESULT: \{"status":"completed"\}/);
@@ -116,4 +117,13 @@ test("application-agent marks Skill questions as tool-enforced read-only request
 	assert.match(prompt, /运行时已将当前输入判定为只读查询/);
 	assert.match(prompt, /Bash 工具层也会拒绝此类命令/);
 	assert.doesNotMatch(prompt, /运行时已将当前输入判定为动作式请求/);
+});
+
+test("English Agent prompts require English prose while preserving result markers", () => {
+	const englishRequest = { ...request("verification"), locale: "en" as const };
+	const prompt = new AgentPromptBuilder().build(englishRequest);
+	assert.match(prompt, /Finish with a concise English list/);
+	assert.match(prompt, /All user-facing prose, including summaries, feedback, and questions, must be in English/);
+	assert.match(prompt, /RDK_AGENT_RESULT: \{"status":"revision","feedback":"specific issue requiring revision"\}/);
+	assert.doesNotMatch(prompt, /最后用简洁中文列出/);
 });
