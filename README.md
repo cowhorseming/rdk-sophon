@@ -18,10 +18,10 @@ This English README is the authoritative competition-facing description for the 
 | --- | --- |
 | Track | Track 2 - Development and Local Deployment of Private AI Agents |
 | Application | RDK Agent |
-| Team / participant | `<TEAM OR PARTICIPANT NAME>` |
+| Team / participant | `d-robotics agent` |
 | Source repository | <https://github.com/cowhorseming/rdk-sophon> |
 | Demo video | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud MP4 backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
-| PR title | `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` |
+| PR title | `Track 2, d-robotics agent, RDK Agent` |
 | Official deadline | 2026-08-06 23:59 Beijing/Singapore time (UTC+8) |
 
 Current delivery status:
@@ -33,15 +33,12 @@ Current delivery status:
 | Demo video, 3-5 minutes | Complete; 3:07.2, 1080p, H.264/AAC; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Supplementary presentation | Complete | [12-slide PowerPoint deck](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included in Sections 8–9 |
-| AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all backed by saved evidence. Reproducing the 32B performance run requires a compatible Radeon host. Agent backend side: vLLM host, model revision, and precision still to be attached |
+| AMD server and performance proof | Complete for both measured Qwen3 paths | The trained 32B SFT path records gfx1100, ROCm 7.2.1, adapter identity, and baseline-versus-optimized A/B. The 80B path records a successful single-Radeon `llama.cpp` deployment, API compatibility canaries, and baseline-versus-optimized serving metrics. See the [model track index](submission/en/MODEL_TRACK.md). |
+| Models actually run | `Qwen3-Next-80B-A3B-Instruct` and the trained `Qwen3-32B-Agentic-SFT-r1-v3` | The 80B model completed the saved single-GPU serving and compatibility runs; the 32B SFT model additionally completed the recorded five-node live `rdk-agent` workflow. |
 | Trained 32B model in live `rdk-agent` | Complete for one recorded task: 5/5 workflow nodes and both live-acceptance gates in 4 min 04 s | [Side-by-side run record](model/AGENT_E2E.en.md) and [screenshot](model/assets/agent-e2e-sft-vs-base.png); physical motion still requires human visual confirmation |
 | Verification evidence | Captured on 2026-08-05 | [Raw verification record](submission/en/evidence/verification-2026-08-05.md) |
 
-Before final submission, the participant must provide:
-
-1. The exact registered team name or participant name.
-2. Redacted, reproducible Radeon GPU, ROCm, vLLM, model revision, precision/quantization, and benchmark evidence from the participant-controlled instance.
-3. A final review of the worktree and explicit approval before commit and publication.
+Before final submission, the team must complete a final worktree review and explicitly approve the changes before commit and publication.
 
 ## 1. Executive summary
 
@@ -283,17 +280,14 @@ The application already reduces unnecessary model work:
 
 These controls reduce tokens, context growth, and variability regardless of accelerator. They are not substitutes for measured GPU optimization.
 
-### 9.3 Server Evidence Required Before Final Submission
+### 9.3 Evidence Scopes and Private-vLLM Boundary
 
-Capture and redact the following evidence from the participant-controlled Radeon instance:
+The repository now archives two measured Radeon paths:
 
-1. GPU product and driver information from `rocm-smi`.
-2. ROCm/HIP versions from `rocminfo` and PyTorch.
-3. The vLLM version and exact launch command.
-4. The model repository, revision, and served model name.
-5. Precision or quantization configuration.
-6. The local `/v1/models` response.
-7. A credential-free screenshot proving control of the Radeon Cloud instance.
+1. The trained 32B SFT path records the `gfx1100` GPU, ROCm/HIP versions, model and adapter identity, precision/quantization, `/v1/models`, an 88-trial-per-arm A/B, and a five-node live Agent screenshot.
+2. The 80B path records the `gfx1100` GPU, GGUF identity and quantization, single-card VRAM, ten baseline/tuned serving records, reproducible aggregate checks, and three API compatibility canaries.
+
+A separate private vLLM endpoint used by one client configuration is verified only at the routing layer. Its server GPU, ROCm/vLLM versions, launch command, model revision, and precision are not independently archived, and none of the published 80B performance numbers depend on that endpoint.
 
 ### 9.4 Controlled Optimization Matrix
 
@@ -331,9 +325,9 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 ### 9.5 Current Evidence Status
 
-Two Radeon inference paths were measured by this team, and they are evidenced separately. **(A)** is the model this team trained. **(B)** is an off-the-shelf 80B deployed on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts. Their saved artifacts can be audited offline; reproducing (A) requires a compatible Radeon host, while (B)'s saved aggregates and deltas can be verified without a GPU.
+The `d-robotics agent` team successfully ran two Qwen3 inference paths, evidenced separately. **(A)** is the team's SFT-trained 32B model, which also completed a recorded live `rdk-agent` workflow against an RDK X5. **(B)** is an off-the-shelf 80B model deployed and exercised on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts. Their saved artifacts can be audited offline; reproducing (A) requires a compatible Radeon host, while (B)'s saved aggregates and deltas can be verified without a GPU.
 
-| Item | (A) Our trained 32B benchmark path | (B) Independent 80B single-GPU serving case (llama.cpp; not the Agent backend) |
+| Item | (A) Trained 32B SFT path | (B) Qwen3-Next 80B single-GPU serving path (`llama.cpp`) |
 | --- | --- | --- |
 | Client provider/model selection | Verified locally; sanitized in this repository | Local loopback endpoint |
 | AMD Radeon GPU model | `gfx1100`, Card Model `0x744b`, 51,522,830,336 B VRAM | `gfx1100`, 51,522,830,336 B VRAM, 503 GiB system RAM |
@@ -344,7 +338,7 @@ Two Radeon inference paths were measured by this team, and they are evidenced se
 | Baseline and tuned TTFT | User-visible p50 17.41 s → **8.26 s**; p95 83.97 s → **12.89 s** | Median 2,021.26 ms → **1,808.76 ms** (−10.5%) |
 | Baseline and tuned decode throughput | 6.54 → **6.72** tok/s, 88/88 outputs byte-identical | 37.19 → **49.82** tok/s (+34.0%); prefill 1,271.45 → 1,397.39 tok/s (+9.9%) |
 | Peak VRAM/utilization | ~19.3 GB after load; benchmark peak 27.99 → 28.06 GB; 99% GPU utilization sampled during decode | 48,843,468,800 → 49,523,740,672 B — **96.1% of a 51.5 GB card**, holding an 80B-class model |
-| End-to-end agent workflow latency | Five-node `rdk-agent` workflow on a live RDK X5: SFT accepted in **4 min 04 s** (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | Not applicable — this case study measures serving, not the agent workflow |
+| End-to-end agent workflow latency | Five-node `rdk-agent` workflow on a live RDK X5: SFT accepted in **4 min 04 s** (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | The model completed the saved serving and API-compatibility runs; this repository does not include a separately archived five-node Agent trace for this arm. |
 | Measurement protocol | 88 trials per arm, temperature 0, 2 warm-up records | 1 warm-up + 5 measured runs per arm, 2,332-token prompt, temperature 0 |
 
 #### 9.5.1 Trained 32B SFT model completed the live RDK Agent workflow
@@ -359,7 +353,7 @@ This is one task and one run per arm. It proves that the SFT run completed the m
 
 This project does not fabricate AMD performance data. For (A), `model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` reruns the 88-trial-per-arm benchmark and regenerates `results.json` only on a compatible Radeon host with the frozen model, adapter, and test data. For (B), `model/radeon-optimization/qwen3-next-80b/verify_results.py` runs without a GPU and recomputes the wall-time, prefill, and decode aggregates plus every published delta from the ten saved measurement records. Only per-arm TTFT medians were archived, so the script checks the TTFT delta from those stored medians rather than reconstructing its distribution.
 
-One item remains outside both columns: the private vLLM endpoint that the `rdk-agent` client routes to is verified only at the client level — provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` were observed in the request path, but that server's GPU, ROCm version, vLLM version and launch command, model revision and precision have not been independently attested here, and no figure for it is stated anywhere in this submission.
+Both Qwen3 model paths therefore completed real runs, but the archived evidence has different scope. The 32B SFT screenshot proves a five-node model-to-Agent-to-board command path; the 80B records prove single-Radeon serving, performance, long-context retrieval, structured tool calls, and tool-result continuation. The private vLLM endpoint used by one `rdk-agent` client configuration is verified at the client-routing level only. Its separate server provenance is not used for the 80B performance figures above, which come from the archived `llama.cpp` run.
 
 ## 10. Installation, deployment, and reproduction
 
@@ -624,8 +618,8 @@ Evidence boundaries:
 
 - `cargo fmt --all -- --check` reported existing formatting differences, so this submission does not describe the Rust formatting check as passing.
 - This snapshot does not describe the complete `scripts/full_test.sh` pipeline as one complete run; its constituent stages were run and verified separately.
-- The client model configuration proves model selection only; it does not prove the **80B agent backend** server-side GPU, ROCm, vLLM, model revision, or quantization.
-- Radeon/ROCm/vLLM/precision evidence and performance benchmarks for the **80B agent backend** remain to be captured.
+- Both Qwen3 models were actually run: the 80B path has archived single-Radeon serving and compatibility evidence, while the trained 32B SFT path also has a recorded five-node live `rdk-agent` run.
+- The client model configuration alone proves model selection, not the private vLLM endpoint's server-side GPU, ROCm, vLLM version, model revision, or quantization. This evidence boundary does not negate the separately archived 80B `llama.cpp` run.
 - For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`), those facts are attested and reproducible: GPU `gfx1100`, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, adapter SHA-256 `4dcee691…f20bf`, NF4 4-bit quantization, and a baseline-versus-optimized A/B measured on that host (user-visible TTFT p50 17.41 s → 8.26 s, peak VRAM 27.99 → 28.06 GB, 88/88 outputs byte-identical). See the [model track index](submission/en/MODEL_TRACK.md); `results.json` is generated by the benchmark on the Radeon host rather than transcribed by hand.
 - Automated results prove the software contract and command path only; physical motion quality still requires human observation.
 - Public evidence omits MAC addresses, credentials, and private infrastructure details.

@@ -1,13 +1,13 @@
 # Pull Request 标题
 
 ```text
-Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
+Track 2, d-robotics agent, RDK Agent
 ```
 
 ## 赛道 2 提交项目：RDK Agent
 
 - **赛道：** Track 2 - Development and Local Deployment of Private AI Agents
-- **团队 / 参赛者：** `<TEAM OR PARTICIPANT NAME>`
+- **团队 / 参赛者：** `d-robotics agent`
 - **应用名称：** RDK Agent
 - **演示视频（主地址）：** https://www.bilibili.com/video/BV1t3up6iEhy/
 - **演示视频（备用地址）：** https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd
@@ -61,7 +61,7 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 
 应用层推理控制已经减少不必要的模型工作：确定性问候绕过、无工具的短时意图会话、按阶段聚焦的会话、严格的 Skill 加载、6,000 字符的交接上限，以及位于模型之外的确定性验证器。
 
-本提交不会编造服务器侧 GPU/ROCm/vLLM/精度证据或性能对比。在附上由参赛者控制的 Radeon Cloud 实例所产生、经过脱敏的日志之前，这些项目均明确标记为“证据待补充”。
+团队已经实际跑通 `Qwen3-Next-80B-A3B-Instruct` 与经过 SFT 的 `Qwen3-32B-Agentic-SFT-r1-v3`。80B 路径封存了单张 Radeon 上的 `llama.cpp` 服务、兼容性与性能记录；32B SFT 路径还完成了有记录的五节点 `rdk-agent` 实机运行。单独的私有 vLLM 端点目前仅在客户端路由层得到佐证，因此公开性能结论不依赖该端点的服务器信息。
 
 ## 验证
 

@@ -54,17 +54,19 @@ Verified on 2026-08-05:
 - A configured RDK X5 responded to `ping` and `state`; the `servo` plugin was discovered.
 - The private Pi runtime selects provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` through an OpenAI-compatible endpoint.
 
+Both `Qwen3-Next-80B-A3B-Instruct` and the SFT-trained `Qwen3-32B-Agentic-SFT-r1-v3` were actually run. The 80B model has archived single-Radeon `llama.cpp` serving and compatibility records; the 32B SFT model also completed a recorded five-node live `rdk-agent` workflow.
+
 Not independently attested by this repository snapshot:
 
 - Server-side Radeon GPU model, ROCm version, vLLM launch command, and model precision/quantization.
 - Client-side TTFT and output-token throughput. The provided benchmark script is ready, but no API key or private endpoint is included in this submission.
 
-The submission therefore does not invent AMD performance figures. Replace the marked evidence fields only with redacted, reproducible logs from the participant-controlled Radeon Cloud instance.
+The private vLLM endpoint remains a client-routing claim only. Published 80B performance figures come from the separately archived `llama.cpp` run, and the submission does not invent missing measurements.
 
 ## Pull request title
 
 ```text
-Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
+Track 2, d-robotics agent, RDK Agent
 ```
 
 All submitted descriptions and artifacts in this directory are written in English. Internal Chinese engineering documentation remains in the source tree and is not used as the competition-facing project description.

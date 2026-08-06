@@ -6,9 +6,13 @@ import { Presentation, PresentationFile } from "@oai/artifact-tool";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../../..");
-const ASSETS = path.join(ROOT, "submission", "en", "assets");
-const OUT = path.join(ROOT, "submission", "en", "deliverables", "RDK_Agent_Track2_Pitch_Deck.pptx");
-const RENDER = path.join(ROOT, "submission", "en", "tmp", "pptx", "rendered");
+const LOCALE = process.env.RDK_LOCALE === "zh" ? "zh" : "en";
+const LOCALIZATION = LOCALE === "zh"
+  ? JSON.parse(await fs.readFile(path.join(ROOT, "submission", "zh", "scripts", "localization-map.json"), "utf8"))
+  : {};
+const ASSETS = path.join(ROOT, "submission", LOCALE, "assets");
+const OUT = path.join(ROOT, "submission", LOCALE, "deliverables", "RDK_Agent_Track2_Pitch_Deck.pptx");
+const RENDER = path.join(ROOT, "submission", LOCALE, "tmp", "pptx", "rendered");
 
 const W = 1280;
 const H = 720;
@@ -30,6 +34,7 @@ const C = {
 };
 
 const noLine = { style: "solid", fill: "none", width: 0 };
+const tr = (text) => LOCALIZATION[text] ?? text;
 
 function rect(slide, x, y, width, height, fill, options = {}) {
   return slide.shapes.add({
@@ -51,7 +56,7 @@ function textBox(slide, text, x, y, width, height, options = {}) {
     line: options.line ?? noLine,
     borderRadius: options.borderRadius,
   });
-  shape.text = text;
+  shape.text = tr(text);
   shape.text.style = {
     fontSize: options.fontSize ?? 22,
     typeface: options.typeface ?? FONT,
@@ -141,7 +146,7 @@ async function addImage(slide, filename, x, y, width, height, options = {}) {
 
 function notes(slide, body, sources) {
   const sourceBlock = ["[Sources]", ...sources.map((s) => `- ${s}`), "[/Sources]"].join("\n");
-  slide.speakerNotes.textFrame.setText(`${body}\n\n${sourceBlock}`);
+  slide.speakerNotes.textFrame.setText(`${tr(body)}\n\n${sourceBlock}`);
   slide.speakerNotes.setVisible(true);
 }
 
@@ -187,7 +192,7 @@ async function build() {
       color: "#D4DAE3",
       lineSpacing: 1.05,
     });
-    textBox(s, "<TEAM OR PARTICIPANT NAME>", 56, 656, 320, 20, { fontSize: 13, color: "#AEB6C2" });
+    textBox(s, "d-robotics agent", 56, 656, 320, 20, { fontSize: 13, color: "#AEB6C2" });
     notes(s, "Open with the product promise: one governed path from intent to a board action. The visual is conceptual, not hardware evidence.", [
       "Project repository: README.md and submission/en/PROJECT_SPECIFICATION.md.",
       "Project-created AI-generated asset: submission/en/assets/rdk-agent-hero.png.",
@@ -344,9 +349,9 @@ async function build() {
   {
     const s = deck.slides.add();
     s.background.fill = C.white;
-    addTitle(s, 9, "AMD Radeon + ROCm", "The client is wired for private Radeon inference", "The configured provider/model route is real; server-side GPU, ROCm and vLLM proof remains intentionally pending.");
+    addTitle(s, 9, "AMD Radeon + ROCm", "Both Qwen3 model paths ran successfully", "80B single-GPU serving and the trained 32B SFT live Agent workflow are evidenced separately.");
     rect(s, M, 218, 492, 350, C.ink, { geometry: "roundRect", borderRadius: 8 });
-    pill(s, "CLIENT CONFIGURED", 76, 246, 166, C.green);
+    pill(s, "BOTH MODELS RUN", 76, 246, 166, C.green);
     textBox(s, "Qwen3-Next-80B-\nA3B-Instruct", 76, 302, 430, 92, { fontSize: 34, bold: true, color: C.white, lineSpacing: 0.95 });
     textBox(s, "Provider  amd\nAPI       OpenAI-compatible\nContext   131,072\nMax out   8,192", 76, 422, 420, 112, { fontSize: 20, color: "#D8DEE8", lineSpacing: 1.2 });
     const bx = [610, 830, 1050];
@@ -360,25 +365,25 @@ async function build() {
       }
     }
     rect(s, 610, 414, 610, 154, C.paleCoral, { geometry: "roundRect", borderRadius: 8 });
-    textBox(s, "Server evidence still required", 638, 438, 480, 32, { fontSize: 23, bold: true, color: C.coral });
-    textBox(s, "GPU + ROCm inventory\nvLLM launch flags + model precision\nRedacted request log + benchmark JSON", 638, 486, 540, 72, { fontSize: 19, color: C.ink, lineSpacing: 1.2 });
+    textBox(s, "Archived evidence", 638, 438, 480, 32, { fontSize: 23, bold: true, color: C.green });
+    textBox(s, "80B: single-Radeon llama.cpp metrics\n32B SFT: 5/5 live Agent nodes\nPrivate vLLM provenance remains separate", 638, 486, 540, 72, { fontSize: 19, color: C.ink, lineSpacing: 1.2 });
     addFooter(s);
-    notes(s, "Be explicit: the repository currently proves client routing, not server hardware. Only attach redacted server proof captured from the participant-controlled instance.", [
+    notes(s, "Both models ran. Keep the evidence scopes distinct: the 80B figures come from the archived llama.cpp case; the 32B SFT screenshot proves the live Agent path.", [
       "Sanitized config: submission/en/config/pi-models.amd-rocm.example.json.",
       "AMD evidence plan: submission/en/AMD_RADEON_ROCM.md.",
       "Current evidence boundary: submission/en/evidence/verification-2026-08-05.md.",
     ]);
   }
 
-  // Slide 10 - Codex Grid slide-19 metric-led layout without fabricated values.
+  // Slide 10 - metric-led view of the two archived Radeon paths.
   {
     const s = deck.slides.add();
     s.background.fill = C.white;
-    addTitle(s, 10, "Optimization", "Optimization claims remain evidence-driven", "The benchmark harness measures the user path; no performance value is shown until the endpoint owner authorizes a run.");
+    addTitle(s, 10, "Optimization", "Measured gains on two Radeon paths", "32B SFT improves user-visible TTFT; 80B single-GPU serving improves decode throughput.");
     const cards = [
-      { x: 48, key: "TTFT", title: "Time to first token", body: "Interactive responsiveness" },
-      { x: 444, key: "TOTAL", title: "End-to-end latency", body: "User-perceived task delay" },
-      { x: 840, key: "TOK/S", title: "Output throughput", body: "Serving efficiency" },
+      { x: 48, key: "32B TTFT", title: "17.41 -> 8.26 s", body: "p50, 88 trials per arm" },
+      { x: 444, key: "80B TOK/S", title: "37.19 -> 49.82", body: "decode, five measured runs per arm" },
+      { x: 840, key: "AGENT 5/5", title: "4:04 total", body: "32B SFT workflow on RDK X5" },
     ];
     for (const card of cards) {
       rect(s, card.x, 244, 344, 260, C.panel, { geometry: "roundRect", borderRadius: 6 });
@@ -387,11 +392,11 @@ async function build() {
       textBox(s, card.body, card.x + 28, 425, 288, 50, { fontSize: 18, color: C.muted });
     }
     rect(s, M, 546, W - M * 2, 92, C.ink, { geometry: "roundRect", borderRadius: 6 });
-    textBox(s, "Benchmark sequence", 72, 566, 205, 26, { fontSize: 19, bold: true, color: C.cyan });
-    textBox(s, "Warm up  ->  repeat fixed prompt  ->  compare baseline/tuned  ->  publish redacted JSON", 290, 563, 880, 36, { fontSize: 20, bold: true, color: C.white, verticalAlignment: "middle" });
-    textBox(s, "STATUS: PENDING EXPLICIT ENDPOINT/CREDENTIAL AUTHORIZATION", 290, 604, 880, 18, { fontSize: 13, bold: true, color: "#FF9B92" });
+    textBox(s, "Evidence scope", 72, 566, 205, 26, { fontSize: 19, bold: true, color: C.cyan });
+    textBox(s, "32B and 80B runs keep separate runtimes, protocols and archived measurements", 290, 563, 880, 36, { fontSize: 20, bold: true, color: C.white, verticalAlignment: "middle" });
+    textBox(s, "NO CROSS-RUNTIME SPEED CLAIM; PRIVATE VLLM PROVENANCE REMAINS SEPARATE", 290, 604, 880, 18, { fontSize: 13, bold: true, color: "#FF9B92" });
     addFooter(s);
-    notes(s, "Do not imply a tuned result exists. The script reports TTFT, total latency and throughput when usage data is available.", [
+    notes(s, "Both paths have measured baseline-versus-optimized results. Do not compare their absolute speeds because model sizes, servers and protocols differ.", [
       "Benchmark script: submission/en/scripts/benchmark-openai-compatible.mjs.",
       "Optimization plan: submission/en/AMD_RADEON_ROCM.md.",
     ]);
@@ -401,10 +406,10 @@ async function build() {
   {
     const s = deck.slides.add();
     s.background.fill = C.white;
-    addTitle(s, 11, "Demo", "The video should prove the entire closed loop", "The recording already exists; insert the public URL and verify it from a signed-out browser.");
+    addTitle(s, 11, "Demo", "The video proves the entire closed loop", "The 3:07 public recording is available from two independent links.");
     rect(s, M, 208, W - M * 2, 78, C.ink, { geometry: "roundRect", borderRadius: 6 });
-    textBox(s, "PUBLIC VIDEO URL", 72, 226, 180, 20, { fontSize: 14, bold: true, color: C.cyan });
-    textBox(s, "<DEMO VIDEO URL>", 266, 220, 850, 34, { fontSize: 28, bold: true, color: C.white });
+    textBox(s, "PUBLIC VIDEO", 72, 226, 180, 20, { fontSize: 14, bold: true, color: C.cyan });
+    textBox(s, "Bilibili BV1t3up6iEhy  |  Baidu Cloud backup", 266, 220, 850, 34, { fontSize: 28, bold: true, color: C.white });
     line(s, 86, 382, 1108, C.ink, 2);
     const marks = [200, 640, 1080];
     const chapters = [
@@ -436,9 +441,9 @@ async function build() {
     line(s, M, 370, 88, C.cyan, 5);
     textBox(s, "Private reasoning. Deterministic delivery. Live board evidence.", M, 400, 920, 44, { fontSize: 29, bold: true, color: C.muted });
     const items = [
-      ["01", "Add team / participant name"],
-      ["02", "Add public 3-5 minute video URL"],
-      ["03", "Attach Radeon / ROCm proof and benchmark"],
+      ["01", "Team: d-robotics agent"],
+      ["02", "Public video: primary + backup"],
+      ["03", "32B SFT + 80B Radeon evidence"],
     ];
     let y = 500;
     for (const [n, label] of items) {
@@ -448,7 +453,7 @@ async function build() {
     }
     rect(s, 784, 490, 448, 142, C.ink, { geometry: "roundRect", borderRadius: 8 });
     textBox(s, "Next action", 816, 514, 160, 22, { fontSize: 17, bold: true, color: C.cyan });
-    textBox(s, "Complete the owner evidence, then open the official Track 2 pull request.", 816, 552, 372, 60, { fontSize: 22, bold: true, color: C.white, lineSpacing: 1.03 });
+    textBox(s, "Run the final integrity review, then open the official Track 2 pull request.", 816, 552, 372, 60, { fontSize: 22, bold: true, color: C.white, lineSpacing: 1.03 });
     addFooter(s);
     notes(s, "Close by resolving the opening promise and naming the only remaining owner actions. Do not end with a generic thank-you slide.", [
       "Submission checklist: submission/en/SUBMISSION_CHECKLIST.md.",

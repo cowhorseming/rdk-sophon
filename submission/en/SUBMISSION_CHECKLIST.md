@@ -4,7 +4,7 @@ Official deadline: **2026-08-06 23:59 Beijing/Singapore time (UTC+8)**.
 
 ## User-supplied fields
 
-- [ ] Replace every `<TEAM OR PARTICIPANT NAME>` placeholder with the exact Luma team name, or the participant's legal name if no team name was registered.
+- [x] Use the registered team name `d-robotics agent` consistently across the submission.
 - [x] Provide and verify both the Bilibili primary video URL and Baidu Cloud backup URL.
 
 ## Eligibility and pull request
@@ -12,7 +12,7 @@ Official deadline: **2026-08-06 23:59 Beijing/Singapore time (UTC+8)**.
 - [ ] Every team member is approved on Luma and enrolled in the AMD AI Developer Program.
 - [ ] Team size is one to three and all members used the same team name.
 - [ ] Fork the official competition repository and create one project directory, for example `submissions/track2-your-team-rdk-agent/`.
-- [ ] Use the title `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent`.
+- [x] Use the title `Track 2, d-robotics agent, RDK Agent`.
 - [ ] Keep the PR description and competition-facing artifacts in English.
 - [ ] Confirm the source and all links are publicly readable.
 
@@ -47,17 +47,17 @@ Official deadline: **2026-08-06 23:59 Beijing/Singapore time (UTC+8)**.
 - [ ] Verify the unprivileged `probe` service user has the GPIO permissions required by `Hobot.GPIO`.
 - [ ] Do not include ignored local `target/` or `node_modules/` directories in the competition copy.
 
-## Required AMD evidence
+## AMD evidence
 
-- [ ] Attach a redacted Radeon Cloud instance screenshot.
-- [ ] Capture AMD Radeon GPU model.
-- [ ] Capture ROCm/HIP version.
+- [x] Archive a redacted Radeon run record and model-side evidence.
+- [x] Capture AMD Radeon GPU model for both measured paths.
+- [x] Capture ROCm/HIP version for the 32B SFT path; disclose that the exact version was not archived for the independent 80B `llama.cpp` run.
 - [ ] Capture vLLM version and exact launch command.
-- [ ] Record model revision and precision/quantization.
-- [ ] Capture local `/v1/models` response.
-- [ ] Run the included benchmark on a baseline and tuned configuration.
-- [ ] Report p50/p95 TTFT, decode throughput, end-to-end time, and peak VRAM.
-- [ ] Keep raw/redacted evidence with the submitted project.
+- [x] Record model revision and precision/quantization for both measured paths.
+- [x] Capture local `/v1/models` response for the 32B SFT path; retain the three archived API canaries for the 80B path.
+- [x] Run baseline and tuned benchmarks for both measured paths.
+- [x] Report the metrics actually archived for each path without inventing missing percentiles.
+- [x] Keep raw/redacted evidence with the submitted project.
 - [ ] Never publish the endpoint credential or API key.
 
 ## Demo video

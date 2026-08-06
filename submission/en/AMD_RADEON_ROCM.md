@@ -2,7 +2,7 @@
 
 ## Compliance objective
 
-The Track 2 target inference path is a participant-controlled dedicated vLLM service on Radeon Cloud. The model process is intended to run on that AMD Radeon GPU instance with ROCm; `rdk-agent` reaches it through an OpenAI-compatible service boundary. A shared public model API must not be the only core inference path. Server-side proof remains pending and is listed below.
+The team has run two private Radeon inference paths: a trained Qwen3 32B SFT path and a Qwen3-Next 80B single-GPU serving path. Both use participant-controlled `gfx1100` hosts and have archived, auditable measurements. A separate `rdk-agent` client configuration routes to a private OpenAI-compatible vLLM endpoint; that endpoint's server provenance is not used for the published 80B performance figures.
 
 ## Current client configuration
 
@@ -20,17 +20,15 @@ The endpoint and API key are intentionally excluded. The public example uses an 
 
 This client configuration proves only model routing. It does not prove GPU type, ROCm version, serving backend, or quantization.
 
-## Server evidence required before final submission
+## Current evidence scope
 
-Capture and redact:
+Archived evidence includes:
 
-1. `rocm-smi` GPU product and driver output.
-2. ROCm/HIP version from `rocminfo` and PyTorch.
-3. vLLM version and exact launch command.
-4. Model repository/revision and served model name.
-5. Precision or quantization configuration.
-6. Local `/v1/models` response.
-7. A screenshot showing the participant-controlled Radeon Cloud instance without credentials.
+1. **32B SFT:** `gfx1100`, ROCm 7.2.1/HIP identity, pinned base revision and adapter hash, NF4 4-bit configuration, `/v1/models`, 88-trial-per-arm A/B, and a five-node live `rdk-agent` screenshot.
+2. **80B:** `gfx1100`, Q4_K_M GGUF identity and hash, single-card VRAM evidence, ten saved baseline/tuned records, aggregate verification script, and three API compatibility canaries.
+3. **Private vLLM client route:** provider `amd` and model selection are verified, but its separate server GPU, ROCm/vLLM version, launch command, revision, and precision are not independently archived here.
+
+See [MODEL_TRACK.md](MODEL_TRACK.md), [`model/AGENT_E2E.en.md`](../../model/AGENT_E2E.en.md), and the root README Section 9.5.
 
 ## Implemented software-level inference controls
 
@@ -80,16 +78,15 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 ## Evidence table
 
-| Item | Status |
-| --- | --- |
-| Client provider/model selection | Verified locally; sanitized in this submission |
-| AMD Radeon GPU model | Evidence pending |
-| ROCm version | Evidence pending |
-| Dedicated vLLM server version/configuration | Evidence pending |
-| Model precision/quantization | Evidence pending |
-| Baseline and tuned TTFT | Evidence pending |
-| Baseline and tuned decode throughput | Evidence pending |
-| Peak VRAM/utilization | Evidence pending |
-| End-to-end agent workflow latency | Evidence pending |
+| Item | 32B SFT path | 80B serving path |
+| --- | --- | --- |
+| Client/API identity | `/v1/models` and `/health` archived | three API compatibility canaries archived |
+| AMD Radeon GPU | `gfx1100`, 51.5 GB | `gfx1100`, 51.5 GB |
+| ROCm/runtime | ROCm 7.2.1, torch 2.9.1+rocm7.2.0 | `llama.cpp` HIP binary archived; exact ROCm version not captured |
+| Precision/quantization | NF4 4-bit base + LoRA, bf16 compute | Q4_K_M GGUF |
+| Baseline -> optimized TTFT | p50 17.41 -> 8.26 s; p95 83.97 -> 12.89 s | archived medians 2,021.26 -> 1,808.76 ms |
+| Baseline -> optimized decode | 6.54 -> 6.72 tok/s | 37.19 -> 49.82 tok/s |
+| Peak VRAM | 27.99 -> 28.06 GB | 48.84 -> 49.52 GB |
+| Agent workflow | 5/5 nodes in 4 min 04 s | no separately archived five-node trace |
 
-No unmeasured value should be changed from `Evidence pending` to a number.
+The separate private vLLM server remains a client-routing claim only. No unmeasured value is presented as measured.

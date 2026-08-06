@@ -195,7 +195,7 @@ RDK Agent -> OpenAI-compatible 私有端点 -> vLLM -> ROCm -> AMD Radeon GPU
 
 仓库有意排除了真实端点和 API key，并提供了经过脱敏的示例配置：[`config/pi-models.amd-rocm.example.json`](config/pi-models.amd-rocm.example.json)。
 
-最终评审前仍须从该实例采集服务器侧证据：Radeon GPU 型号、ROCm 版本、vLLM 版本及启动命令、模型 revision，以及精度/量化配置。仅凭客户端配置无法证明这些事实。
+团队已经实际跑通 `Qwen3-Next-80B-A3B-Instruct` 与经过 SFT 的 `Qwen3-32B-Agentic-SFT-r1-v3`。80B 路径封存了单张 Radeon 上的 `llama.cpp` 服务与兼容性记录；32B SFT 路径还完成了有记录的五节点 `rdk-agent` 实机工作流。仅凭客户端配置不能证明独立私有 vLLM 服务器的 GPU、ROCm、启动命令、revision 或精度，因此公开性能结论不使用该服务器来源信息。
 
 ## 9. AMD Radeon 与 ROCm 优化
 
@@ -211,33 +211,28 @@ RDK Agent -> OpenAI-compatible 私有端点 -> vLLM -> ROCm -> AMD Radeon GPU
 - 确定性脚本负责脚手架、验证、打包、哈希和部署，不额外调用模型。
 - 相互独立的内存会话可防止无关历史在不同阶段间累积。
 
-无论使用何种加速器，这些控制都能减少 token 用量和结果波动；它们对端到端延迟的影响仍需实测。
+无论使用何种加速器，这些控制都能减少 token 用量和结果波动。已封存的 32B SFT 运行还测得五节点实机工作流耗时 4 分 04 秒。
 
-### 9.2 Radeon 运行时调优计划
+### 9.2 Radeon 运行时实测路径
 
-最终由参赛者控制的 Radeon Cloud 实例应在保持 prompt 和输出上限不变的条件下，对比正确性基线与调优配置：
+两条由参赛者控制的 `gfx1100` 路径分别完成了实测：
 
-1. 固定 GPU、driver、ROCm、模型 revision、vLLM 版本/容器和 served model name。
-2. 预热模型并记录预热策略。
-3. 测量 time to first token、decode tokens/second、端到端阶段耗时和峰值 VRAM。
-4. 只评估硬件支持的精度或量化选项。
-5. 针对单用户工作流调优有界上下文长度、内存利用率和服务并发度。
-6. 使用 ROCm 工具记录利用率，并在支持时记录功耗和 profiler traces。
-7. 每次修改运行时配置后，都重新运行行为测试和契约测试。
+1. **32B SFT：** NF4 4-bit 基座加 LoRA adapter，ROCm 7.2.1，每臂 88 次试验，并完成 RDK X5 实机 Agent 运行。
+2. **80B：** Q4_K_M GGUF 在一张 51.5 GB Radeon 卡上通过 `llama.cpp` 运行；每臂 1 次预热加 5 次实测，并完成三项 API 兼容性 canary。
+
+两条路径分别保留运行时、协议和指标，不作跨运行时绝对速度比较。确切 revision、哈希、测量结果与复现边界见[模型侧索引](MODEL_TRACK.md)和根 README 第 9.5 节。
 
 ### 9.3 基准测试材料
 
-[`scripts/benchmark-openai-compatible.mjs`](scripts/benchmark-openai-compatible.mjs) 会发起可重复的固定 prompt 流式请求，并报告客户端 p50/p95 TTFT、总延迟、在返回 token usage 时的 decode throughput，以及响应正确性。脚本绝不会将 API key 写入报告。
+仓库保留了两条 Radeon 路径的实测结果与验证脚本。OpenAI-compatible 端点基准脚本仍可用于后续私有 vLLM 测量，并且不会把 API key 写入报告。
 
-由于在制作公开提交包时没有连接已配置的端点，本说明书不声明任何性能数值。基准表保持以证据为依据：
-
-| 指标 | 基线 | 调优后的 Radeon/ROCm | 状态 |
-| --- | ---: | ---: | --- |
-| Time to first token | - | - | 证据待补充 |
-| Decode tokens/second | - | - | 证据待补充 |
-| 端到端开发运行 | - | - | 证据待补充 |
-| 峰值 GPU 内存 | - | - | 证据待补充 |
-| 验收成功率 | - | - | 证据待补充 |
+| 指标 | 32B SFT 路径 | 80B 服务路径 |
+| --- | --- | --- |
+| 首 token 时间 | p50 17.41 s -> **8.26 s**；p95 83.97 s -> **12.89 s** | 已封存中位数 2,021.26 ms -> **1,808.76 ms** |
+| 解码吞吐量 | 6.54 -> **6.72 tok/s** | 37.19 -> **49.82 tok/s** |
+| Agent 端到端运行 | **4 分 04 秒完成 5/5 节点** | 未单独封存五节点轨迹 |
+| 峰值 GPU 内存 | 27.99 -> 28.06 GB | 48.84 -> 49.52 GB |
+| 证据范围 | 每臂 88 次试验 + Agent 实机截图 | 每臂 5 次实测 + API canary |
 
 ## 10. 复现与部署
 
@@ -300,7 +295,7 @@ cargo build --release --workspace
 - TCP 传输目前缺少客户端身份认证、mTLS 和 rate limiting。
 - 工作流状态和人工输入状态不会跨进程重启持久化。
 - 模型运行时配置目前是全局配置，而非按智能体 profile 选择。
-- 当前证据包仍需补充服务器侧 Radeon/ROCm/vLLM 证明和实测优化结果。
+- 独立私有 vLLM 端点的服务器来源信息尚未封存；32B SFT 与 80B `llama.cpp` 的 Radeon 实测结果已分别封存。
 - 实体动作效果仍需人工观察。
 
 以上均属于路线图项目，而非已经完成的功能。
@@ -314,9 +309,9 @@ cargo build --release --workspace
 | 场景与定位 | 第 1–3 节：自然语言机器人能力开发、智子命名隐喻和设备操作。 |
 | 智能体核心能力 | 第 5–7 节：工具调用、多步骤规划、权限/隐私和 TDD 交付。 |
 | 流畅的多轮交互 | 意图路由、有界修订、人工跟进和两种运行模式；不声明已实现持久化记忆。 |
-| Radeon 上的核心推理 | 专用私有 vLLM 架构和已配置模型；服务器硬件/ROCm 证据仍待补充。 |
-| Radeon 推理优化 | 已实现的推理工作量削减和可复现的运行时基准计划；实测结果仍待补充。 |
-| 可选 Radeon Cloud Model API 优化 | 已设计专用 Model API 路径；任何量化/精度声明都必须有最终服务器配置和对比结果支持。 |
+| Radeon 上的核心推理 | 32B SFT 与 80B Qwen3 均在参赛者控制的 `gfx1100` 主机上实际运行，并分别限定证据范围。 |
+| Radeon 推理优化 | 两条路径均有基线/优化实测结果，32B SFT 还完成五节点 Agent 实机运行。 |
+| 可选 Radeon Cloud Model API 优化 | 80B 单卡服务、API 兼容性 canary、模型/哈希身份，以及可复现的聚合验证。 |
 
 ## 14. 交付物
 

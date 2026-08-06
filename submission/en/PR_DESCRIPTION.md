@@ -1,13 +1,13 @@
 # Pull Request Title
 
 ```text
-Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
+Track 2, d-robotics agent, RDK Agent
 ```
 
 ## Track 2 Submission: RDK Agent
 
 - **Track:** Track 2 - Development and Local Deployment of Private AI Agents
-- **Team / Participant:** `<TEAM OR PARTICIPANT NAME>`
+- **Team / Participant:** `d-robotics agent`
 - **Application:** RDK Agent
 - **Demo video (primary):** https://www.bilibili.com/video/BV1t3up6iEhy/
 - **Demo video (backup):** https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd
@@ -61,7 +61,7 @@ The private runtime selects provider `amd` and `Qwen3-Next-80B-A3B-Instruct` thr
 
 Application-level inference controls already reduce unnecessary model work: deterministic greeting bypass, a short tool-free intent session, focused per-stage sessions, strict Skill loading, 6,000-character handoff bounds, and deterministic validators outside the model.
 
-Server-side GPU/ROCm/vLLM/precision proof and performance comparisons are not fabricated. They remain explicitly marked as evidence pending until redacted logs from the participant-controlled Radeon Cloud instance are attached.
+The team has run both `Qwen3-Next-80B-A3B-Instruct` and the SFT-trained `Qwen3-32B-Agentic-SFT-r1-v3`. The 80B path has archived single-Radeon `llama.cpp` serving, compatibility, and performance records; the 32B SFT path also has a recorded five-node live `rdk-agent` run. The separate private vLLM endpoint is only attested at the client-routing level, so its server provenance is not used for the published performance claims.
 
 ## Verification
 

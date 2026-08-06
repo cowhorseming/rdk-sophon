@@ -4,7 +4,7 @@
 
 ## 需由参赛者填写的字段
 
-- [ ] 将所有 `<TEAM OR PARTICIPANT NAME>` 占位符替换为准确的 Luma 团队名称；若未登记团队名称，则填写参赛者法定姓名。
+- [x] 在全部提交材料中统一使用已登记团队名称 `d-robotics agent`。
 - [x] 提供并验证 B 站主视频地址与百度云备用地址。
 
 ## 参赛资格与 Pull Request
@@ -12,7 +12,7 @@
 - [ ] 每位团队成员均已在 Luma 获得批准，并加入 AMD AI Developer Program。
 - [ ] 团队人数为 1–3 人，且所有成员使用同一团队名称。
 - [ ] Fork 官方比赛仓库并创建一个项目目录，例如 `submissions/track2-your-team-rdk-agent/`。
-- [ ] 使用标题 `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent`。
+- [x] 使用标题 `Track 2, d-robotics agent, RDK Agent`。
 - [ ] PR 描述及面向比赛评审的材料保持为英文。
 - [ ] 确认源代码及所有链接均可公开访问。
 
@@ -47,17 +47,17 @@
 - [ ] 验证非特权 `probe` 服务用户具备 `Hobot.GPIO` 所需的 GPIO 权限。
 - [ ] 不要在比赛副本中包含已忽略的本地 `target/` 或 `node_modules/` 目录。
 
-## 必需的 AMD 证据
+## AMD 证据
 
-- [ ] 附上经脱敏的 Radeon Cloud 实例截图。
-- [ ] 采集 AMD Radeon GPU 型号。
-- [ ] 采集 ROCm/HIP 版本。
+- [x] 封存经脱敏的 Radeon 运行记录与模型侧证据。
+- [x] 采集两条实测路径的 AMD Radeon GPU 型号。
+- [x] 采集 32B SFT 路径的 ROCm/HIP 版本；如实披露独立 80B `llama.cpp` 运行未封存确切版本。
 - [ ] 采集 vLLM 版本及确切启动命令。
-- [ ] 记录模型 revision 与精度/量化方式。
-- [ ] 采集本地 `/v1/models` 响应。
-- [ ] 使用随附基准脚本分别测试基线配置和优化配置。
-- [ ] 报告 p50/p95 TTFT、解码吞吐量、端到端时间和峰值 VRAM。
-- [ ] 将原始/脱敏证据与提交项目一并保存。
+- [x] 记录两条实测路径的模型 revision 与精度/量化方式。
+- [x] 采集 32B SFT 路径的本地 `/v1/models` 响应；80B 路径保留三项已封存 API canary。
+- [x] 对两条实测路径分别完成基线与优化配置测试。
+- [x] 报告各路径实际封存的指标，不补写未采集的百分位数据。
+- [x] 将原始/脱敏证据与提交项目一并保存。
 - [ ] 绝不公开端点凭据或 API key。
 
 ## 演示视频

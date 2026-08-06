@@ -54,17 +54,19 @@ RDK Agent 提供两种运行模式：
 - 一台已配置的 RDK X5 成功响应 `ping` 和 `state`；已发现 `servo` 插件。
 - 私有 Pi 运行时通过 OpenAI-compatible 端点选择了提供方 `amd` 和模型 `Qwen3-Next-80B-A3B-Instruct`。
 
+`Qwen3-Next-80B-A3B-Instruct` 与经过 SFT 的 `Qwen3-32B-Agentic-SFT-r1-v3` 均已实际跑通。80B 模型有已封存的单张 Radeon `llama.cpp` 服务与兼容性记录；32B SFT 模型还完成了有记录的五节点 `rdk-agent` 实机工作流。
+
 本仓库快照尚未独立证明：
 
 - 服务器侧 Radeon GPU 型号、ROCm 版本、vLLM 启动命令，以及模型精度/量化配置。
 - 客户端 TTFT 和输出 token 吞吐量。随附的基准测试脚本已经就绪，但本次提交不包含 API key 或私有端点。
 
-因此，本提交不会编造 AMD 性能数据。只有在取得参赛者控制的 Radeon Cloud 实例所产生、经过脱敏且可复现的日志后，才能替换标记为待补充的证据字段。
+私有 vLLM 端点仍只是一项客户端路由层声明。公开的 80B 性能数字来自另行封存的 `llama.cpp` 运行，本提交不会补写未采集的指标。
 
 ## Pull Request 标题
 
 ```text
-Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
+Track 2, d-robotics agent, RDK Agent
 ```
 
 本目录提供面向中文读者的完整译文；正式英文参赛材料位于 [`submission/en`](../en/README.md)。源代码树中的内部中文工程文档不作为面向比赛的项目说明。

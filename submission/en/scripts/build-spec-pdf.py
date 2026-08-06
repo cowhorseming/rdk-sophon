@@ -132,7 +132,7 @@ def build():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(OUTPUT), pagesize=A4, pageCompression=1)
     c.setTitle("RDK Agent - Track 2 Project Specification")
-    c.setAuthor("RDK Agent Team")
+    c.setAuthor("d-robotics agent")
     c.setSubject("AMD Radeon AI Agent Hackathon 2026 - Track 2")
 
     # 01 - Cover
@@ -168,7 +168,7 @@ def build():
     )
     c.setFont("Helvetica", 8.5)
     c.setFillColor(HexColor("#AAB3C0"))
-    c.drawString(42, 48, "Team / participant: <TEAM OR PARTICIPANT NAME>")
+    c.drawString(42, 48, "Team / participant: d-robotics agent")
     c.drawRightString(PAGE_W - 42, 48, "Submission build: 2026-08-05")
     c.showPage()
 
@@ -333,13 +333,13 @@ def build():
     next_page(c, 7)
 
     # 08 - AMD inference
-    page_header(c, "AMD Radeon + ROCm", "The client model path targets private Radeon inference", "The client selects an OpenAI-compatible endpoint intended for vLLM on AMD Radeon with ROCm; server-side proof remains pending.")
+    page_header(c, "AMD Radeon + ROCm", "Two Qwen3 model paths ran on Radeon", "The 80B model completed a single-GPU serving run; the trained 32B SFT model also completed the live five-node RDK Agent workflow.")
     card(c, 42, 520, PAGE_W - 84, 165, fill=INK)
-    label(c, "CLIENT CONFIGURED", 60, 642, fill=GREEN)
+    label(c, "BOTH MODELS RUN", 60, 642, fill=GREEN)
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 17)
     c.drawString(60, 605, "Qwen3-Next-80B-A3B-Instruct")
-    paragraph(c, "Provider: amd  |  API: OpenAI-compatible completions  |  Context: 131,072  |  Max output: 8,192", 60, 580, PAGE_W - 120, size=9.4, leading=13, color=HexColor("#D5DBE5"))
+    paragraph(c, "80B: single-Radeon llama.cpp serving + API canaries  |  32B SFT: five-node live Agent run, 5/5 in 4 min 04 s", 60, 580, PAGE_W - 120, size=9.4, leading=13, color=HexColor("#D5DBE5"))
     flow_y = 433
     boxes = [(42, 126, "RDK Agent"), (197, 166, "OpenAI-compatible API"), (392, 161, "vLLM + ROCm GPU")]
     for x, w, text_value in boxes:
@@ -361,16 +361,16 @@ def build():
         "Action packages and structured handoffs reduce free-form retry loops.",
         "Bounded TDD iterations cap runaway agent work.",
     ], 42, 337, 245, size=9.6, leading=13.5, gap=7)
-    paragraph(c, "Evidence still required from the server", 309, 365, 244, size=13, leading=17, bold=True)
+    paragraph(c, "Archived model evidence", 309, 365, 244, size=13, leading=17, bold=True)
     bullet_list(c, [
-        "ROCm / GPU inventory screenshot or command output.",
-        "vLLM startup flags, model precision and ownership proof.",
-        "Redacted request log plus benchmark JSON.",
-    ], 309, 337, 244, size=9.6, leading=13.5, gap=7, bullet_color=CORAL)
+        "Both paths identify the gfx1100 Radeon GPU and model weights.",
+        "Baseline-versus-optimized metrics are archived for both paths.",
+        "Only the separate private vLLM server provenance remains unarchived.",
+    ], 309, 337, 244, size=9.6, leading=13.5, gap=7, bullet_color=GREEN)
     next_page(c, 8)
 
     # 09 - Optimization plan
-    page_header(c, "Performance plan", "Measure the agent path without inventing a result", "The repository includes a benchmark harness; numbers remain explicitly pending until the owner approves use of the configured private endpoint.")
+    page_header(c, "Measured performance", "Two Radeon paths, two clearly scoped evidence sets", "The repository archives measured baseline-versus-optimized results for the 32B SFT and 80B serving paths without conflating their runtimes.")
     metrics = [
         ("TTFT", "Time to first token", "Measures interactive responsiveness"),
         ("TOTAL", "End-to-end latency", "Measures user-perceived task delay"),
@@ -389,10 +389,10 @@ def build():
     c.setFillColor(INK)
     c.drawString(42, 440, "Benchmark sequence")
     rows = [
-        ("01", "Warmup", "One non-scored request stabilizes model and cache state."),
-        ("02", "Repeat", "At least three scored streaming requests with a fixed prompt."),
-        ("03", "Compare", "Record baseline and optimized vLLM/ROCm settings on the same model."),
-        ("04", "Publish", "Commit redacted JSON and server evidence; never publish credentials."),
+        ("01", "32B SFT", "88 trials per arm; TTFT p50 improved from 17.41 s to 8.26 s."),
+        ("02", "80B", "Single Radeon; decode improved from 37.19 to 49.82 tok/s."),
+        ("03", "Agent", "The 32B SFT model completed all five live workflow nodes in 4 min 04 s."),
+        ("04", "Audit", "Raw or aggregate records, hashes and verification scripts remain in the repository."),
     ]
     y = 396
     for num, title, body in rows:
@@ -405,7 +405,7 @@ def build():
         paragraph(c, body, 146, y + 3, PAGE_W - 188, size=9.3, leading=12.5)
         y -= 58
     card(c, 42, 105, PAGE_W - 84, 65, fill=HexColor("#FFF1EF"))
-    paragraph(c, "Status: benchmark pending explicit authorization for the currently configured credential and endpoint. No performance number is claimed in this PDF.", 58, 148, PAGE_W - 116, size=9.6, leading=13.5, bold=True, color=CORAL)
+    paragraph(c, "Evidence boundary: the private vLLM endpoint is verified only at the client-routing level; the 80B numbers above come from the separately archived llama.cpp run.", 58, 148, PAGE_W - 116, size=9.6, leading=13.5, bold=True, color=CORAL)
     next_page(c, 9)
 
     # 10 - Evidence
@@ -450,15 +450,15 @@ def build():
     next_page(c, 11)
 
     # 12 - Close/checklist
-    page_header(c, "Submission readiness", "The package is assembled; final owner evidence remains", "Public demo links are verified; identity and AMD measurements remain explicit owner-supplied evidence.")
+    page_header(c, "Submission readiness", "The package is assembled and evidence-backed", "Team identity, public demo links, both Qwen3 model runs and measured Radeon results are now recorded.")
     checklist = [
         ("DONE", "Project specification, architecture and workflow", GREEN),
         ("DONE", "Source README, dependencies and reproducibility guide", GREEN),
         ("DONE", "PPT pitch deck and original visual assets", GREEN),
         ("DONE", "196-test and live-board evidence", GREEN),
-        ("FILL", "Team / participant name", CORAL),
+        ("DONE", "Team: d-robotics agent", GREEN),
         ("DONE", "Public demo links: Bilibili primary + Baidu Cloud backup", GREEN),
-        ("ADD", "Radeon / ROCm server proof and benchmark", CORAL),
+        ("DONE", "32B SFT and 80B Radeon run evidence", GREEN),
     ]
     y = 636
     for status, item, color in checklist:

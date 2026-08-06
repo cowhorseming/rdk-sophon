@@ -195,7 +195,7 @@ The current private runtime configuration selects:
 
 The repository intentionally excludes the real endpoint and API key. A sanitized configuration is provided in [`config/pi-models.amd-rocm.example.json`](config/pi-models.amd-rocm.example.json).
 
-Server-side evidence must be captured from that instance before final judging: Radeon GPU model, ROCm version, vLLM version and launch command, model revision, and precision/quantization. The client configuration alone does not attest these facts.
+The team has actually run both `Qwen3-Next-80B-A3B-Instruct` and the SFT-trained `Qwen3-32B-Agentic-SFT-r1-v3`. The 80B path has archived single-Radeon `llama.cpp` serving and compatibility records; the 32B SFT path also completed a recorded five-node live `rdk-agent` workflow. The client configuration alone does not attest the separate private vLLM server's GPU, ROCm, launch command, revision, or precision, so that server provenance is not used for the published performance claims.
 
 ## 9. AMD Radeon and ROCm optimization
 
@@ -211,33 +211,28 @@ The project already reduces model work at the application layer:
 - Deterministic scripts handle scaffolding, validation, packaging, hashes, and deployment without extra model calls.
 - Independent in-memory sessions prevent unrelated history from accumulating across stages.
 
-These controls reduce tokens and variability regardless of accelerator. Their impact on end-to-end latency still requires measurement.
+These controls reduce tokens and variability regardless of accelerator. The archived 32B SFT run additionally measures the live five-node workflow at 4 min 04 s.
 
-### 9.2 Radeon runtime tuning plan
+### 9.2 Measured Radeon runtime paths
 
-The final participant-controlled Radeon Cloud instance should compare a correctness baseline against tuned configurations while holding prompts and output limits constant:
+Two participant-controlled `gfx1100` paths were measured separately:
 
-1. Pin GPU, driver, ROCm, model revision, vLLM version/container, and served model name.
-2. Warm the model and record the warm-up policy.
-3. Measure time to first token, decode tokens/second, end-to-end stage time, and peak VRAM.
-4. Evaluate only hardware-supported precision or quantization options.
-5. Tune bounded context length, memory utilization, and serving concurrency for the single-user workflow.
-6. Use ROCm tools to record utilization and, where supported, power and profiler traces.
-7. Re-run behavior and contract tests after every runtime change.
+1. **32B SFT:** NF4 4-bit base plus LoRA adapter, ROCm 7.2.1, 88 trials per arm, and a live RDK X5 Agent run.
+2. **80B:** Q4_K_M GGUF on one 51.5 GB Radeon card with `llama.cpp`, one warm-up plus five measured runs per arm, and three API compatibility canaries.
+
+The paths keep their runtimes, protocols, and metrics separate. See the [model track index](MODEL_TRACK.md) and the root README Section 9.5 for exact revisions, hashes, measurements, and reproduction boundaries.
 
 ### 9.3 Benchmark artifact
 
-[`scripts/benchmark-openai-compatible.mjs`](scripts/benchmark-openai-compatible.mjs) issues repeatable fixed-prompt streaming requests and reports p50/p95 client TTFT, total latency, decode throughput when token usage is returned, and response correctness. It never writes the API key to its report.
+The repository retains the measured results and verification scripts for both Radeon paths. The OpenAI-compatible endpoint benchmark script remains available for future private vLLM measurements and never writes the API key to its report.
 
-No performance number is claimed in this specification because the configured endpoint was not contacted while creating the public submission package. The benchmark table remains evidence-driven:
-
-| Metric | Baseline | Tuned Radeon/ROCm | Status |
-| --- | ---: | ---: | --- |
-| Time to first token | - | - | Evidence pending |
-| Decode tokens/second | - | - | Evidence pending |
-| End-to-end development run | - | - | Evidence pending |
-| Peak GPU memory | - | - | Evidence pending |
-| Acceptance success rate | - | - | Evidence pending |
+| Metric | 32B SFT path | 80B serving path |
+| --- | --- | --- |
+| Time to first token | p50 17.41 s -> **8.26 s**; p95 83.97 s -> **12.89 s** | archived medians 2,021.26 ms -> **1,808.76 ms** |
+| Decode throughput | 6.54 -> **6.72 tok/s** | 37.19 -> **49.82 tok/s** |
+| End-to-end Agent run | **5/5 nodes in 4 min 04 s** | no separately archived five-node trace |
+| Peak GPU memory | 27.99 -> 28.06 GB | 48.84 -> 49.52 GB |
+| Evidence scope | 88 trials/arm plus live-Agent screenshot | 5 measured runs/arm plus API canaries |
 
 ## 10. Reproducibility and deployment
 
@@ -300,7 +295,7 @@ The Rust formatting check is not presented as passing: `cargo fmt --all -- --che
 - TCP transport currently lacks client authentication, mTLS, and rate limiting.
 - Workflow and human-input state are not persisted across process restarts.
 - The model runtime configuration is global rather than selected per agent profile.
-- The current evidence package still needs server-side Radeon/ROCm/vLLM proof and measured optimization results.
+- The separate private vLLM endpoint's server provenance is not archived; measured 32B SFT and 80B `llama.cpp` Radeon results are archived independently.
 - Physical motion quality requires human observation.
 
 These boundaries are roadmap items, not completed features.
@@ -314,9 +309,9 @@ The governing rules score 100 base points plus 20 optional points. The submissio
 | Scenario and positioning | Sections 1-3; natural-language robot capability development, the Sophon naming metaphor, and device operation. |
 | Agent core capability | Sections 5-7; tool calling, multi-step planning, permissions/privacy, TDD delivery. |
 | Smooth multi-turn interaction | Intent routing, bounded revision, human follow-up, and two operating modes; persistent memory is not claimed. |
-| Core inference on Radeon | Dedicated private vLLM architecture and configured model; server hardware/ROCm proof remains required. |
-| Radeon inference optimization | Implemented inference-work reduction plus the reproducible runtime benchmark plan; measured results remain required. |
-| Optional Radeon Cloud Model API optimization | Dedicated model API path is designed; any quantization/precision claim must be backed by the final server configuration and comparison. |
+| Core inference on Radeon | Actual 32B SFT and 80B Qwen3 runs on participant-controlled `gfx1100` hosts, with separate evidence scopes. |
+| Radeon inference optimization | Measured baseline-versus-optimized results for both paths, plus the 32B SFT live five-node Agent run. |
+| Optional Radeon Cloud Model API optimization | 80B single-card serving, API compatibility canaries, model/hash identity, and reproducible aggregate verification. |
 
 ## 14. Deliverables
 

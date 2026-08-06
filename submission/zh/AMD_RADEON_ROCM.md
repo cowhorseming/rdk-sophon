@@ -2,7 +2,7 @@
 
 ## 合规目标
 
-赛道 2 的目标推理链路，是在参赛者控制的 Radeon Cloud 上运行专用 vLLM 服务。模型进程应在该 AMD Radeon GPU 实例上通过 ROCm 运行；`rdk-agent` 通过 OpenAI-compatible 服务边界访问它。共享的公共模型 API 不得成为唯一的核心推理链路。服务器侧证明仍为证据待补（Evidence pending），具体项目列于下文。
+团队已实际跑通两条私有 Radeon 推理路径：自训练的 Qwen3 32B SFT 路径，以及 Qwen3-Next 80B 单 GPU 服务路径。两条路径均运行在参赛者控制的 `gfx1100` 主机上，并保留了可审计的实测记录。另有一个 `rdk-agent` 客户端配置路由到私有 OpenAI-compatible vLLM 端点；公开的 80B 性能数字不使用该端点的服务器来源信息。
 
 ## 当前客户端配置
 
@@ -20,17 +20,15 @@
 
 该客户端配置只能证明模型路由，不能证明 GPU 型号、ROCm 版本、服务后端或量化方式。
 
-## 最终提交前必须补充的服务器证据
+## 当前证据范围
 
-采集并脱敏：
+已封存证据包括：
 
-1. `rocm-smi` 输出的 GPU 产品与驱动信息。
-2. `rocminfo` 和 PyTorch 输出的 ROCm/HIP 版本。
-3. vLLM 版本及确切启动命令。
-4. 模型仓库/revision 和 served model name。
-5. 精度或量化配置。
-6. 本地 `/v1/models` 响应。
-7. 能体现参赛者控制 Radeon Cloud 实例、且不含凭据的截图。
+1. **32B SFT：** `gfx1100`、ROCm 7.2.1/HIP 身份、固定的基座 revision 与 adapter 哈希、NF4 4-bit 配置、`/v1/models`、每臂 88 次 A/B，以及五节点 `rdk-agent` 实机截图。
+2. **80B：** `gfx1100`、Q4_K_M GGUF 身份与哈希、单卡显存证据、十条基线/优化记录、聚合验证脚本，以及三项 API 兼容性 canary。
+3. **私有 vLLM 客户端路由：** provider `amd` 与模型选择已经验证，但其独立服务器的 GPU、ROCm/vLLM 版本、启动命令、revision 与精度未在此单独封存。
+
+详见 [MODEL_TRACK.md](MODEL_TRACK.md)、[`model/AGENT_E2E.md`](../../model/AGENT_E2E.md)与根 README 第 9.5 节。
 
 ## 已实现的软件层推理控制
 
@@ -80,16 +78,15 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 
 ## 证据表
 
-| 项目 | 状态 |
-| --- | --- |
-| 客户端 provider/model 选择 | 已在本地验证；本提交中已脱敏 |
-| AMD Radeon GPU 型号 | 证据待补（Evidence pending） |
-| ROCm 版本 | 证据待补（Evidence pending） |
-| 专用 vLLM 服务器版本/配置 | 证据待补（Evidence pending） |
-| 模型精度/量化 | 证据待补（Evidence pending） |
-| 基线与优化后 TTFT | 证据待补（Evidence pending） |
-| 基线与优化后解码吞吐量 | 证据待补（Evidence pending） |
-| 峰值 VRAM/利用率 | 证据待补（Evidence pending） |
-| 智能体工作流端到端延迟 | 证据待补（Evidence pending） |
+| 项目 | 32B SFT 路径 | 80B 服务路径 |
+| --- | --- | --- |
+| 客户端/API 身份 | 已封存 `/v1/models` 与 `/health` | 已封存三项 API 兼容性 canary |
+| AMD Radeon GPU | `gfx1100`，51.5 GB | `gfx1100`，51.5 GB |
+| ROCm/运行时 | ROCm 7.2.1，torch 2.9.1+rocm7.2.0 | 已封存 `llama.cpp` HIP 二进制；未采集确切 ROCm 版本 |
+| 精度/量化 | NF4 4-bit 基座 + LoRA，bf16 计算 | Q4_K_M GGUF |
+| 基线 -> 优化 TTFT | p50 17.41 -> 8.26 s；p95 83.97 -> 12.89 s | 已封存中位数 2,021.26 -> 1,808.76 ms |
+| 基线 -> 优化解码 | 6.54 -> 6.72 tok/s | 37.19 -> 49.82 tok/s |
+| 峰值显存 | 27.99 -> 28.06 GB | 48.84 -> 49.52 GB |
+| Agent 工作流 | 4 分 04 秒完成 5/5 节点 | 未单独封存五节点轨迹 |
 
-任何未经测量的项目都不得从 `Evidence pending` 改为具体数值。
+独立私有 vLLM 服务器仍只是一项客户端路由声明。任何未测量值都不会被描述为实测。
