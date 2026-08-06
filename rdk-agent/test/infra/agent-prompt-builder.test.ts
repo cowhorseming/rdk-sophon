@@ -41,7 +41,9 @@ test("test-agent prompt requires an initial target-behavior red run for new capa
 	assert.match(prompt, /不得拿上一个循环的测试文件冒充当前阶段测试/);
 	assert.match(prompt, /当前 Agent 的唯一任务（优先级最高）/);
 	assert.match(prompt, /工具层允许写入的唯一路径范围：tests\/\*\.ts/);
-	assert.match(prompt, /必须创建本轮新脚手架并先得到因目标行为未实现而失败的有效红测/);
+	assert.match(prompt, /必须调用 scaffold 创建本轮新脚手架/);
+	assert.match(prompt, /同名历史动作会被运行时可恢复地备份/);
+	assert.match(prompt, /必须先得到因目标行为未实现而失败的有效红测/);
 	assert.match(prompt, /测试在实现前直接通过.*意外绿测/);
 	assert.match(prompt, /导入、测试收集、fixture、路径或 mock 配置失败永远不是有效红测/);
 	assert.match(prompt, /工具调用上限为 6 次/);

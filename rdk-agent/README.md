@@ -184,6 +184,8 @@ Pi SDK 本身没有内置安全沙箱；它提供可替换工具接口和容器/
 
 默认托管工程位于 `~/.local/state/rdk-agent/workspaces/magicbox-servo/v<workspace.version>`，由内置模板首次原子初始化，重复启动不会覆盖已开发代码。它是研发 Agent 在当前开发机上的可写交付工程，不是对 rdk-sophon 源码仓库的依赖；动作包在这里完成测试与构建后才部署到目标板。`/workspace` 可查看当前工程和来源。模板交付契约升级时必须提高 `workspace.version`，以创建新目录并保留旧工程，不能在同一版本下复用不完整模板。
 
+托管工程的持久化不等于允许新增功能复用历史实现。明确的新增/创建/实现请求在第一轮必须由当前 Session 调用 scaffold；若同名动作已经存在，运行时会先将它可恢复地归档到 `.rdk-agent/action-history/<action-id>/vN`，再创建干净脚手架。实现 Agent 工作前必须运行目标 `unittest` 并得到有效行为红测；若新脚手架的测试提前变绿，运行时会拒绝该意外绿测。修改、修复和测试既有功能仍允许绿色回归。
+
 开发阶段的动作行为与契约测试在离线 Podman 容器中执行。运行时只依赖 Python 3.12 标准库，测试统一使用 `unittest`；不使用 pytest，不会在任务中联网安装包。模板自带 FakeContext 和 GPIO mock 参考测试，供测试 Agent 按现有项目规范扩展。
 
 只有参与 rdk-sophon 仓库开发时才需要显式指定外部源码：
@@ -210,6 +212,15 @@ rdk-agent --workspace /path/to/rdk-sophon
 ```sh
 rdk-agent --config-dir /path/to/config
 ```
+
+界面语言默认为简体中文。可通过启动参数或环境变量切换为英文，启动参数优先：
+
+```sh
+rdk-agent --lang en
+RDK_AGENT_LANG=en rdk-agent
+```
+
+支持 `zh` / `zh-CN` 与 `en` / `en-US` 等常用别名。语言选项会切换 TUI、无头模式、编排状态和 Agent 面向用户的回答；命令、路径、标识符以及底层工具和板端返回的原始输出保持不变。`agents.yaml` 中的 `nameEn`、`descriptionEn`、`deliverableEn` 和 `developmentScopeEn` 是可选英文展示字段，缺失时回退到原字段。
 
 部署目录可通过 `npm run deploy -- --install-dir <dir> --bin-dir <dir> --config-dir <dir>` 覆盖；脚本会先在临时目录安装生产依赖，成功后再替换旧版本。需要显式刷新静态配置时追加 `--refresh-config`。
 

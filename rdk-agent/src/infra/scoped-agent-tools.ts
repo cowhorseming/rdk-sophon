@@ -175,6 +175,24 @@ export function assertNewCapabilityTestBaseline(command: string, context: Scoped
 	));
 }
 
+function actionPackageStatus(result: unknown): string | undefined {
+	if (typeof result !== "object" || result === null) return undefined;
+	const content = (result as { content?: unknown }).content;
+	if (!Array.isArray(content)) return undefined;
+	for (const item of content) {
+		if (typeof item !== "object" || item === null || (item as { type?: unknown }).type !== "text") continue;
+		const value = (item as { text?: unknown }).text;
+		if (typeof value !== "string") continue;
+		try {
+			const payload = JSON.parse(value) as { status?: unknown };
+			if (typeof payload.status === "string") return payload.status;
+		} catch {
+			// The fixed action-package script normally returns JSON; leave unknown output untrusted.
+		}
+	}
+	return undefined;
+}
+
 export function scopedAgentTools(
 	workspaceRoot: string,
 	skillDirectory: string,
@@ -205,8 +223,12 @@ export function scopedAgentTools(
 			return writeTool.execute(...executeArgs);
 		},
 	} as AnyToolDefinition;
+	const freshExisting = runContext !== undefined
+		&& runContext.expectation === "test"
+		&& (runContext.iteration ?? 1) === 1
+		&& isNewCapabilityRequest(runContext.userRequest);
 	const actionPackageTool = profile.actionPackage
-		? createActionPackageToolDefinition(workspaceRoot, profile, runContext!.userRequest)
+		? createActionPackageToolDefinition(workspaceRoot, profile, runContext!.userRequest, { freshExisting })
 		: undefined;
 	const guardedActionPackageTool = actionPackageTool
 		? {
@@ -214,7 +236,9 @@ export function scopedAgentTools(
 			async execute(...executeArgs: Parameters<typeof actionPackageTool.execute>) {
 				const result = await actionPackageTool.execute(...executeArgs);
 				const input = executeArgs[1] as { operation?: unknown };
-				if (input.operation === "scaffold" && runContext?.testBaseline) {
+				if (input.operation === "scaffold"
+					&& actionPackageStatus(result) === "scaffolded"
+					&& runContext?.testBaseline) {
 					runContext.testBaseline.scaffoldSucceeded = true;
 				}
 				return result;

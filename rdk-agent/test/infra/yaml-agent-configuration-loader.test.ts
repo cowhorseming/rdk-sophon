@@ -278,7 +278,7 @@ test("bundled development workflow uses action-package TDD and deterministic rel
 	]);
 	if (configuration.workspace.kind === "managed-template") {
 		assert.equal(configuration.workspace.id, "magicbox-servo");
-		assert.equal(configuration.workspace.version, 6);
+	assert.equal(configuration.workspace.version, 7);
 		assert.match(configuration.workspace.templateDirectory, /config\/templates\/magicbox-servo$/);
 	}
 	for (const profile of configuration.profiles) assert.equal(profile.maxToolCalls, undefined);
@@ -312,7 +312,7 @@ test("bundled development workflow uses action-package TDD and deterministic rel
 	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /对“开发一个挥动右手的功能”/);
 	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /start\s*=\s*`?(?:left|right)`?/);
 	assert.doesNotMatch(byId.get("action-test")?.systemPrompt ?? "", /lift_(?:left|right).*lower_(?:left|right)/);
-	assert.match(byId.get("action-test")?.systemPrompt ?? "", /返工轮已存在时绝不能再次 scaffold/);
+	assert.match(byId.get("action-test")?.systemPrompt ?? "", /修改、修复、测试既有功能或返工轮时绝不能再次 scaffold/);
 	assert.match(byId.get("action-test")?.systemPrompt ?? "", /v1 只支持无参数动作/);
 	assert.match(byId.get("action-coding")?.systemPrompt ?? "", /run\(context, params\)/);
 	assert.match(byId.get("action-verification")?.systemPrompt ?? "", /错误码/);

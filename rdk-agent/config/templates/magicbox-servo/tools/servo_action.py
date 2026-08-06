@@ -29,6 +29,7 @@ BRIDGE_METHODS = {
 ROOT = Path(__file__).resolve().parents[1]
 ACTIONS_ROOT = ROOT / "examples" / "plugins" / "servo" / "servo_actions"
 RELEASE_ROOT = ROOT / ".rdk-agent" / "releases" / "current"
+ACTION_HISTORY_ROOT = ROOT / ".rdk-agent" / "action-history"
 BASE_SKILL = ROOT / "skills" / "servo-control" / "SKILL.md"
 SCHEMA = "rdk-servo-action/v1"
 
@@ -181,45 +182,74 @@ def validate_action(directory: Path, allow_placeholder: bool = False) -> dict[st
     return manifest
 
 
-def scaffold(action_id: str, description: str | None = None, start: str = "both", intents: list[str] | None = None) -> None:
+def archive_action(action_id: str, directory: Path) -> Path:
+    history = ACTION_HISTORY_ROOT / action_id
+    history.mkdir(parents=True, exist_ok=True)
+    version = 1
+    while (history / ("v%d" % version)).exists():
+        version += 1
+    destination = history / ("v%d" % version)
+    os.replace(directory, destination)
+    return destination
+
+
+def scaffold(
+    action_id: str,
+    description: str | None = None,
+    start: str = "both",
+    intents: list[str] | None = None,
+    fresh: bool = False,
+) -> None:
     directory = action_directory(action_id)
+    archived: Path | None = None
     if directory.exists():
-        manifest = read_manifest(directory)
-        if manifest.get("schema") != SCHEMA or manifest.get("id") != action_id or manifest.get("entrypoint") != "action.py:run":
-            raise ContractError("ACTION-SCAFFOLD-002", "既有动作包不符合可复用契约：%s" % directory, directory / "registry.json")
-        emit({"status": "existing", "actionId": action_id, "directory": str(directory.relative_to(ROOT))})
-    if start not in {"left", "right", "both", "none"}:
-        raise ContractError("ACTION-START-001", "start 必须是 left、right、both 或 none")
-    resolved_description = require_metadata_text(description or "待补充：%s 动作说明" % action_id, "description")
-    resolved_intents = intents or ["待补充：%s 的自然语言触发语句" % action_id]
-    if not resolved_intents:
-        raise ContractError("ACTION-SKILL-001", "intentExamples 必须至少包含一项")
-    resolved_intents = [require_metadata_text(item, "intentExamples[]") for item in resolved_intents]
-    directory.mkdir(parents=True)
-    (directory / "tests").mkdir()
-    manifest = {
-        "schema": SCHEMA,
-        "id": action_id,
-        "description": resolved_description,
-        "entrypoint": "action.py:run",
-        "start": start,
-        "arguments": [],
-        "skill": {"intentExamples": resolved_intents, "risk": "motion"},
-    }
-    (directory / "registry.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (directory / "action.py").write_text(
-        '"""%s action package."""\n\n\ndef run(context, params):\n    """Implement the action using the supplied hardware bridge only."""\n    raise NotImplementedError("implement %s")\n' % (action_id, action_id),
-        encoding="utf-8",
-    )
-    (directory / "tests" / "test_action.py").write_text(
-        "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nACTION_PATH = Path(__file__).resolve().parents[1] / 'action.py'\n\n\ndef load_run():\n    spec = importlib.util.spec_from_file_location('action_under_test', ACTION_PATH)\n    module = importlib.util.module_from_spec(spec)\n    assert spec and spec.loader\n    spec.loader.exec_module(module)\n    return module.run\n\n\nclass FakeContext:\n    def __init__(self):\n        self.calls = []\n\n    def __getattr__(self, name):\n        def record(*args, **kwargs):\n            self.calls.append(name)\n        return record\n\n\nclass ActionBehaviorTest(unittest.TestCase):\n    def test_action_behavior(self):\n        # Replace this one method with the requested behavior. Keep this file, loader and FakeContext.\n        self.fail('define the expected context calls for %s')\n\n\nif __name__ == '__main__':\n    unittest.main()\n" % action_id,
-        encoding="utf-8",
-    )
-    (directory / "tests" / "test_contract.py").write_text(
-        "import subprocess\nimport sys\nimport unittest\nfrom pathlib import Path\n\n\nclass ActionContractTest(unittest.TestCase):\n    def test_package_contract(self):\n        root = Path(__file__).resolve().parents[6]\n        result = subprocess.run([sys.executable, 'tools/servo_action.py', 'validate-scaffold', '%s'], cwd=root, capture_output=True, text=True)\n        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)\n\n\nif __name__ == '__main__':\n    unittest.main()\n" % action_id,
-        encoding="utf-8",
-    )
-    emit({"status": "scaffolded", "actionId": action_id, "directory": str(directory.relative_to(ROOT))})
+        if not fresh:
+            manifest = read_manifest(directory)
+            if manifest.get("schema") != SCHEMA or manifest.get("id") != action_id or manifest.get("entrypoint") != "action.py:run":
+                raise ContractError("ACTION-SCAFFOLD-002", "既有动作包不符合可复用契约：%s" % directory, directory / "registry.json")
+            emit({"status": "existing", "actionId": action_id, "directory": str(directory.relative_to(ROOT))})
+        archived = archive_action(action_id, directory)
+    try:
+        if start not in {"left", "right", "both", "none"}:
+            raise ContractError("ACTION-START-001", "start 必须是 left、right、both 或 none")
+        resolved_description = require_metadata_text(description or "待补充：%s 动作说明" % action_id, "description")
+        resolved_intents = intents or ["待补充：%s 的自然语言触发语句" % action_id]
+        if not resolved_intents:
+            raise ContractError("ACTION-SKILL-001", "intentExamples 必须至少包含一项")
+        resolved_intents = [require_metadata_text(item, "intentExamples[]") for item in resolved_intents]
+        directory.mkdir(parents=True)
+        (directory / "tests").mkdir()
+        manifest = {
+            "schema": SCHEMA,
+            "id": action_id,
+            "description": resolved_description,
+            "entrypoint": "action.py:run",
+            "start": start,
+            "arguments": [],
+            "skill": {"intentExamples": resolved_intents, "risk": "motion"},
+        }
+        (directory / "registry.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (directory / "action.py").write_text(
+            '"""%s action package."""\n\n\ndef run(context, params):\n    """Implement the action using the supplied hardware bridge only."""\n    raise NotImplementedError("implement %s")\n' % (action_id, action_id),
+            encoding="utf-8",
+        )
+        (directory / "tests" / "test_action.py").write_text(
+            "import importlib.util\nimport unittest\nfrom pathlib import Path\n\n\nACTION_PATH = Path(__file__).resolve().parents[1] / 'action.py'\n\n\ndef load_run():\n    spec = importlib.util.spec_from_file_location('action_under_test', ACTION_PATH)\n    module = importlib.util.module_from_spec(spec)\n    assert spec and spec.loader\n    spec.loader.exec_module(module)\n    return module.run\n\n\nclass FakeContext:\n    def __init__(self):\n        self.calls = []\n\n    def __getattr__(self, name):\n        def record(*args, **kwargs):\n            self.calls.append(name)\n        return record\n\n\nclass ActionBehaviorTest(unittest.TestCase):\n    def test_action_behavior(self):\n        # Replace this one method with the requested behavior. Keep this file, loader and FakeContext.\n        self.fail('define the expected context calls for %s')\n\n\nif __name__ == '__main__':\n    unittest.main()\n" % action_id,
+            encoding="utf-8",
+        )
+        (directory / "tests" / "test_contract.py").write_text(
+            "import subprocess\nimport sys\nimport unittest\nfrom pathlib import Path\n\n\nclass ActionContractTest(unittest.TestCase):\n    def test_package_contract(self):\n        root = Path(__file__).resolve().parents[6]\n        result = subprocess.run([sys.executable, 'tools/servo_action.py', 'validate-scaffold', '%s'], cwd=root, capture_output=True, text=True)\n        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)\n\n\nif __name__ == '__main__':\n    unittest.main()\n" % action_id,
+            encoding="utf-8",
+        )
+    except Exception:
+        if archived is not None:
+            shutil.rmtree(directory, ignore_errors=True)
+            os.replace(archived, directory)
+        raise
+    payload = {"status": "scaffolded", "actionId": action_id, "directory": str(directory.relative_to(ROOT))}
+    if archived is not None:
+        payload["archived"] = str(archived.relative_to(ROOT))
+    emit(payload)
 
 
 def validate(action_id: str, allow_placeholder: bool = False) -> None:
@@ -318,11 +348,12 @@ def main() -> None:
             child.add_argument("--description")
             child.add_argument("--start", default="both")
             child.add_argument("--intent", action="append")
+            child.add_argument("--fresh", action="store_true")
     subparsers.add_parser("build")
     args = parser.parse_args()
     try:
         if args.command == "new":
-            scaffold(args.action_id, args.description, args.start, args.intent)
+            scaffold(args.action_id, args.description, args.start, args.intent, args.fresh)
         elif args.command == "validate":
             validate(args.action_id)
         elif args.command == "validate-scaffold":

@@ -116,6 +116,45 @@ test("action-package tooling fails closed without the original user request cont
 	}));
 });
 
+test("first-iteration new capability uses a fresh scaffold and records only a new baseline", async (context) => {
+	const workspace = mkdtempSync(join(tmpdir(), "rdk-agent-scoped-fresh-scaffold-"));
+	context.after(() => rmSync(workspace, { recursive: true, force: true }));
+	mkdirSync(join(workspace, "tools"), { recursive: true });
+	writeFileSync(
+		join(workspace, "tools", "servo_action.py"),
+		"import json, sys\nfrom pathlib import Path\nPath('invocation.json').write_text(json.dumps(sys.argv[1:]), encoding='utf-8')\nprint(json.dumps({'status': 'scaffolded'}))\n",
+	);
+	const profile: AgentProfile = {
+		id: "action-test",
+		name: "Action test",
+		description: "test",
+		tools: ["action-package"],
+		skills: [],
+		systemPrompt: "test",
+		writePaths: [],
+		timeoutSeconds: 30,
+		actionPackage: { operations: ["scaffold"] },
+	};
+	const baseline = { scaffoldSucceeded: false };
+	const [tool] = scopedAgentTools(workspace, join(workspace, "skills"), profile, {
+		expectation: "test",
+		userRequest: "Implement a feature for waving the right hand",
+		iteration: 1,
+		testBaseline: baseline,
+	});
+	await tool!.execute("call", {
+		operation: "scaffold",
+		actionId: "wave-right-hand",
+		description: "Wave the right hand",
+		start: "right",
+		intentExamples: ["Wave the right hand"],
+	}, undefined, undefined, {} as never);
+
+	const invocation = JSON.parse(readFileSync(join(workspace, "invocation.json"), "utf8")) as string[];
+	assert.deepEqual(invocation.slice(0, 3), ["new", "wave-right-hand", "--fresh"]);
+	assert.equal(baseline.scaffoldSucceeded, true);
+});
+
 test("workspace mutation policy binds servo action paths to the requested direction", () => {
 	const paths = ["examples/plugins/servo/servo_actions/*/action.py"];
 	const left = new WorkspaceWritePolicy("/tmp/workspace", paths, "开发一个挥动左手的功能");
