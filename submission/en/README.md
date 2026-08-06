@@ -21,6 +21,7 @@ The visual above is a project-created AI-generated conceptual illustration. No o
 | Demo video, 3-5 minutes | [Video placeholder and shot list](VIDEO.md) | **Add public URL** |
 | Supplementary PPT or poster | [PowerPoint deck](deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | Complete |
 | AMD Radeon/ROCm plan | [Private deployment and optimization guide](AMD_RADEON_ROCM.md) | Complete; server proof noted below |
+| Model trained, deployed and optimized on Radeon | [Model track index](MODEL_TRACK.md) and [`model/`](../../model/README.en.md) | Complete; measured on gfx1100 and recomputable offline |
 | Verification evidence | [Evidence log](evidence/verification-2026-08-05.md) | Captured; refresh after the final source freeze |
 | PR copy | [PR description](PR_DESCRIPTION.md) | Complete; add identity and video URL |
 | Final review | [Submission checklist](SUBMISSION_CHECKLIST.md) | Team/video fields and the open technical evidence items remain |

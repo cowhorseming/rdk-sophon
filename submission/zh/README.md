@@ -21,6 +21,7 @@ RDK Agent 能够将自然语言描述的机器人需求转化为适用于 RDK X5
 | 3–5 分钟演示视频 | [视频占位页与镜头清单](VIDEO.md) | **待添加公开 URL** |
 | 补充 PPT 或海报 | [PowerPoint 演示文稿](deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | 已完成 |
 | AMD Radeon/ROCm 方案 | [私有部署与优化指南](AMD_RADEON_ROCM.md) | 已完成；服务器侧证据见下文说明 |
+| 在 Radeon 上训练、部署并优化的模型 | [模型侧索引](MODEL_TRACK.md)与 [`model/`](../../model/README.md) | 已完成；gfx1100 实测，可离线重算 |
 | 验证证据 | [证据日志](evidence/verification-2026-08-05.md) | 已采集；最终冻结源码后需刷新 |
 | PR 文案 | [PR 描述](PR_DESCRIPTION.md) | 已完成；待补充身份信息和视频 URL |
 | 最终复核 | [提交检查清单](SUBMISSION_CHECKLIST.md) | 团队/视频字段及尚未闭环的技术证据项仍待完成 |
