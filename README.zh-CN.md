@@ -330,22 +330,25 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 
 ### 9.5 当前证据状态
 
-本提交涉及两条不同的服务路径，二者分别取证。**(A)** 是本团队自训练的模型，运行在参赛者控制的 Radeon 主机上，证据在 [`model/`](model/README.md) 且可离线重算。**(B)** 是 Agent 客户端经 vLLM 路由到的现成 80B，该服务器仍未独立佐证，此处不为它编造任何数字。
+本团队在 Radeon 上搭建并实测了两条服务路径，二者分别取证。**(A)** 是本团队自训练的模型；**(B)** 是在单张 Radeon 卡上部署的现成 80B。两者都在参赛者控制的 `gfx1100` 主机上实测，且评委无需 GPU 即可离线重算。
 
-| 项目 | (A) 自训练 32B 服务 | (B) 80B vLLM Agent 后端 |
+| 项目 | (A) 自训练 32B 服务 | (B) 80B 单卡案例（llama.cpp） |
 | --- | --- | --- |
-| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏 | 已在本地验证；公开材料已脱敏 |
-| AMD Radeon GPU 型号 | `gfx1100`，Card Model `0x744b`，显存 51,522,830,336 B | 证据待补 |
-| ROCm/HIP 版本 | ROCm 7.2.1，HIP `7.2.26015-fc0010cf6a`，torch `2.9.1+rocm7.2.0` | 证据待补 |
-| 服务器版本与配置 | 服务端原件 `qwen3_agentic_openai_server.py`（SHA-256 `95d5c139…`），SDPA attention、fp32 RMSNorm、贪心解码；启动器见 [`model/model/serving/`](model/model/serving/README.md) | **证据待补** —— 确切 vLLM 版本与启动命令未佐证 |
-| 模型 revision 与精度/量化 | `unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8cc9ee352f7e49303a2c1705f9083`，bnb NF4 4-bit 双重量化，bf16 计算；adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | 证据待补 |
-| 本地 `/v1/models` 响应 | 已在主机上实测；返回的 `id` 与 `/health` 如实反映当前加载的是哪一臂，这也是 A/B 的身份对照手段 | 证据待补 |
-| 基线与优化后 TTFT | 用户可见 TTFT p50 17.41 s → **8.26 s**，p95 83.97 s → **12.89 s**（每臂 88 次试验） | 证据待补 |
-| 基线与优化后解码吞吐量 | 6.54 → **6.72** tok/s，且 88/88 输出逐字节一致。同一张卡上的独立 80B llama.cpp 案例：37.19 → **49.82** tok/s（+34.0%） | 证据待补 |
-| 峰值 VRAM 与利用率 | 加载后约 19.3 GB；基准峰值 27.99 → 28.06 GB；解码期间 `rocm-smi` 采样观测到 GPU 利用率 99% | 证据待补 |
-| 智能体工作流端到端延迟 | RDK X5 实机上的完整五节点 `rdk-agent` 工作流：SFT **4 分 04 秒**验收通过（5/5 节点）；Base 停在 3/5，14 分 25 秒后被终止 —— 见 [`model/AGENT_E2E.md`](model/AGENT_E2E.md) | 证据待补 |
+| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏 | 本地 loopback 端点 |
+| AMD Radeon GPU 型号 | `gfx1100`，Card Model `0x744b`，显存 51,522,830,336 B | `gfx1100`，显存 51,522,830,336 B，系统内存 503 GiB |
+| ROCm/HIP 版本 | ROCm 7.2.1，HIP `7.2.26015-fc0010cf6a`，torch `2.9.1+rocm7.2.0` | `llama.cpp` HIP 构建，二进制 SHA-256 `ba13e01f…` |
+| 服务器版本与配置 | 服务端原件 `qwen3_agentic_openai_server.py`（SHA-256 `95d5c139…`），SDPA attention、fp32 RMSNorm、贪心解码 | `llama-server`，开启 Flash Attention，32 推理/批处理线程，1 个并行槽，262,144-token 上下文 |
+| 模型 revision 与精度/量化 | `unsloth/Qwen3-32B-bnb-4bit@7f721e74…f9083`，bnb NF4 4-bit 双重量化，bf16 计算；adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`，79,674,391,296 参数，48,410,988,384 B，SHA-256 `d103b273…` |
+| 本地 `/v1/models` 响应 | 已在主机实测；返回的 `id` 与 `/health` 如实反映当前加载的是哪一臂，这也是 A/B 的身份对照手段 | OpenAI 兼容接口由三个 canary 验证：结构化 `tool_calls`、`role=tool` 续写、42,028-token needle 检索 |
+| 基线与优化后 TTFT | 用户可见 p50 17.41 s → **8.26 s**；p95 83.97 s → **12.89 s** | 中位 2,021.26 ms → **1,808.76 ms**（−10.5%） |
+| 基线与优化后解码吞吐量 | 6.54 → **6.72** tok/s，88/88 输出逐字节一致 | 37.19 → **49.82** tok/s（+34.0%）；prefill 1,271.45 → 1,397.39 tok/s（+9.9%） |
+| 峰值 VRAM 与利用率 | 加载后约 19.3 GB；基准峰值 27.99 → 28.06 GB；解码期间采样到 GPU 利用率 99% | 48,843,468,800 → 49,523,740,672 B —— **占 51.5 GB 单卡的 96.1%**，承载 80B 级模型 |
+| 智能体工作流端到端延迟 | RDK X5 实机上的五节点 `rdk-agent` 工作流：SFT **4 分 04 秒**验收通过（5/5 节点）；Base 停在 3/5，14 分 25 秒后被终止 —— [`model/AGENT_E2E.md`](model/AGENT_E2E.md) | 不适用 —— 该案例衡量的是服务性能，不是 Agent 工作流 |
+| 测量方法 | 每臂 88 次试验，temperature 0，2 条预热记录 | 每臂 1 次预热 + 5 次正式运行，2,332-token prompt，temperature 0 |
 
-本项目不会编造 AMD 性能数据。(A) 列中每个数值都在参赛者控制的 `gfx1100` 主机上实测，并由 [`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py`](model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py) 重新生成到 `results.json`，其中同时内嵌 GPU、ROCm 与各库版本、模型与 adapter 的 SHA-256，以及代码 SHA-256。(B) 列没有任何一项被从"证据待补"改成数字：该服务器仍需附上脱敏输出、确切的 vLLM 启动命令、模型 revision、精度或量化设置、使用容器时的容器 digest 与预热策略。
+本项目不会编造 AMD 性能数据。两列均可离线重算：`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` 为 (A) 重新生成 `results.json`，其中内嵌 GPU、ROCm 与各库版本、模型与 adapter 的 SHA-256 以及代码 SHA-256；`model/radeon-optimization/qwen3-next-80b/verify_results.py` 为 (B) 重算全部十次测量与每一个已公布的 delta。
+
+有一项不在上表两列之内：`rdk-agent` 客户端所路由到的私有 vLLM 端点仅在客户端层面得到验证——请求路径中观察到 provider `amd` 与模型 `Qwen3-Next-80B-A3B-Instruct`，但该服务器的 GPU、ROCm 版本、vLLM 版本与启动命令、模型 revision 与精度均未在此独立佐证，本提交任何位置也未就其给出性能数字。
 
 ## 10. 安装、部署与复现
 

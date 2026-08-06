@@ -330,22 +330,25 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 ### 9.5 Current Evidence Status
 
-Two different serving paths appear in this submission and they are evidenced separately. **(A)** is the model this team trained, served from a participant-controlled Radeon host — its evidence is in [`model/`](model/README.en.md) and is recomputable offline. **(B)** is the off-the-shelf 80B the agent client routes to through vLLM; that server has still not been independently attested and no number for it is invented here.
+Two Radeon serving paths were built and measured by this team, and they are evidenced separately. **(A)** is the model this team trained. **(B)** is an off-the-shelf 80B deployed on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts, and both can be recomputed by a judge without a GPU.
 
-| Item | (A) Our trained 32B service | (B) 80B vLLM agent backend |
+| Item | (A) Our trained 32B service | (B) 80B single-GPU case (llama.cpp) |
 | --- | --- | --- |
-| Client provider/model selection | Verified locally; sanitized in this repository | Verified locally; sanitized in this repository |
-| AMD Radeon GPU model | `gfx1100`, Card Model `0x744b`, 51,522,830,336 B VRAM | Evidence pending |
-| ROCm/HIP version | ROCm 7.2.1, HIP `7.2.26015-fc0010cf6a`, torch `2.9.1+rocm7.2.0` | Evidence pending |
-| Server version and configuration | Original artifact `qwen3_agentic_openai_server.py` (SHA-256 `95d5c139…`), SDPA attention, fp32 RMSNorm, greedy decoding; launcher in [`model/model/serving/`](model/model/serving/README.en.md) | **Evidence pending** — exact vLLM version and launch command not attested |
-| Model repository/revision and precision/quantization | `unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8cc9ee352f7e49303a2c1705f9083`, bnb NF4 4-bit double-quant, bf16 compute; adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | Evidence pending |
-| Local `/v1/models` response | Verified live on the host; the returned `id` and `/health` report which arm is loaded, which is the identity control for the A/B | Evidence pending |
-| Baseline and tuned TTFT | User-visible TTFT p50 17.41 s → **8.26 s**, p95 83.97 s → **12.89 s** (88 trials per arm) | Evidence pending |
-| Baseline and tuned decode throughput | 6.54 → **6.72** tok/s, with 88/88 outputs byte-identical. Separate 80B llama.cpp case on the same card: 37.19 → **49.82** tok/s (+34.0%) | Evidence pending |
-| Peak VRAM/utilization | ~19.3 GB after load; benchmark peak 27.99 → 28.06 GB; GPU utilization observed at 99% during decode (`rocm-smi` sampling) | Evidence pending |
-| End-to-end agent workflow latency | Full five-node `rdk-agent` workflow on a live RDK X5: SFT **4 min 04 s** accepted (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — see [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | Evidence pending |
+| Client provider/model selection | Verified locally; sanitized in this repository | Local loopback endpoint |
+| AMD Radeon GPU model | `gfx1100`, Card Model `0x744b`, 51,522,830,336 B VRAM | `gfx1100`, 51,522,830,336 B VRAM, 503 GiB system RAM |
+| ROCm/HIP version | ROCm 7.2.1, HIP `7.2.26015-fc0010cf6a`, torch `2.9.1+rocm7.2.0` | `llama.cpp` HIP build, binary SHA-256 `ba13e01f…` |
+| Server version and configuration | Original artifact `qwen3_agentic_openai_server.py` (SHA-256 `95d5c139…`), SDPA attention, fp32 RMSNorm, greedy decoding | `llama-server`, Flash Attention on, 32 inference/batch threads, 1 parallel slot, 262,144-token context |
+| Model repository/revision and precision/quantization | `unsloth/Qwen3-32B-bnb-4bit@7f721e74…f9083`, bnb NF4 4-bit double-quant, bf16 compute; adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`, 79,674,391,296 parameters, 48,410,988,384 B, SHA-256 `d103b273…` |
+| Local `/v1/models` response | Verified live; the returned `id` and `/health` report which arm is loaded, which is the A/B identity control | OpenAI-compatible surface verified by three canaries: structured `tool_calls`, `role=tool` continuation, 42,028-token needle retrieval |
+| Baseline and tuned TTFT | User-visible p50 17.41 s → **8.26 s**; p95 83.97 s → **12.89 s** | Median 2,021.26 ms → **1,808.76 ms** (−10.5%) |
+| Baseline and tuned decode throughput | 6.54 → **6.72** tok/s, 88/88 outputs byte-identical | 37.19 → **49.82** tok/s (+34.0%); prefill 1,271.45 → 1,397.39 tok/s (+9.9%) |
+| Peak VRAM/utilization | ~19.3 GB after load; benchmark peak 27.99 → 28.06 GB; 99% GPU utilization sampled during decode | 48,843,468,800 → 49,523,740,672 B — **96.1% of a 51.5 GB card**, holding an 80B-class model |
+| End-to-end agent workflow latency | Five-node `rdk-agent` workflow on a live RDK X5: SFT accepted in **4 min 04 s** (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | Not applicable — this case study measures serving, not the agent workflow |
+| Measurement protocol | 88 trials per arm, temperature 0, 2 warm-up records | 1 warm-up + 5 measured runs per arm, 2,332-token prompt, temperature 0 |
 
-This project does not fabricate AMD performance data. Every value in column (A) is measured on the participant-controlled `gfx1100` host and regenerated by [`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py`](model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py) into `results.json`, which also embeds the GPU, ROCm and library versions, the model and adapter SHA-256s, and the code SHA-256s. No value in column (B) has been changed from `Evidence pending`: for that server, redacted output, the exact vLLM launch command, model revision, precision or quantization setting, container digest if used, and warm-up policy still have to be attached.
+This project does not fabricate AMD performance data. Both columns are recomputable offline: `model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` regenerates `results.json` for (A), embedding the GPU, ROCm and library versions, the model and adapter SHA-256s and the code SHA-256s; `model/radeon-optimization/qwen3-next-80b/verify_results.py` recomputes all ten saved measurements and every published delta for (B).
+
+One item remains outside both columns: the private vLLM endpoint that the `rdk-agent` client routes to is verified only at the client level — provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` were observed in the request path, but that server's GPU, ROCm version, vLLM version and launch command, model revision and precision have not been independently attested here, and no figure for it is stated anywhere in this submission.
 
 ## 10. Installation, deployment, and reproduction
 
