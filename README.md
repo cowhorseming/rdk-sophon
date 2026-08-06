@@ -1,6 +1,6 @@
 # rdk-platform
 
-RDK 设备接入与智能编排平台。仓库采用 monorepo 组织；两个子项目可独立构建、测试、发布，当前放在同一仓库中以便比赛期间联调。
+RDK 设备接入与智能编排平台。仓库采用 monorepo 组织；板端、Agent 与模型复现材料放在同一仓库中，以便比赛期间联调与验证。
 
 ## 1. 子项目
 
@@ -8,8 +8,15 @@ RDK 设备接入与智能编排平台。仓库采用 monorepo 组织；两个子
 | --- | --- | --- |
 | [`rdk-sophon/`](rdk-sophon/) | Rust | 板端 `probe-daemon`、`sophonctl` 客户端、HTTP/WS 接入与部署工具。 |
 | [`rdk-agent/`](rdk-agent/) | TypeScript | 基于 Pi SDK 的机器人开发/应用多 Agent TUI 编排器及集成部署工具。 |
+| [`model/`](model/) | Python / Node.js | Dataset、Qwen3-32B LoRA-SFT、Radeon 推理服务与 Base/SFT 可复算结果。 |
 
 ## 2. 系统关系
+
+比赛集成链路如下；`model/` 只暴露 OpenAI-compatible API，模型 provider、Base URL、模型名与 API Key 由 `rdk-agent` 自行配置：
+
+```text
+Dataset → SFT → Radeon OpenAI-compatible API → rdk-agent → sophonctl → probe-daemon → RDK
+```
 
 `rdk-agent` 不依赖 `rdk-sophon` 的 Rust crate，而是在自身的 `infra` 层通过开发机已安装的 `sophonctl` 连接板端 `probe-daemon`，从而保持两套系统的构建、发布与未来拆仓独立。
 

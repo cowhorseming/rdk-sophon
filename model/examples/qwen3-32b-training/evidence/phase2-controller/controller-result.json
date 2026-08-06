@@ -1,0 +1,166 @@
+{
+  "boot_id": "73ba1e0f-a019-41e7-b958-5f906f01698b",
+  "breach": null,
+  "child_launch_started_monotonic": 3097807.125200262,
+  "command": [
+    "/workspace/qwen36-agentic-sft/.venv/bin/python",
+    "/workspace/qwen36-agentic-sft/configs/qwen3_32b_agentic_formal_trainer_v2_cachebounded.py",
+    "--phase",
+    "phase2",
+    "--model",
+    "/workspace/qwen36-agentic-sft/models/Qwen3-32B-bnb-4bit-7f721e74",
+    "--model-verification",
+    "/workspace/qwen36-agentic-sft/artifacts/model-acquisition/qwen3-32b-bnb-7f721e74-verification.json",
+    "--data-dir",
+    "/workspace/qwen36-agentic-sft/data/rdk-sft-v1-20260803-agentic",
+    "--original-plan",
+    "/workspace/qwen36-agentic-sft/artifacts/training-plan/qwen3-32b-agentic-train-plan-v1.json",
+    "--loss-plan",
+    "/workspace/qwen36-agentic-sft/artifacts/training-plan/qwen3-32b-agentic-loss-window-plan-v1.json",
+    "--common-script",
+    "/workspace/qwen36-agentic-sft/configs/qwen3_agentic_common.py",
+    "--run-dir",
+    "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded",
+    "--result",
+    "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/phase2-controller/gate-result.json",
+    "--resume",
+    "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/checkpoints/checkpoint-000010"
+  ],
+  "containment": {
+    "dedicated_cgroup_leaf": false,
+    "new_session": true,
+    "parent_death_signal": true,
+    "pidfd": true,
+    "reason": "container cgroup2 mount is read-only",
+    "sampling_boundary": "direct bound amdgpu sysfs and cgroup sampling targeted every 250ms; any observed start gap above 1.0s or sample duration above 0.5s is non-PASS; gate-reported torch max_reserved is supplemental",
+    "scoped_posix_fadvise_dontneed": [
+      "/workspace/qwen36-agentic-sft/models/Qwen3-32B-bnb-4bit-7f721e74/model-00001-of-00004.safetensors",
+      "/workspace/qwen36-agentic-sft/models/Qwen3-32B-bnb-4bit-7f721e74/model-00002-of-00004.safetensors",
+      "/workspace/qwen36-agentic-sft/models/Qwen3-32B-bnb-4bit-7f721e74/model-00003-of-00004.safetensors",
+      "/workspace/qwen36-agentic-sft/models/Qwen3-32B-bnb-4bit-7f721e74/model-00004-of-00004.safetensors"
+    ]
+  },
+  "controller_pid": 56956,
+  "cpu_after_bytes": 37097267200,
+  "cpu_after_initial_reclaim_bytes": 28481261568,
+  "cpu_before_initial_reclaim_bytes": 28481261568,
+  "cpu_limit_bytes": 51539607552,
+  "elapsed_seconds": 39505.62465570215,
+  "events_after": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "events_before": {
+    "high": 0,
+    "low": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "expected_exit_code": 0,
+  "expected_result_status": "PASS",
+  "gate_exit_code": 0,
+  "gate_pid": 56966,
+  "gate_reported_gpu_peak_bytes": 38593888256,
+  "gate_result": {
+    "best_validation": {
+      "checkpoint": "checkpoint-000119",
+      "mean_cross_entropy": 0.5936630333639499,
+      "optimizer_step": 119
+    },
+    "checkpoint": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/checkpoints/checkpoint-000119",
+    "checkpoint_manifest_sha256": "8e21e476dc8d756804425d1f863fd7308ca4712c666c431fd74e026322522481",
+    "completed_optimizer_step": 119,
+    "exit_code": 0,
+    "gpu_memory": {
+      "allocated": 20085789696,
+      "max_allocated": 37633069056,
+      "max_reserved": 38593888256,
+      "reserved": 36878417920
+    },
+    "next_optimizer_step": null,
+    "phase": "phase2",
+    "process": {
+      "boot_id": "73ba1e0f-a019-41e7-b958-5f906f01698b",
+      "pid": 56966,
+      "start_ticks": 309780712
+    },
+    "progress": {
+      "completed_optimizer_step": 119,
+      "curated_micro_windows": 262,
+      "curated_shifted_supervised_tokens": 100078,
+      "micro_windows": 948,
+      "next_optimizer_step": 120,
+      "ordered_task_ids_sha256": "98367809a7080d7cb874a4916b656e7812db24a659242f99d878caad87398738",
+      "ordered_window_ids_sha256": "f1516c99a606dd2b29b958e9cf86e017f9945ecfd969ba17340c101e4f67f5c1",
+      "per_micro_allocator_cache_release_executions": 948,
+      "promoted_micro_windows": 686,
+      "promoted_shifted_supervised_tokens": 434656,
+      "shifted_supervised_tokens": 534734,
+      "unique_tasks": 946
+    },
+    "run_dir": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded",
+    "run_manifest_sha256": "f328ccbe319ff84ee724794225ab92744b3a663692d6fb9ba37848c4617c8bf0",
+    "schema_version": "qwen3_32b_agentic_formal_phase_result.v1",
+    "status": "PASS",
+    "validation_steps": [
+      0,
+      30,
+      60,
+      90,
+      119
+    ]
+  },
+  "gate_result_error": null,
+  "gpu_after": {
+    "gpu_total_bytes": 51522830336,
+    "gpu_unique_id": "0x1f135175d2ee4757",
+    "gpu_used_bytes": 36933709824,
+    "probe_completed_monotonic": 3137312.625828193,
+    "probe_seconds": 0.00022955797612667084,
+    "probe_source": "amdgpu_sysfs"
+  },
+  "gpu_baseline_limit_bytes": 1073741824,
+  "gpu_before": {
+    "gpu_total_bytes": 51522830336,
+    "gpu_unique_id": "0x1f135175d2ee4757",
+    "gpu_used_bytes": 28028928,
+    "probe_completed_monotonic": 3097807.125112503,
+    "probe_seconds": 0.0002556378021836281,
+    "probe_source": "amdgpu_sysfs"
+  },
+  "gpu_limit_bytes": 47244640256,
+  "hostname": "u-7701-ae3eba8a",
+  "identity_ok": true,
+  "machine_sha256": "7c225d1717bb5f671c4bf071b1df172abdc72a50a3ed53e24de9ab724d35ad54",
+  "max_sample_duration_limit_seconds": 0.5,
+  "max_sample_start_gap_limit_seconds": 1.0,
+  "maximum_cpu_current_bytes": 48528687104,
+  "maximum_gpu_used_bytes": 41575378944,
+  "maximum_sample_duration_seconds": 0.14147326489910483,
+  "maximum_sample_start_gap_seconds": 0.2937733461149037,
+  "monitor_error": null,
+  "post_exit_event_delta": {
+    "max": 0,
+    "oom": 0,
+    "oom_group_kill": 0,
+    "oom_kill": 0
+  },
+  "postflight_error": null,
+  "samples": 158023,
+  "sampling_interval_seconds": 0.25,
+  "schema_version": "guarded_gate_controller.v7",
+  "started_unix": 1785820814.980041,
+  "status": "PASS",
+  "telemetry": {
+    "bytes": 102108344,
+    "lines": 158023,
+    "path": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/phase2-controller/telemetry.jsonl",
+    "sha256": "32452cdba4473860036e6871151b29dc637811c9a889b6763c670678b079b14a"
+  }
+}

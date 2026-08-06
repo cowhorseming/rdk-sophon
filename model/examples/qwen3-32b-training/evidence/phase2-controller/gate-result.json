@@ -1,0 +1,49 @@
+{
+  "best_validation": {
+    "checkpoint": "checkpoint-000119",
+    "mean_cross_entropy": 0.5936630333639499,
+    "optimizer_step": 119
+  },
+  "checkpoint": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/checkpoints/checkpoint-000119",
+  "checkpoint_manifest_sha256": "8e21e476dc8d756804425d1f863fd7308ca4712c666c431fd74e026322522481",
+  "completed_optimizer_step": 119,
+  "exit_code": 0,
+  "gpu_memory": {
+    "allocated": 20085789696,
+    "max_allocated": 37633069056,
+    "max_reserved": 38593888256,
+    "reserved": 36878417920
+  },
+  "next_optimizer_step": null,
+  "phase": "phase2",
+  "process": {
+    "boot_id": "73ba1e0f-a019-41e7-b958-5f906f01698b",
+    "pid": 56966,
+    "start_ticks": 309780712
+  },
+  "progress": {
+    "completed_optimizer_step": 119,
+    "curated_micro_windows": 262,
+    "curated_shifted_supervised_tokens": 100078,
+    "micro_windows": 948,
+    "next_optimizer_step": 120,
+    "ordered_task_ids_sha256": "98367809a7080d7cb874a4916b656e7812db24a659242f99d878caad87398738",
+    "ordered_window_ids_sha256": "f1516c99a606dd2b29b958e9cf86e017f9945ecfd969ba17340c101e4f67f5c1",
+    "per_micro_allocator_cache_release_executions": 948,
+    "promoted_micro_windows": 686,
+    "promoted_shifted_supervised_tokens": 434656,
+    "shifted_supervised_tokens": 534734,
+    "unique_tasks": 946
+  },
+  "run_dir": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded",
+  "run_manifest_sha256": "f328ccbe319ff84ee724794225ab92744b3a663692d6fb9ba37848c4617c8bf0",
+  "schema_version": "qwen3_32b_agentic_formal_phase_result.v1",
+  "status": "PASS",
+  "validation_steps": [
+    0,
+    30,
+    60,
+    90,
+    119
+  ]
+}

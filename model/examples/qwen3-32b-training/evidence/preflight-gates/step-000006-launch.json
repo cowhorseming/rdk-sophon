@@ -1,0 +1,16 @@
+{
+  "boot_id": "73ba1e0f-a019-41e7-b958-5f906f01698b",
+  "controller_hard_limit_bytes": 47244640256,
+  "controller_pid": 23599,
+  "controller_sha256": "8f598ff868952eb46a94031bec27ca41085518258fd039d9e47a75b7d22a0cb0",
+  "controller_start_ticks": 306908154,
+  "formal_trainer_sha256": "44978c4a386f638688a3ffdea30cf7595565489c1249a7d380343b26638a8edd",
+  "gate_sha256": "eef88b00f8ef1c32cd12d60a55769fa68ed383f4629afc3b3e8a80d4c0aaa5d3",
+  "hostname": "u-7701-ae3eba8a",
+  "internal_target_bytes": 45097156608,
+  "loss_window_plan_sha256": "7ef449cb41f37f5d32d4562c336aba4e3cb8f01b506850a93d34bccef6260afb",
+  "schedule_step": 6,
+  "schema_version": "qwen3_32b_cachebounded_gate_launch.v1",
+  "started_unix": 1785792090.4187753,
+  "status": "STARTED"
+}

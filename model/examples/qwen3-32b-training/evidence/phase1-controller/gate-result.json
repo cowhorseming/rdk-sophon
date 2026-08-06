@@ -1,0 +1,37 @@
+{
+  "checkpoint": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/checkpoints/checkpoint-000010",
+  "checkpoint_manifest_sha256": "bb1d0a5a6dd28107987e92796d1a6b823c8772046c099aaf0eb74bf956655016",
+  "completed_optimizer_step": 10,
+  "exit_code": 75,
+  "gpu_memory": {
+    "allocated": 20085789696,
+    "max_allocated": 36996902912,
+    "max_reserved": 37906022400,
+    "reserved": 20837302272
+  },
+  "next_optimizer_step": 11,
+  "phase": "phase1",
+  "process": {
+    "boot_id": "73ba1e0f-a019-41e7-b958-5f906f01698b",
+    "pid": 33854,
+    "start_ticks": 308968377
+  },
+  "progress": {
+    "completed_optimizer_step": 10,
+    "curated_micro_windows": 22,
+    "curated_shifted_supervised_tokens": 8396,
+    "micro_windows": 79,
+    "next_optimizer_step": 11,
+    "ordered_task_ids_sha256": "83a85cc431ea3d00b4b41376c9dd4bcd9f3f62c3916a0e1fbdc4ca20dee8a0b5",
+    "ordered_window_ids_sha256": "56fdf2ec59cefc53b249260af67cb290dab4dff70e4981f21becfa4173c89dc6",
+    "per_micro_allocator_cache_release_executions": 79,
+    "promoted_micro_windows": 57,
+    "promoted_shifted_supervised_tokens": 36629,
+    "shifted_supervised_tokens": 45025,
+    "unique_tasks": 79
+  },
+  "run_dir": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded",
+  "run_manifest_sha256": "f328ccbe319ff84ee724794225ab92744b3a663692d6fb9ba37848c4617c8bf0",
+  "schema_version": "qwen3_32b_agentic_formal_phase_result.v1",
+  "status": "RESTART_READY"
+}

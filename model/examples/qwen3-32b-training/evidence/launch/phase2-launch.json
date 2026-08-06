@@ -1,0 +1,13 @@
+{
+  "controller_pid": 56956,
+  "controller_start_ticks": 309780697,
+  "launch_binding_path": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/phase2-launch-binding.json",
+  "launch_binding_sha256": "f7143688d76f47dde494b16df4518ebf389019095cdba673abcb0cabedcc9f8f",
+  "phase": "phase2",
+  "resume_checkpoint": "/workspace/qwen36-agentic-sft/runs/qwen3-32b-agentic-sft-r1-v3-cachebounded/checkpoints/checkpoint-000010",
+  "schema_version": "qwen3_32b_agentic_formal_phase_launch.v2",
+  "started_unix": 1785820815.0658984,
+  "status": "STARTED",
+  "trainer_pid": 56966,
+  "trainer_start_ticks": 309780712
+}
