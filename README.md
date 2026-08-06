@@ -20,7 +20,7 @@ This English README is the authoritative competition-facing description for the 
 | Application | RDK Agent |
 | Team / participant | `<TEAM OR PARTICIPANT NAME>` |
 | Source repository | <https://github.com/cowhorseming/rdk-sophon> |
-| Demo video | `<DEMO VIDEO URL>` |
+| Demo video | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud MP4 backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | PR title | `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` |
 | Official deadline | 2026-08-06 23:59 Beijing/Singapore time (UTC+8) |
 
@@ -30,7 +30,7 @@ Current delivery status:
 | --- | --- | --- |
 | Project specification | Complete | This README and the [12-page PDF](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) |
 | Complete source and README | Complete | This monorepo; subsystem details are in the [`rdk-agent` README](rdk-agent/README.md) and [`rdk-sophon` README](rdk-sophon/README.md) |
-| Demo video, 3-5 minutes | Recorded; public URL pending | URL placeholder and final review list are included below |
+| Demo video, 3-5 minutes | Complete; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Supplementary presentation | Complete | [12-slide PowerPoint deck](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included below |
 | AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all recomputable offline. Agent backend side: vLLM host, model revision, and precision still to be attached |
@@ -39,9 +39,8 @@ Current delivery status:
 Before final submission, the participant must provide:
 
 1. The exact registered team name or participant name.
-2. A public URL for the already recorded 3-5 minute demo, verified from a signed-out browser.
-3. Redacted, reproducible Radeon GPU, ROCm, vLLM, model revision, precision/quantization, and benchmark evidence from the participant-controlled instance.
-4. A final review of the worktree and explicit approval before commit and publication.
+2. Redacted, reproducible Radeon GPU, ROCm, vLLM, model revision, precision/quantization, and benchmark evidence from the participant-controlled instance.
+3. A final review of the worktree and explicit approval before commit and publication.
 
 ## Executive summary
 
@@ -600,11 +599,17 @@ For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`) those figur
 
 ## Demo video
 
-**Public video URL:** `<DEMO VIDEO URL>`
+**Primary playback:** [Bilibili - BV1t3up6iEhy](https://www.bilibili.com/video/BV1t3up6iEhy/)
+
+**Backup playback/download:** [Baidu Cloud direct MP4](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd)
+
+**Local master:** `submission/en/amd-hackathon-2026-07.mp4`
+
+**Media check:** 3:07.2, 1920x1080, H.264 video with AAC audio, 174,000,121 bytes (about 165.9 MiB).
 
 **Recommended PR label:** `Demo video - 3-5 minutes`
 
-The video has already been recorded. Replace the URL above and the Track 2 metadata placeholder before opening the competition pull request, then verify access from a signed-out browser.
+The recording satisfies the required 3-5 minute duration. On 2026-08-06, the Bilibili page returned HTTP 200 and the Baidu Cloud endpoint returned HTTP 206 with `video/mp4` for a range request. The 165.9 MiB local master is intentionally excluded from ordinary Git because both public delivery links are available.
 
 Suggested 3-5 minute chapter list:
 
@@ -658,8 +663,9 @@ Primary attachments were validated on 2026-08-06:
 
 | Deliverable | File | SHA-256 |
 | --- | --- | --- |
-| Project specification | [RDK_Agent_Project_Specification.pdf](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) | `6f0b324449f1216c0e6256f615ed9b42f7b2f276cc4fb0cb94fd8c0259850efc` |
+| Project specification | [RDK_Agent_Project_Specification.pdf](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) | `f77ff42aa2ebd58a015664dfe1e5d135d334c11607c511d53fafc09a7e4949ac` |
 | Pitch deck | [RDK_Agent_Track2_Pitch_Deck.pptx](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `807e1711d3e14d536b5704f8510120a1c1a614cebb9902e945d4026b570461ce` |
+| Demo video | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
 
 The delivery also includes:
 
@@ -667,7 +673,7 @@ The delivery also includes:
 - This English competition README and a Chinese localized reference.
 - Architecture, workflow, board-evidence, test-evidence, and Sophon concept images.
 - A sanitized AMD model-provider example and benchmark script.
-- A demo video placeholder and shot list for the already recorded video.
+- The verified local demo-video master plus its public-URL placeholder and review list.
 - Raw verification evidence and final submission review items.
 
 Validation recorded for the current attachments:
@@ -685,7 +691,7 @@ Evidence integrity matters: this submission does not expose credentials, does no
 Identity, eligibility, and PR:
 
 - [ ] Replace every `<TEAM OR PARTICIPANT NAME>` placeholder with the exact Luma team name, or the participant's legal name if no team name was registered.
-- [ ] Replace every `<DEMO VIDEO URL>` placeholder and verify the link while signed out.
+- [x] Provide and verify both the Bilibili primary video URL and Baidu Cloud backup URL.
 - [ ] Confirm every team member is approved on Luma and enrolled in the AMD AI Developer Program.
 - [ ] Confirm the team has one to three members and everyone used the same team name.
 - [ ] Fork the official competition repository and create one project directory, for example `submissions/track2-your-team-rdk-agent/`.

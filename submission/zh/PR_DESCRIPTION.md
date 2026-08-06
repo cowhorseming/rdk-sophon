@@ -9,7 +9,8 @@ Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
 - **赛道：** Track 2 - Development and Local Deployment of Private AI Agents
 - **团队 / 参赛者：** `<TEAM OR PARTICIPANT NAME>`
 - **应用名称：** RDK Agent
-- **演示视频：** `<DEMO VIDEO URL>`
+- **演示视频（主地址）：** https://www.bilibili.com/video/BV1t3up6iEhy/
+- **演示视频（备用地址）：** https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd
 - **源码：** `https://github.com/cowhorseming/rdk-sophon`
 
 ## 项目概述
@@ -81,7 +82,7 @@ RDK Agent -> 私有 OpenAI-compatible vLLM -> ROCm -> AMD Radeon GPU
 - Markdown 和 PDF 格式的项目说明书。
 - 完整源代码仓库和英文根 README。
 - 详细的复现与部署指南。
-- 演示视频链接（待材料所有者提供公开 URL）。
+- B 站主视频地址与百度云 MP4 备用地址。
 - 补充 PowerPoint 演示文稿。
 - 架构图、工作流图和证据图。
 - 经过脱敏的 AMD 模型配置与基准测试脚本。

@@ -10,7 +10,7 @@
 | 应用名称 | RDK Agent |
 | 源码仓库 | `https://github.com/cowhorseming/rdk-sophon` |
 | 团队 / 参赛者 | `<TEAM OR PARTICIPANT NAME>` |
-| 演示视频 | 已录制；公开 URL 待填写：`<DEMO VIDEO URL>` |
+| 演示视频 | [B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云 MP4 备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Pull Request 标题 | `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` |
 
 ![RDK Agent 概念封面](submission/zh/assets/rdk-agent-hero.png)
@@ -23,14 +23,14 @@
 | --- | --- | --- |
 | 项目说明书 | 已完成 | 本文档与[中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) |
 | 完整源代码与 README | 已完成 | 本 monorepo；两个子系统的深层说明见 [`rdk-agent`](rdk-agent/README.md) 与 [`rdk-sophon`](rdk-sophon/README.md) 文档 |
-| 3–5 分钟演示视频 | 已录制；公开 URL 待补 | 视频位置与最终复核要求见本文第 12 节 |
+| 3–5 分钟演示视频 | 已完成；两个公开地址均已验证 | [B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | 补充 PPT / 海报 | 已完成 | [中文 12 张幻灯片路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm 部署与优化方案 | 已完成 | 客户端配置、受控实验、指标与基准方法见本文第 8–9 节 |
 | AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均可离线重算。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
 | 验证证据 | 已于 2026-08-05 采集 | 本文第 11 节与[原始脱敏日志](submission/zh/evidence/verification-2026-08-05.md) |
 | 正式比赛文案 | 英文版为准 | 仓库根目录[英文 README](README.md) |
 
-正式提交前，材料所有者仍需补齐：准确的团队或参赛者名称、已录制视频的公开 URL、脱敏且可复现的 AMD 服务器及性能证据，以及对最终 commit / 发布的明确批准。当前材料记录的截止时间为 **2026-08-06 23:59（UTC+8，北京/新加坡时间）**。
+正式提交前，材料所有者仍需补齐：准确的团队或参赛者名称、脱敏且可复现的 AMD 服务器及性能证据，以及对最终 commit / 发布的明确批准。当前材料记录的截止时间为 **2026-08-06 23:59（UTC+8，北京/新加坡时间）**。
 
 ## 1. 执行摘要
 
@@ -588,9 +588,17 @@ Wave the left side once.
 
 ## 12. 演示视频
 
-**状态：** 视频已录制；公开 URL 待参赛者填写：`<DEMO VIDEO URL>`。
+**主播放地址：** [B 站 - BV1t3up6iEhy](https://www.bilibili.com/video/BV1t3up6iEhy/)
 
-在创建比赛 Pull Request 前，需要在本文档和 PR 文案中替换占位符，并用未登录的浏览器验证访问权限。
+**备用播放/下载地址：** [百度云 MP4 直链](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd)
+
+**本地母版：** `submission/en/amd-hackathon-2026-07.mp4`
+
+**媒体检查：** 3 分 07.2 秒、1920x1080、H.264 视频与 AAC 音频、174,000,121 字节（约 165.9 MiB）。
+
+**状态：** 视频时长符合 3–5 分钟要求，主、备两个公开地址均已提供。
+
+2026-08-06 外网检查中，B 站页面返回 HTTP 200，百度云端点对 Range 请求返回 HTTP 206 与 `video/mp4`。165.9 MiB 本地母版不进入普通 Git；交付使用上面的双公网地址。
 
 ### 12.1 建议的 3–5 分钟章节
 
@@ -646,12 +654,13 @@ Wave the left side once.
 
 | 交付物 | 状态 | SHA-256 |
 | --- | --- | --- |
-| [中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | 已完成；12 页 A4、可读、未加密，不包含表单或 JavaScript | `efcc98e92be2ab7b80a8a8974a236377249a0eba0f22f3dd31bab0aa99e6f505` |
+| [中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | 已完成；12 页 A4、可读、未加密，不包含表单或 JavaScript | `d99f78fc2be72c3032df2cc5915870c134d0c0897f819c684e9bde56c371a72e` |
 | [中文路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | 已完成；12 张幻灯片，结构有效，含演讲者备注并通过渲染溢出检查 | `b67ce13cc099480ea9c6a47f882380e81f209005d80fd2f79cf538edcc2ac976` |
+| 演示视频：[B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) | 已完成；3:07.2、1080p、H.264/AAC；两个公开地址均已验证 | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
 | 完整 TypeScript 与 Rust 源代码 | 已完成；包含 lockfile | 以最终提交 revision 为准 |
 | 架构、工作流、开发板和测试证据图 | 已完成 | 包含 PNG 与可编辑 SVG |
 | AMD 脱敏配置与基准脚本 | 已完成 | 服务器侧实测证据待补 |
-| 演示视频 | 已录制 | 公开 URL 待补 |
+| 演示视频 | 已录制并完成媒体检查 | B 站主地址与百度云备用地址均已登记 |
 
 已执行的交付完整性检查：
 
@@ -668,7 +677,7 @@ Wave the left side once.
 ### 16.1 必填与参赛资格
 
 - [ ] 将所有 `<TEAM OR PARTICIPANT NAME>` 替换为准确的 Luma 团队名；未登记团队名时填写参赛者法定姓名。
-- [ ] 将所有 `<DEMO VIDEO URL>` 替换为公开视频链接，并在未登录浏览器中验证。
+- [x] 提供并验证 B 站主视频地址与百度云备用地址。
 - [ ] 确认每位团队成员都已在 Luma 获批并加入 AMD AI Developer Program。
 - [ ] 确认团队人数为 1–3 人，所有成员使用同一团队名称。
 - [ ] Fork 官方比赛仓库，并建立类似 `submissions/track2-your-team-rdk-agent/` 的项目目录。
@@ -697,4 +706,4 @@ Wave the left side once.
 - [ ] 确保没有用未经测量的估算值替换任何 `Evidence pending` 项。
 - [ ] 复核当前 worktree；只有在仓库所有者明确确认后才提交和发布。
 
-完成以上事项前，当前仍由材料所有者提供的核心内容是：**团队或参赛者名称、公开视频 URL、脱敏后的 Radeon/ROCm/vLLM/模型精度与基准证据，以及最终提交/发布批准**。
+完成以上事项前，当前仍由材料所有者提供的核心内容是：**团队或参赛者名称、脱敏后的 Radeon/ROCm/vLLM/模型精度与基准证据，以及最终提交/发布批准**。

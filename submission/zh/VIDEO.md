@@ -1,10 +1,18 @@
 # 演示视频
 
-**公开视频 URL：** `<DEMO VIDEO URL>`
+**主播放地址：** [B 站 - BV1t3up6iEhy](https://www.bilibili.com/video/BV1t3up6iEhy/)
+
+**备用播放/下载地址：** [百度云 MP4 直链](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd)
+
+**本地母版：** `submission/en/amd-hackathon-2026-07.mp4`
+
+**媒体检查：** 3 分 07.2 秒、1920x1080、H.264 视频与 AAC 音频、174,000,121 字节（约 165.9 MiB）。
+
+**SHA-256：** `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f`
 
 **建议 PR 标签：** `Demo video - 3-5 minutes`
 
-参赛者已完成视频录制。创建比赛 Pull Request 前，请替换上方 URL 及 `PR_DESCRIPTION.md` 中的同一占位符，并在未登录的浏览器中验证访问权限。
+视频时长符合 3–5 分钟要求。2026-08-06 外网检查中，B 站页面返回 HTTP 200，百度云端点对 Range 请求返回 HTTP 206 与 `video/mp4`。本地母版不进入普通 Git，提交使用上面的两个公网地址。
 
 ## 建议的 3–5 分钟章节清单
 

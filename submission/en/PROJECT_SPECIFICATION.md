@@ -7,7 +7,7 @@
 **Application:** RDK Agent
 
 **Source repository:** `https://github.com/cowhorseming/rdk-sophon`
-**Demo video:** See [VIDEO.md](VIDEO.md) - public URL to be added by the participant.
+**Demo video:** [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud MP4 backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) · [video notes](VIDEO.md)
 
 ![RDK Agent concept cover](assets/rdk-agent-hero.png)
 

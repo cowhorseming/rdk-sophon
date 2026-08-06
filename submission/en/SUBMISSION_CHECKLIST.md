@@ -5,7 +5,7 @@ Official deadline: **2026-08-06 23:59 Beijing/Singapore time (UTC+8)**.
 ## User-supplied fields
 
 - [ ] Replace every `<TEAM OR PARTICIPANT NAME>` placeholder with the exact Luma team name, or the participant's legal name if no team name was registered.
-- [ ] Replace every `<DEMO VIDEO URL>` placeholder and verify the link from a signed-out browser.
+- [x] Provide and verify both the Bilibili primary video URL and Baidu Cloud backup URL.
 
 ## Eligibility and pull request
 

@@ -21,3 +21,6 @@
 **/.rdk-agent/deliveries/
 **/.rdk-agent-*.bak/
 **/.*.rdk-agent-*.bak/
+
+# Local demo master is published through Bilibili and Baidu Cloud.
+/submission/en/amd-hackathon-2026-07.mp4

@@ -9,7 +9,8 @@ Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent
 - **Track:** Track 2 - Development and Local Deployment of Private AI Agents
 - **Team / Participant:** `<TEAM OR PARTICIPANT NAME>`
 - **Application:** RDK Agent
-- **Demo video:** `<DEMO VIDEO URL>`
+- **Demo video (primary):** https://www.bilibili.com/video/BV1t3up6iEhy/
+- **Demo video (backup):** https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd
 - **Source:** `https://github.com/cowhorseming/rdk-sophon`
 
 ## Project summary
@@ -81,7 +82,7 @@ Evidence captured on 2026-08-05:
 - Project Specification: Markdown and PDF.
 - Complete source repository and English root README.
 - Detailed reproducibility and deployment guide.
-- Demo video link (pending owner-supplied public URL).
+- Primary Bilibili video link plus a Baidu Cloud MP4 backup link.
 - Supplementary PowerPoint deck.
 - Architecture/workflow/evidence graphics.
 - Sanitized AMD model configuration and benchmark script.

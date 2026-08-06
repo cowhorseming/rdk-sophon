@@ -23,6 +23,8 @@ from reportlab.platypus import Paragraph
 ROOT = Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "submission" / "zh" / "assets"
 OUTPUT = ROOT / "submission" / "zh" / "deliverables" / "RDK_Agent_Project_Specification.pdf"
+BILIBILI_URL = "https://www.bilibili.com/video/BV1t3up6iEhy/"
+BAIDU_URL = "https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd"
 LOCALIZATION = json.loads((Path(__file__).with_name("localization-map.json")).read_text(encoding="utf-8"))
 PAGE_W, PAGE_H = A4
 
@@ -480,14 +482,14 @@ def build():
     next_page(c, 11)
 
     # 12 - Close/checklist
-    page_header(c, "Submission readiness", "The package is assembled; final owner evidence remains", "All visible submission copy is in English, and the PDF/PPT leave explicit placeholders instead of inventing identity, video links or AMD measurements.")
+    page_header(c, "Submission readiness", "The package is assembled; final owner evidence remains", "Public demo links are verified; identity and AMD measurements remain explicit owner-supplied evidence.")
     checklist = [
         ("DONE", "Project specification, architecture and workflow", GREEN),
         ("DONE", "Source README, dependencies and reproducibility guide", GREEN),
         ("DONE", "PPT pitch deck and original visual assets", GREEN),
         ("DONE", "196-test and live-board evidence", GREEN),
         ("FILL", "Team / participant name", CORAL),
-        ("FILL", "3-5 minute demo video URL", CORAL),
+        ("DONE", "Public demo links: Bilibili primary + Baidu Cloud backup", GREEN),
         ("ADD", "Radeon / ROCm server proof and benchmark", CORAL),
     ]
     y = 636
@@ -499,7 +501,16 @@ def build():
         y -= 54
     card(c, 42, 170, PAGE_W - 84, 86, fill=INK)
     paragraph(c, "Demo video", 60, 231, 120, size=10, leading=13, bold=True, color=CYAN)
-    paragraph(c, "DEMO VIDEO URL - TO BE ADDED", 60, 204, PAGE_W - 120, size=15, leading=19, color=white, bold=True)
+    paragraph(
+        c,
+        f'<a href="{BILIBILI_URL}" color="#FFFFFF"><b>B 站：BV1t3up6iEhy</b></a><br/><a href="{BAIDU_URL}" color="#55D5E5">备用：百度云 MP4 直链</a>',
+        60,
+        207,
+        PAGE_W - 120,
+        size=12.5,
+        leading=18,
+        color=white,
+    )
     paragraph(c, "Primary references", 42, 126, 160, size=10.5, leading=14, bold=True)
     paragraph(
         c,
