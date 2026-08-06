@@ -196,6 +196,13 @@
       "origin": null,
       "relation": "authored_for_this_example",
       "sha256": "66cf714f125378faeae71d0bcaf4a8961fea4e6bedc97ee6b6f2c9d3657155b2"
+    },
+    {
+      "file": "README.en.md",
+      "origin": null,
+      "relation": "english_translation",
+      "translation_of": "README.md",
+      "sha256": "2e45d3653271806649819427eae9c2599586e59f85fbe2c8f7463d16585b1d69"
     }
   ]
 }
