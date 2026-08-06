@@ -34,6 +34,7 @@ RDK Agent 是一个私有化部署的多智能体平台，用于在 RDK X5 上�
 | 补充 PPT / 海报 | 已完成 | [中文 12 张幻灯片路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm 部署与优化方案 | 已完成 | 客户端配置、受控实验、指标与基准方法见本文第 8–9 节 |
 | AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均有保存证据支撑；重新运行 32B 性能基准需要兼容的 Radeon 主机。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
+| 自训练 32B 模型运行真实 `rdk-agent` | 已完成一个有记录的任务：4 分 04 秒跑完 5/5 节点与两道真机验收闸门 | [两臂运行记录](model/AGENT_E2E.md)与[对比截图](model/assets/agent-e2e-sft-vs-base.png)；物理动作仍需人类目视确认 |
 | 验证证据 | 已于 2026-08-05 采集 | 本文第 11 节与[原始脱敏日志](submission/zh/evidence/verification-2026-08-05.md) |
 
 正式提交前，参赛者必须提供：
@@ -345,6 +346,16 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 | 峰值 VRAM 与利用率 | 加载后约 19.3 GB；基准峰值 27.99 → 28.06 GB；解码期间采样到 GPU 利用率 99% | 48,843,468,800 → 49,523,740,672 B —— **占 51.5 GB 单卡的 96.1%**，承载 80B 级模型 |
 | 智能体工作流端到端延迟 | RDK X5 实机上的五节点 `rdk-agent` 工作流：SFT **4 分 04 秒**验收通过（5/5 节点）；Base 停在 3/5，14 分 25 秒后被终止 —— [`model/AGENT_E2E.md`](model/AGENT_E2E.md) | 不适用 —— 该案例衡量的是服务性能，不是 Agent 工作流 |
 | 测量方法 | 每臂 88 次试验，temperature 0，2 条预热记录 | 每臂 1 次预热 + 5 次正式运行，2,332-token prompt，temperature 0 |
+
+#### 9.5.1 自训练 32B SFT 模型跑通真实 RDK Agent 工作流
+
+本团队训练的 32B SFT 模型（`d-robotics-glm/Qwen3-32B-Agentic-SFT-r1-v3`，模型回退为“无”）已面对真实 RDK X5，完成一次有记录的端到端 `rdk-agent` 运行。它在 **4 分 04 秒**内跑完全部五个工作流节点，包括 CLI 与自然语言 Skill 两道真机验收。保持 agent、开发板、任务、工具和命令不变，仅切换模型时，Base 到达 3/5 节点，并因 CLI 验收无法解析其结构化结果，在 14 分 25 秒后被终止。
+
+![RDK Agent 有记录的实机运行：Base 停在 3/5；自训练 32B SFT 完成 5/5](model/assets/agent-e2e-sft-vs-base.png)
+
+左侧：Base 停在 CLI 真机验收节点。右侧：自训练 32B SFT 模型跑完五个节点与两道真机验收闸门。完整记录与复现边界见[端到端运行说明](model/AGENT_E2E.md)。
+
+这是每臂一个任务、一次运行。它证明 SFT 这次运行完成了“模型 → Agent → 开发板”的命令链路；命令退出码 0 与截图本身不能独立证明物理动作的视觉效果正确。
 
 本项目不会编造 AMD 性能数据。对于 (A)，`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` 只有在具备冻结模型、adapter、测试数据及兼容 Radeon GPU 的主机上，才能重新运行每臂 88 次试验并生成 `results.json`。对于 (B)，`model/radeon-optimization/qwen3-next-80b/verify_results.py` 无需 GPU，可从十条保存的测量记录重算墙钟时间、prefill、decode 聚合指标及所有公开 delta。TTFT 只封存了两臂各自的中位数，因此脚本依据保存的中位数检查 TTFT delta，不能重建其分布。
 
