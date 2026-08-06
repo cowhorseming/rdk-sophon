@@ -2,7 +2,7 @@
 
 # 模型侧 —— 在 AMD Radeon 上训练、部署并优化
 
-本页是模型侧工作的索引。下列每个数字都可以基于 [`model/`](../../model/README.md) 中的证据离线重算，没有一项是估计值。
+本页是模型侧工作的索引。下列每个数字都有 [`model/`](../../model/README.md) 中的保存证据支撑，没有一项是估计值。复现说明会区分需要 GPU 的重新运行与针对保存结果的离线验证。
 
 ## 在 Radeon 上完成了什么
 
@@ -11,7 +11,7 @@
 | SFT 训练 | 基于 `unsloth/Qwen3-32B-bnb-4bit@7f721e74` 的 LoRA `checkpoint-000119` | AMD Radeon gfx1100、ROCm、119 optimizer steps |
 | 部署 | OpenAI 兼容服务，服务身份与训练产物哈希绑定 | 同一张卡 |
 | 推理优化 | 真流式 / TTFT + lean LoRA 解码路径，实机 A/B | 同一张卡 |
-| 第二个优化案例 | 现成 80B 单卡部署：KV 精度 + offload 深度 | 同一张卡 |
+| 第二个优化案例 | 现成 80B 单卡部署：KV 精度 + offload 深度 | 另一台 gfx1100 主机 |
 
 adapter 身份 `4dcee6914e3f9c61aeb33529208bf7e63f37c4c5ae5e0e37e7f7c6b3bfff20bf` 在四个独立来源上一致：训练冻结清单、训练机原件、本地备份、ModelScope 平台侧哈希。
 
@@ -53,9 +53,9 @@ Base 不是崩溃。它返回了验收节点无法解析的结果——`Agent �
 
 环境：gfx1100、ROCm 7.2.1、torch 2.9.1+rocm7.2.0、transformers 5.5.0、peft 0.19.1、bitsandbytes 0.50.0。
 
-## 结果四 —— 同一张卡，另一个优化层
+## 结果四 —— 同一 GPU 架构，另一个优化层
 
-上面那个优化刻意不动数值：32B 是全部质量主张的载体，验收门槛设成了"输出逐字节一致"，这决定了它的天花板。为了展示能力区间的另一端，同一张 `gfx1100` 上部署了现成的 `Qwen3-Next-80B-A3B-Instruct`（官方 Q4_K_M GGUF，ROCm/HIP `llama.cpp`）——**48.4 GB 权重跑在 48 GB 显存的单卡上**——这里允许拿 KV 精度做交换：
+上面那个优化刻意不动数值：32B 是全部质量主张的载体，验收门槛设成了"输出逐字节一致"，这决定了它的天花板。为了展示能力区间的另一端，另一台采用相同 `gfx1100` GPU 架构的主机部署了现成的 `Qwen3-Next-80B-A3B-Instruct`（官方 Q4_K_M GGUF，ROCm/HIP `llama.cpp`）——**48.4 GB 权重跑在 48 GiB（51.5 GB）显存的单卡上**——这里允许拿 KV 精度做交换：
 
 | 指标 | Q8 KV / 45 层 | Q4 KV / 47 层 | 变化 |
 | --- | ---: | ---: | ---: |
@@ -75,7 +75,7 @@ Base 不是崩溃。它返回了验收节点无法解析的结果——`Agent �
 | 头条数字 | 用户可见 TTFT **2.11×** | decode **+34.0%** |
 
 ```bash
-cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 重算全部十次测量，无需 GPU
+cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 从十条记录重算保存的聚合指标与 delta，无需 GPU
 ```
 
 这个 80B 是现成模型：既不是本团队训练的模型，也不是产出训练数据的教师。模型产物固定为 48,410,988,384 B，SHA-256 `d103b273…`。

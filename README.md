@@ -30,10 +30,10 @@ Current delivery status:
 | --- | --- | --- |
 | Project specification | Complete | This README and the [12-page PDF](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) |
 | Complete source and README | Complete | This monorepo; subsystem details are in the [`rdk-agent` README](rdk-agent/README.md) and [`rdk-sophon` README](rdk-sophon/README.md) |
-| Demo video, 3-5 minutes | Complete; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
+| Demo video, 3-5 minutes | Complete; 3:07.2, 1080p, H.264/AAC; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Supplementary presentation | Complete | [12-slide PowerPoint deck](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included in Sections 8–9 |
-| AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all recomputable offline. Agent backend side: vLLM host, model revision, and precision still to be attached |
+| AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all backed by saved evidence. Reproducing the 32B performance run requires a compatible Radeon host. Agent backend side: vLLM host, model revision, and precision still to be attached |
 | Verification evidence | Captured on 2026-08-05 | [Raw verification record](submission/en/evidence/verification-2026-08-05.md) |
 
 Before final submission, the participant must provide:
@@ -88,7 +88,7 @@ A developer can request a new self-contained robot action without manually coord
 Example:
 
 ```text
-Create a new action that moves its left side once.
+Developed a feature that waves the left hand.
 ```
 
 The system preserves the original request throughout the workflow. If generated metadata, paths, or hardware calls reverse the requested side, a deterministic guard rejects the change before it is written.
@@ -330,23 +330,23 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 ### 9.5 Current Evidence Status
 
-Two Radeon serving paths were built and measured by this team, and they are evidenced separately. **(A)** is the model this team trained. **(B)** is an off-the-shelf 80B deployed on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts, and both can be recomputed by a judge without a GPU.
+Two Radeon inference paths were measured by this team, and they are evidenced separately. **(A)** is the model this team trained. **(B)** is an off-the-shelf 80B deployed on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts. Their saved artifacts can be audited offline; reproducing (A) requires a compatible Radeon host, while (B)'s saved aggregates and deltas can be verified without a GPU.
 
-| Item | (A) Our trained 32B service | (B) 80B single-GPU case (llama.cpp) |
+| Item | (A) Our trained 32B benchmark path | (B) Independent 80B single-GPU serving case (llama.cpp; not the Agent backend) |
 | --- | --- | --- |
 | Client provider/model selection | Verified locally; sanitized in this repository | Local loopback endpoint |
 | AMD Radeon GPU model | `gfx1100`, Card Model `0x744b`, 51,522,830,336 B VRAM | `gfx1100`, 51,522,830,336 B VRAM, 503 GiB system RAM |
-| ROCm/HIP version | ROCm 7.2.1, HIP `7.2.26015-fc0010cf6a`, torch `2.9.1+rocm7.2.0` | `llama.cpp` HIP build, binary SHA-256 `ba13e01f…` |
+| ROCm/HIP version | ROCm 7.2.1, HIP `7.2.26015-fc0010cf6a`, torch `2.9.1+rocm7.2.0` | Exact ROCm/HIP version not archived; `llama.cpp` HIP binary SHA-256 `ba13e01f…` |
 | Server version and configuration | Original artifact `qwen3_agentic_openai_server.py` (SHA-256 `95d5c139…`), SDPA attention, fp32 RMSNorm, greedy decoding | `llama-server`, Flash Attention on, 32 inference/batch threads, 1 parallel slot, 262,144-token context |
 | Model repository/revision and precision/quantization | `unsloth/Qwen3-32B-bnb-4bit@7f721e74…f9083`, bnb NF4 4-bit double-quant, bf16 compute; adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`, 79,674,391,296 parameters, 48,410,988,384 B, SHA-256 `d103b273…` |
-| Local `/v1/models` response | Verified live; the returned `id` and `/health` report which arm is loaded, which is the A/B identity control | OpenAI-compatible surface verified by three canaries: structured `tool_calls`, `role=tool` continuation, 42,028-token needle retrieval |
+| API identity and compatibility evidence | `/v1/models` verified live; the returned `id` and `/health` report which arm is loaded, which is the A/B identity control | No `/v1/models` capture was archived; the OpenAI-compatible surface was checked with three canaries: structured `tool_calls`, `role=tool` continuation, 42,028-token needle retrieval |
 | Baseline and tuned TTFT | User-visible p50 17.41 s → **8.26 s**; p95 83.97 s → **12.89 s** | Median 2,021.26 ms → **1,808.76 ms** (−10.5%) |
 | Baseline and tuned decode throughput | 6.54 → **6.72** tok/s, 88/88 outputs byte-identical | 37.19 → **49.82** tok/s (+34.0%); prefill 1,271.45 → 1,397.39 tok/s (+9.9%) |
 | Peak VRAM/utilization | ~19.3 GB after load; benchmark peak 27.99 → 28.06 GB; 99% GPU utilization sampled during decode | 48,843,468,800 → 49,523,740,672 B — **96.1% of a 51.5 GB card**, holding an 80B-class model |
 | End-to-end agent workflow latency | Five-node `rdk-agent` workflow on a live RDK X5: SFT accepted in **4 min 04 s** (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | Not applicable — this case study measures serving, not the agent workflow |
 | Measurement protocol | 88 trials per arm, temperature 0, 2 warm-up records | 1 warm-up + 5 measured runs per arm, 2,332-token prompt, temperature 0 |
 
-This project does not fabricate AMD performance data. Both columns are recomputable offline: `model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` regenerates `results.json` for (A), embedding the GPU, ROCm and library versions, the model and adapter SHA-256s and the code SHA-256s; `model/radeon-optimization/qwen3-next-80b/verify_results.py` recomputes all ten saved measurements and every published delta for (B).
+This project does not fabricate AMD performance data. For (A), `model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` reruns the 88-trial-per-arm benchmark and regenerates `results.json` only on a compatible Radeon host with the frozen model, adapter, and test data. For (B), `model/radeon-optimization/qwen3-next-80b/verify_results.py` runs without a GPU and recomputes the wall-time, prefill, and decode aggregates plus every published delta from the ten saved measurement records. Only per-arm TTFT medians were archived, so the script checks the TTFT delta from those stored medians rather than reconstructing its distribution.
 
 One item remains outside both columns: the private vLLM endpoint that the `rdk-agent` client routes to is verified only at the client level — provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` were observed in the request path, but that server's GPU, ROCm version, vLLM version and launch command, model revision and precision have not been independently attested here, and no figure for it is stated anywhere in this submission.
 
@@ -618,139 +618,7 @@ Evidence boundaries:
 - For the **team's own trained model** (`Qwen3-32B-Agentic-SFT-r1-v3`), those facts are attested and reproducible: GPU `gfx1100`, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, adapter SHA-256 `4dcee691…f20bf`, NF4 4-bit quantization, and a baseline-versus-optimized A/B measured on that host (user-visible TTFT p50 17.41 s → 8.26 s, peak VRAM 27.99 → 28.06 GB, 88/88 outputs byte-identical). See the [model track index](submission/en/MODEL_TRACK.md); `results.json` is generated by the benchmark on the Radeon host rather than transcribed by hand.
 - Automated results prove the software contract and command path only; physical motion quality still requires human observation.
 - Public evidence omits MAC addresses, credentials, and private infrastructure details.
-
-This submission does not expose credentials, present development-host Mach-O binaries as RDK X5 deliverables, equate command success with proven physical motion quality, or report estimated AMD performance data as measured results.
-
-## 12. Demo video
-
-**Primary playback:** [Bilibili - BV1t3up6iEhy](https://www.bilibili.com/video/BV1t3up6iEhy/)
-
-**Backup playback/download:** [Baidu Cloud direct MP4](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd)
-
-**Local master:** `submission/en/amd-hackathon-2026-07.mp4`
-
-**Media check:** 3:07.2, 1920x1080, H.264 video with AAC audio, 174,000,121 bytes (about 165.9 MiB).
-
-**Status:** The video meets the 3-5 minute requirement, and both public playback links are available.
-
-**Recommended PR label:** `Demo video - 3-5 minutes`
-
-The recording satisfies the required 3-5 minute duration. On 2026-08-06, the Bilibili page returned HTTP 200 and the Baidu Cloud endpoint returned HTTP 206 with `video/mp4` for a range request. The 165.9 MiB local master is intentionally excluded from ordinary Git because both public delivery links are available.
-
-### 12.1 Suggested 3-5 minute chapter list
-
-| Time | Content | Required evidence |
-| --- | --- | --- |
-| 0:00-0:25 | Problem and product | Natural language -> tested robot capability. |
-| 0:25-0:50 | Architecture | Private model, RDK Agent, `sophonctl`, RDK X5. |
-| 0:50-1:15 | Read-only board proof | `ping`, `state`, and `plugins list`. |
-| 1:15-2:45 | Robot Development Mode | Intent gate; Test -> Code -> Verify; release and Skill installation. |
-| 2:45-3:30 | Acceptance | CLI invocation, then natural-language Skill invocation; show the physical result. |
-| 3:30-4:15 | AMD execution | Participant-controlled Radeon Cloud instance, redacted ROCm/vLLM/model evidence, streaming response, and redacted runtime evidence. |
-| 4:15-4:40 | Safety and value | Allowlists, offline tests, evidence gate, and direction guard. |
-| 4:40-5:00 | Closing | Source, reproducibility, and project value. |
-
-### 12.2 Video privacy review
-
-- Blur or crop API keys, SSH keys, private URLs, email addresses, MAC addresses, and unnecessary internal IP addresses.
-- Do not show `~/.pi/agent/auth.json` or a private `apiKey` value.
-- Show only the sanitized configuration under `submission/en/config/`.
-- Distinguish the generated cover illustration from real hardware footage.
-- Distinguish command-path success from a human observation of physical motion.
-
-## 13. Current limitations and roadmap
-
-- Persistent local multi-turn memory and local RAG are not implemented.
-- Normal-path human approval before every real action is not implemented; an imperative application request authorizes one action.
-- TCP transport currently lacks client authentication, mTLS, and rate limiting.
 - Workflow and human-input state are not persisted across process restarts.
 - Model runtime configuration is global rather than selected per agent profile.
-- Server-side Radeon/ROCm/vLLM proof and measured optimization results are still required.
-- The HTTP/WS adapter's default daemon socket still needs to be aligned with `/run/probe-daemon/probe.sock`.
-- GPIO permissions required by `Hobot.GPIO` for the unprivileged `probe` service user still need confirmation on the final device.
-- Physical motion quality requires human observation.
 
-These are roadmap items, not completed features.
-
-## 14. Track 2 rubric map
-
-The governing rules score 100 base points plus 20 optional points. The submission maps its evidence as follows:
-
-| Rubric item | Submission evidence |
-| --- | --- |
-| Scenario and positioning | Executive summary, target users, Sophon naming metaphor, and RDK X5 device operation. |
-| Agent core capability | Tool calling, ordered multi-step workflow, agent/tool permissions, TDD delivery, deterministic guards, and evidence gates. |
-| Smooth multi-turn interaction | Intent routing, bounded revision, human follow-up, and two operating modes; persistent memory is not claimed. |
-| Core inference on Radeon | Dedicated private vLLM architecture and configured client model; server hardware and ROCm proof remain required. |
-| Radeon inference optimization | Implemented inference-work reduction plus a reproducible runtime benchmark plan; measured results remain required. |
-| Optional Radeon Cloud Model API optimization | A dedicated Model API path is designed; any quantization or precision claim must be backed by the final server configuration and comparison. |
-
-## 15. Deliverables and integrity
-
-Primary attachments were validated on 2026-08-06:
-
-| Deliverable | Status or file | SHA-256 |
-| --- | --- | --- |
-| Project specification | Complete; readable, unencrypted 12-page A4 [PDF](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) with no forms or JavaScript | `f77ff42aa2ebd58a015664dfe1e5d135d334c11607c511d53fafc09a7e4949ac` |
-| Pitch deck | Complete; structurally valid 12-slide [PPTX](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) with speaker notes and no rendered overflow | `807e1711d3e14d536b5704f8510120a1c1a614cebb9902e945d4026b570461ce` |
-| Demo video | Complete; 3:07.2, 1080p, H.264/AAC; [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) and [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) verified | `0cba7eec725a4c8d7e76a3b762c56ce1c96cc8edd9321daf0a2342c0cd0a0a4f` |
-| Complete TypeScript and Rust source | Complete; lockfiles included | Final submission revision |
-| Architecture, workflow, board, and test evidence diagrams | Complete | PNG and editable SVG included |
-| Sanitized AMD configuration and benchmark script | Complete | Server-side measured evidence pending |
-
-Validation recorded for the current attachments:
-
-- The PDF is readable and unencrypted; the PPTX archive is structurally valid.
-- All current local Markdown links resolve.
-- The editable SVG diagrams are valid XML.
-- The benchmark utility and example JSON configuration pass syntax validation.
-- The public-facing submission sources contained no detected common credential pattern, private tunnel URL, or board-private IP address at validation time.
-
-Evidence integrity matters: this submission does not expose credentials, does not present development-host Mach-O binaries as RDK X5 deliverables, does not treat a successful command as proof of physical motion quality, and does not report estimated AMD performance as measured data.
-
-## 16. Final submission checklist
-
-The current materials record the deadline as **2026-08-06 23:59 (UTC+8, Beijing/Singapore time)**. The participant or repository owner must complete the following items before submission.
-
-### 16.1 Identity, eligibility, and PR
-
-- [ ] Replace every `<TEAM OR PARTICIPANT NAME>` placeholder with the exact Luma team name, or the participant's legal name if no team name was registered.
-- [x] Provide and verify both the Bilibili primary video URL and Baidu Cloud backup URL.
-- [ ] Confirm every team member is approved on Luma and enrolled in the AMD AI Developer Program.
-- [ ] Confirm the team has one to three members and everyone used the same team name.
-- [ ] Fork the official competition repository and create one project directory, for example `submissions/track2-your-team-rdk-agent/`.
-- [ ] Use the title `Track 2, <TEAM OR PARTICIPANT NAME>, RDK Agent` and keep competition-facing copy in English.
-- [ ] Confirm the source and all submitted links are publicly readable.
-
-### 16.2 Source and verification
-
-- [x] Complete `rdk-agent` and `rdk-sophon` sources and dependency lockfiles are present.
-- [x] TypeScript check and 134 tests passed.
-- [x] Rust workspace tests (62), Clippy with warnings denied, and release build passed.
-- [ ] Fix existing Rust formatting differences and rerun `cargo fmt --all -- --check` if time permits.
-- [ ] Align the HTTP/WebSocket default daemon socket with `/run/probe-daemon/probe.sock`, or explicitly pass that path in each demo command.
-- [ ] Verify that the unprivileged `probe` service user has the GPIO permissions required by `Hobot.GPIO`.
-- [ ] Decide whether to add a repository-level LICENSE after owner review; Cargo metadata currently declares MIT but no root license file exists.
-- [ ] Exclude ignored local `target/` and `node_modules/` directories from the competition copy.
-
-### 16.3 Required AMD evidence
-
-- [ ] Attach a redacted Radeon Cloud instance screenshot.
-- [ ] Capture Radeon GPU product, ROCm/HIP version, vLLM version, and the exact launch command.
-- [ ] Record model repository/revision, served name, and precision/quantization.
-- [ ] Capture a local `/v1/models` response.
-- [ ] Run the included benchmark against baseline and tuned configurations.
-- [ ] Report p50/p95 TTFT, decode throughput, end-to-end time, peak VRAM, utilization, and correctness.
-- [ ] Keep raw and redacted evidence with the submitted project; never publish the endpoint credential or API key.
-
-### 16.4 Demo and integrity
-
-- [ ] Confirm the video is approximately 3-5 minutes and shows real CLI/TUI operation, both operating modes, read-only board evidence, actual Radeon/ROCm inference, and the final physical action.
-- [ ] Confirm the video contains no credentials or private infrastructure details.
-- [ ] Optionally replace a conceptual cover or placeholder with a strong real frame from the recorded demo.
-- [ ] Repeat link, secret, private-URL, token, key, and personal-data checks after the final source freeze and after copying into the official repository.
-- [ ] Open the PDF and PPTX on a second machine.
-- [ ] Ensure no `Evidence pending` item has been replaced with an unmeasured estimate.
-- [ ] Review the complete worktree and explicitly approve commit and publication.
-
-Until these items are complete, the remaining owner-provided inputs are: **the team or participant name, redacted Radeon/ROCm/vLLM/model precision and benchmark evidence, and final submission/publication approval**.
+This submission does not expose credentials, present development-host Mach-O binaries as RDK X5 deliverables, equate command success with proven physical motion quality, or report estimated AMD performance data as measured results.

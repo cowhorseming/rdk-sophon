@@ -2,7 +2,7 @@
 
 # Model Track — Trained, Deployed, and Optimized on AMD Radeon
 
-This page is the index for the model-side contribution. Every number below is recomputable offline from the evidence in [`model/`](../../model/README.en.md); nothing here is a projection.
+This page is the index for the model-side contribution. Every number below is tied to saved evidence in [`model/`](../../model/README.en.md); nothing here is a projection. The reproduction notes distinguish GPU-required reruns from offline verification of saved results.
 
 ## What was done on Radeon
 
@@ -11,7 +11,7 @@ This page is the index for the model-side contribution. Every number below is re
 | SFT training | LoRA `checkpoint-000119` on `unsloth/Qwen3-32B-bnb-4bit@7f721e74` | AMD Radeon gfx1100, ROCm, 119 optimizer steps |
 | Deployment | OpenAI-compatible service, identity hash-bound to the trained adapter | same GPU |
 | Inference optimization | Streaming/TTFT + lean LoRA decode path, on-device A/B | same GPU |
-| Second optimization case | Off-the-shelf 80B on one card: KV precision + offload depth | same GPU |
+| Second optimization case | Off-the-shelf 80B on one card: KV precision + offload depth | separate gfx1100 host |
 
 Adapter identity `4dcee6914e3f9c61aeb33529208bf7e63f37c4c5ae5e0e37e7f7c6b3bfff20bf` is identical across four independent sources (frozen training manifest, training host, local backup, ModelScope platform hash).
 
@@ -53,9 +53,9 @@ Two higher-ceiling candidates (merging LoRA into the NF4 base; `torch.compile` +
 
 Environment: gfx1100, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, transformers 5.5.0, peft 0.19.1, bitsandbytes 0.50.0.
 
-## Result 4 — the same GPU, the other optimization layer
+## Result 4 — the same GPU architecture, the other optimization layer
 
-The optimization above deliberately changed no numerics: the 32B model is the one whose output quality is the entire claim, so the acceptance bar was byte-identical outputs — which caps how much can be won. To show the other end of the range, the same `gfx1100` card was used to host an off-the-shelf `Qwen3-Next-80B-A3B-Instruct` (official Q4_K_M GGUF, ROCm/HIP `llama.cpp`) — **48.4 GB of weights on a 48 GB card** — where trading KV-cache precision is permitted:
+The optimization above deliberately changed no numerics: the 32B model is the one whose output quality is the entire claim, so the acceptance bar was byte-identical outputs — which caps how much can be won. To show the other end of the range, a separate host with the same `gfx1100` GPU architecture was used to serve an off-the-shelf `Qwen3-Next-80B-A3B-Instruct` (official Q4_K_M GGUF, ROCm/HIP `llama.cpp`) — **48.4 GB of weights on a 48 GiB (51.5 GB) card** — where trading KV-cache precision is permitted:
 
 | Metric | Q8 KV / 45 layers | Q4 KV / 47 layers | Change |
 | --- | ---: | ---: | ---: |
@@ -75,7 +75,7 @@ The two cases together cover both layers at which a ROCm deployment can be tuned
 | Headline | user-visible TTFT **2.11×** | decode **+34.0%** |
 
 ```bash
-cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # recomputes all ten measurements, no GPU needed
+cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # recomputes saved aggregates and deltas from ten records; no GPU needed
 ```
 
 This 80B is off-the-shelf: it is not the model this team trained, and not the teacher that produced the training data. Model artifact pinned at 48,410,988,384 B, SHA-256 `d103b273…`.

@@ -99,11 +99,11 @@ Official pre-quantized Q4_K_M (48.4GB) + ROCm/HIP llama.cpp on one gfx1100 GPU; 
 The optimized configuration also passes all three canaries: structured tool_calls, tool continuation, and 42,028-token needle retrieval.
 
 ```bash
-cd radeon-optimization/qwen3-next-80b && python3 verify_results.py   # Recompute all ten measurements and every delta
+cd radeon-optimization/qwen3-next-80b && python3 verify_results.py   # Recompute saved aggregates and deltas from ten records
 ```
 
 Boundary: this case study is independent of the 32B SFT mainline (not the demo model and not the teacher); verification recomputes the saved measurement evidence rather than rerunning inference; only the TTFT median is stored, so the delta is verifiable but the distribution cannot be reconstructed.
 
 ## Overall Result (One-Sentence Version)
 
-> On Radeon: training converged (CE −48.4%), artifact identity closed across four hash-matched sources, SFT improved strict tool-call agreement by 30.6 percentage points (0→15 tasks satisfying the all-turn contract), inference on that same 32B model cut user-visible TTFT by 2.11× with byte-identical outputs, and an independent case study demonstrated single-GPU deployment optimization for an 80B-class model (decode +34%). Every number above can be recomputed offline with the commands on this page.
+> On Radeon: training converged (CE −48.4%), artifact identity closed across four hash-matched sources, SFT improved strict tool-call agreement by 30.6 percentage points (0→15 tasks satisfying the all-turn contract), inference on that same 32B model cut user-visible TTFT by 2.11× with byte-identical outputs, and an independent case study demonstrated single-GPU deployment optimization for an 80B-class model (decode +34%). Every claim above is tied to saved evidence; the commands on this page distinguish offline recomputation from GPU-required benchmark reruns.

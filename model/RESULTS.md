@@ -99,11 +99,11 @@ cd radeon-optimization/qwen3-32b-agentic-sft && cat results.json   # 由 benchma
 优化配置同时通过结构化 tool_calls、tool continuation 与 42,028-token needle 检索三个 canary。
 
 ```bash
-cd radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 重算全部十次测量与每个 delta
+cd radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 从十条记录重算保存的聚合指标与 delta
 ```
 
 边界:该案例独立于 32B SFT 主线(非 demo 模型、非教师);校验的是保存的测量证据,不重跑推理;TTFT 仅存中位数,delta 可核、分布不可重建。
 
 ## 结果总述(一句话版)
 
-> 在 Radeon 上:训练收敛(CE −48.4%)、产物身份四方哈希闭合、SFT 把严格工具调用一致率提升 30.6 个百分点(0→15 个任务满足全回合合同),同一 32B 模型的推理把用户可见 TTFT 压缩 2.11× 且输出逐字节不变,另以独立案例证明 80B 级模型的单卡部署优化(decode +34%)。以上每个数字都可用本页命令离线重算。
+> 在 Radeon 上:训练收敛(CE −48.4%)、产物身份四方哈希闭合、SFT 把严格工具调用一致率提升 30.6 个百分点(0→15 个任务满足全回合合同),同一 32B 模型的推理把用户可见 TTFT 压缩 2.11× 且输出逐字节不变,另以独立案例证明 80B 级模型的单卡部署优化(decode +34%)。以上每项主张都有保存证据支撑；本页命令会区分离线重算与需要 GPU 的基准复跑。
