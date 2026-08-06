@@ -65,7 +65,7 @@ python3 ../../recompute_ab.py \
 | 目录 | 内容 | 一句话 |
 |---|---|---|
 | `examples/magicbox-data-pipeline/` | 产线原件代码 + 冻结小输入 + 钦定输出 | 数据是怎么产出并被校验的 |
-| `examples/qwen3-32b-training/` | 逐字节冻结训练代码 + 精选执行证据 | 训练确实按合同发生了 |
+| `examples/qwen3-32b-training/` | 逐字节冻结训练代码 + 紧凑结果证据；完整历史见固定 tag | 训练实现、收敛与产物哈希 |
 | `model/` | 身份链 + base/SFT 行为 diff + 服务时间线 | 部署的就是训练出的那份权重 |
 | `model/serving/` | 服务端原件(证据同哈希)+ serve.sh + 依赖 | Tier 1:自己把它跑起来 |
 | `benchmark/` | 冻结重放评测器 + sealed 运行证据 | SFT 比 base 强多少、代价几何 |
@@ -75,7 +75,7 @@ python3 ../../recompute_ab.py \
 
 ## 边界(公开表述以此为准)
 
-重放一致性衡量的是与 historically held-out 教师轨迹的合同一致,**不等于** Agent 端到端成功、板端执行或物理效果;后者必须由当次 Agent、`sophonctl` 与板端观察共同证明。Test 在评测完成后为复现而公开,不应再作为未来无污染评测集使用。评测前缀为确定性有序前缀而非随机抽样,不含 promoted controlled-actuation 任务。训练数据含 848 条带标记的 promoted 样本(一行过滤器可回退,详见数据集 README)。训练代码为 fail-closed 已验证快照,硬绑定原主机与环境。冻结文件中保留原始路径/主机名是 provenance 的一部分,有意未改写。
+重放一致性衡量的是与 historically held-out 教师轨迹的合同一致,**不等于** Agent 端到端成功、板端执行或物理效果;后者必须由当次 Agent、`sophonctl` 与板端观察共同证明。Test 在评测完成后为复现而公开,不应再作为未来无污染评测集使用。评测前缀为确定性有序前缀而非随机抽样,不含 promoted controlled-actuation 任务。训练数据含 848 条带标记的 promoted 样本(一行过滤器可回退,详见数据集 README)。训练代码为 fail-closed 已验证快照,硬绑定原主机与环境；完整历史训练证据固定在 tag [`model-evidence-full-20260806`](https://github.com/wm19999/rdk-sophon/tree/model-evidence-full-20260806/model/examples/qwen3-32b-training)。
 
 ## 许可说明
 

@@ -17,10 +17,10 @@
 
 | Claim | 证据 | 关键哈希/数字 |
 |---|---|---|
-| 训练按冻结合同执行完成 | `examples/qwen3-32b-training/evidence/`(launch binding、phase1/2 controller、run-manifest) | 119 optimizer steps,948 micro-windows,Phase1 `PASS/RESTART_READY`,Phase2 `PASS` |
-| 学习曲线 | `evidence/validations/validation-step-*.json`(0/30/60/90/119) | validation mean CE 1.1516 → 0.5936630333639499 |
-| 冻结代码字节级可对账 | `evidence/local-verification.json` + `source-manifest.json` + `verify_subset.py` | 43 copied 文件 SHA 全一致;19 omitted 文件 SHA 在案 |
-| 基座模型来源固定 | `artifacts/model-acquisition/qwen3-32b-bnb-7f721e74-verification.json` | `unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8…` |
+| 训练按冻结合同执行完成 | `examples/qwen3-32b-training/evidence/training-summary.json` + [完整证据 tag](https://github.com/wm19999/rdk-sophon/tree/model-evidence-full-20260806/model/examples/qwen3-32b-training) | 119 optimizer steps,948 micro-windows,最终 checkpoint `COMPLETE` |
+| 学习曲线 | `examples/qwen3-32b-training/evidence/validations/validation-step-*.json`(0/30/60/90/119) | validation mean CE 1.1516 → 0.5936630333639499 |
+| 精简训练树字节级可对账 | `examples/qwen3-32b-training/{source-manifest.json,verify_subset.py}` | 主树代码与精简证据逐文件 SHA 核验；被移出的历史证据由固定 tag 承接 |
+| 基座模型来源固定 | `examples/qwen3-32b-training/artifacts/model-acquisition/qwen3-32b-bnb-7f721e74-verification.json` | `unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8…` |
 
 ## 模型产物与部署身份
 
@@ -39,7 +39,7 @@
 | 评测身份逐回合锁定 | 同 run 的 `arms/*.manifest.json` + 每条 raw 记录的 `response_models` | 服务进程参数含 `--adapter checkpoint-000119`;6 项 `--expect-file-sha256` 含 adapter `4dcee691…` |
 | 证据不可篡改 | `SHA256SUMS` + `arms/*.recovery-seal.json` | `sha256sum -c` 一键核验;interrupted 臂经一次性只读封存 |
 | 代价如实披露 | `RESULTS.md` Observed cost | SFT 延迟/token ≈ 2.1×;final-text 严格相等两臂均 0(不宣称语义正确性) |
-| 交叉验证 | 训练机 `artifacts/ab-eval/base-results.jsonl`(独立 harness 413 回合 base 全量) | 每回合携带 `response_model` 字段 |
+| 独立重评分 | `benchmark/recompute_ab.py` + Test + Base/SFT raw | 从公开输入与逐回合响应重建参考并逐项比对 `summary.json` |
 
 ## Radeon 推理优化(独立案例)
 

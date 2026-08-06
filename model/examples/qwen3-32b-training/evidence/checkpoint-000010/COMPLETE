@@ -1,6 +1,0 @@
-{
-  "manifest_sha256": "bb1d0a5a6dd28107987e92796d1a6b823c8772046c099aaf0eb74bf956655016",
-  "optimizer_step": 10,
-  "schema_version": "qwen3_32b_agentic_checkpoint_complete.v1",
-  "status": "COMPLETE"
-}

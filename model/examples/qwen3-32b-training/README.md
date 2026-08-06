@@ -1,56 +1,44 @@
-# Qwen3-32B Agentic LoRA-SFT 训练快照（精简公开版）
+# Qwen3-32B Agentic LoRA-SFT（评委精简版）
 
-这里是 AMD 48GB 单卡正式训练所用**逐字节冻结代码**与**精选执行证据**的公开整理版。源目录 `train-model` 保持不动；本目录内每个文件的来源与 SHA-256 记录在 `source-manifest.json`，可用一条命令核对：
+这里保留 Radeon 训练的核心代码、运行环境、五个 validation 点、最终 checkpoint 清单和一份紧凑训练摘要。历史 plan、preflight、launch/controller 报告与完整 run manifest 已从主树移出，避免评委先看到大批机器 JSON。
+
+完整原始证据没有丢失，固定在 [`model-evidence-full-20260806`](https://github.com/wm19999/rdk-sophon/tree/model-evidence-full-20260806/model/examples/qwen3-32b-training)（commit `c079855dabb11e50f7026b9da60e5b162e8f04d2`）。
+
+## 一分钟核验
 
 ```bash
-python3 verify_subset.py   # 纯标准库，无需 GPU / 权重 / 网络
+python3 verify_subset.py
 ```
 
-## 训练结论（来自已验证的正式 run）
+该命令只用 Python 标准库，核对当前精简树的文件哈希、Test 行数与 SHA-256；无需 GPU、权重或网络。训练结果先看 [`evidence/training-summary.json`](evidence/training-summary.json)。
+
+## 训练结论
 
 - 基础模型：`unsloth/Qwen3-32B-bnb-4bit@7f721e74a6a8cc9ee352f7e49303a2c1705f9083`
-- 方法：4-bit base + LoRA-SFT（r=8, alpha=16，67,108,864 可训练参数），assistant-only shifted CE
-- 1 epoch、119 optimizer steps、948 micro-windows、最大窗口 8192 tokens
-- Phase 1 `PASS / RESTART_READY`（step 10），Phase 2 `PASS`（step 119）
-- 最佳 validation：`checkpoint-000119`，mean CE 0.5936630333639499
-- Controller 全程未见 OOM、cgroup memory event、采样缺口
+- 方法：4-bit NF4 base + LoRA-SFT（r=8、alpha=16、67,108,864 可训练参数），assistant-only shifted CE
+- 1 epoch、119 optimizer steps、948 training micro-windows、最大窗口 8192 tokens
+- validation mean CE：1.151614（step 0）→ 0.593663（step 119）
+- 最终 adapter：268,555,264 bytes，SHA-256 `4dcee6914e3f9c61aeb33529208bf7e63f37c4c5ae5e0e37e7f7c6b3bfff20bf`
+- 单卡 AMD Radeon gfx1100；Phase 2 记录的 PyTorch 峰值为 37,633,069,056 allocated / 38,593,888,256 reserved bytes
 
-证据落点：`evidence/launch/`（历史命令绑定）、`evidence/phase1-controller/` 与 `evidence/phase2-controller/`（门禁与资源结论）、`evidence/validations/`（0/30/60/90/119 五个曲线点）、`evidence/checkpoint-*/manifest.json`、`evidence/run-manifest.json`（冻结 run 合同）、`evidence/local-verification.json`（41 个冻结文件 + 12 个模型元数据文件的 SHA-256 总账）。
+## 主树保留什么
 
-## 本目录与完整快照的关系
+| 内容 | 位置 | 用途 |
+|---|---|---|
+| trainer、controller、gate 与构建工具 | `configs/`、`gates/`、`tools/` | 展示实际训练实现 |
+| 固定模型 revision 与运行环境 | `artifacts/model-acquisition/`、`environment/` | 说明 Radeon/ROCm 与依赖口径 |
+| 训练摘要与学习曲线 | `evidence/training-summary.json`、`evidence/validations/` | 快速审计 119-step 结果 |
+| 最终 checkpoint 清单 | `evidence/checkpoint-000119/` | 绑定发布 adapter 的大小和哈希 |
+| 公开 Test | `../../data/releases/rdk-sft-v1-20260803/agentic/test.jsonl` | 独立重算 Base/SFT A/B |
 
-为控制体积，以下大文件**未随仓库分发**，其 SHA-256 全部记录在 `source-manifest.json` 的 `omitted` 条目中：
+训练时的 946-row train 与 116-row validation 已以脱敏形式发布到 [ModelScope](https://modelscope.ai/datasets/ming01/RDK-Agentic-SFT-Sanitized-v1/summary)。评测时 historically held-out 的 113-row Test 在评测完成后随仓库公开，仅用于复现本次结果。
 
-- `models/Qwen3-32B-bnb-4bit-7f721e74/` 的 tokenizer/vocab/merges 等元数据（可用 `tools/acquire_qwen3_32b_bnb.py` 按固定 revision 重新获取并逐文件校验）；
-- 两份约 1MB 的 preflight `telemetry.jsonl`（保留了 `telemetry.head20.sample.jsonl` 头部样例）与 checkpoint `state.json`；
-- 3.7MB 的 loss-window plan（可由 `tools/build_qwen3_32b_loss_window_plan_v2.py` 从冻结输入重建）。
+## 复现口径
 
-`scripts/verify_bundle.py` 与 `tests/test_bundle_contract.py` 是完整快照的字节级验证器，原样保留；要跑通它们，需按 source-manifest 恢复省略文件并将数据放到源目录约定路径。日常核对请使用 `verify_subset.py`。
+公开 adapter 是 demo 与 A/B 使用的制品；下载和服务接口见 [`../../model/README.md`](../../model/README.md) 与 [`../../model/serving/README.md`](../../model/serving/README.md)。完整重训是可选项，数值可能随硬件和软件版本变化。
 
-数据合同：held-out test（113 行）的逐字节副本在 `../../data/releases/rdk-sft-v1-20260803/agentic/`，`verify_subset.py` 会一并核对行数与 SHA-256;train/validation（946/116 行）已由 ModelScope 公开数据集承接，冻结原件哈希记录于 `source-manifest.json` 的 `data_release.removed_files`。
+`configs/` 中是历史训练原件，包含 bound-host fail-closed 门禁，不是跨机器即插即用脚本。换机器时应重新生成 plan、模型验证清单和主机门禁；`tools/build_qwen3_32b_train_plan.py` 与 `tools/build_qwen3_32b_loss_window_plan_v2.py` 提供 plan 构建逻辑，运行合同见 [`docs/RUNBOOK.md`](docs/RUNBOOK.md)。不要把归档中的历史 PASS 当成新主机授权。
 
-## 复现口径（评委须知）
+## 证据边界
 
-**The released adapter is the artifact used by the demo and the A/B benchmark. Full retraining is optional and may produce numerically different results depending on hardware and software versions.**
-
-复现所需的全部事实:基座 `unsloth/Qwen3-32B-bnb-4bit@7f721e74`;adapter 下载与哈希见 `../../model/README.md`;训练数据见 ModelScope 数据集(脱敏 train+validation);冻结训练代码与配置即本目录 `configs/`、`gates/`、`tools/`;历史训练为 119 optimizer steps、单卡 AMD Radeon gfx1100(48GB)、约 26.6GB 峰值 VRAM。示例启动命令(在源目录布局与已过门禁的环境下):
-
-```bash
-# 实际使用的启动形态:守护控制器包裹 trainer(CLI 契约与冻结代码逐字对应)
-python3 configs/guarded_process_controller_v7.py --run-dir runs/<new-run> -- \
-  python3 configs/qwen3_32b_agentic_formal_trainer_v2_cachebounded.py \
-    --phase phase2 \
-    --model models/Qwen3-32B-bnb-4bit-7f721e74 \
-    --model-verification artifacts/model-acquisition/qwen3-32b-bnb-7f721e74-verification.json \
-    --data-dir data/rdk-sft-v1-20260803-agentic \
-    --original-plan artifacts/training-plan/qwen3-32b-agentic-train-plan-v1.json \
-    --loss-plan artifacts/training-plan/qwen3-32b-agentic-loss-window-plan-v1.json \
-    --common-script configs/qwen3_agentic_common.py \
-    --run-dir runs/<new-run>/trainer --result runs/<new-run>/result.json
-```
-
-注意:controller 与 trainer 均 fail-closed 校验主机名/machine-id 等身份,换机器需按 RUNBOOK 重新过门禁;loss-window plan 可由 `tools/build_qwen3_32b_loss_window_plan_v2.py` 重建。
-
-## 重要边界（公开表述请以此为准）
-
-这是"已验证快照"，不是跨机器通用 trainer。正式代码 fail-closed 硬绑定原主机、GPU、`/workspace` 布局、数据与依赖哈希；换任何一项都必须生成新的验证清单并重新过门禁，不能沿用历史 PASS。冻结代码与证据中保留的原始绝对路径、主机标识是 provenance 的一部分，有意未改写——改写将破坏与 `evidence/local-verification.json` 的对账。训练完成也不等价于 Agentic 效果验收；held-out Test 与 A/B 评测是单独的质量门禁。运行合同详见 `docs/RUNBOOK.md`。
+validation CE 下降证明训练发生并收敛；Agentic 能力增益由单独的 Base/SFT A/B 原始输出证明。二者都不等于 `rdk-agent → sophonctl → RDK` 的实时板端执行或物理效果，后者必须由当次演示证据确认。

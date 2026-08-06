@@ -1,26 +1,10 @@
 #!/usr/bin/env python3
-"""Integrity check for this slimmed training snapshot (stdlib only).
-
-Reads source-manifest.json and verifies:
-  1. every file marked `copied` is present and byte-identical to the recorded
-     source SHA-256;
-  2. every file marked `sampled` matches its recorded sample SHA-256 (the SHA
-     of the full original is also recorded for off-repo comparison);
-  3. every file marked `omitted` is genuinely absent from this tree;
-  4. no unlisted stray file exists in this tree;
-  5. the agentic release split under ../../data/releases matches the recorded
-     row counts and SHA-256 values.
-
-This is NOT the full byte-frozen bundle verification: scripts/verify_bundle.py
-requires the omitted files to be restored first (see source-manifest.json and
-README.md).
-"""
+"""Verify the compact judge-facing training snapshot with the standard library."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -37,38 +21,21 @@ def sha256(path: Path) -> str:
 def main() -> int:
     manifest = json.loads((ROOT / "source-manifest.json").read_text(encoding="utf-8"))
     errors: list[str] = []
-    counts = {"copied": 0, "sampled": 0, "omitted": 0, "authored": 0, "superseded": 0}
+    listed = {"source-manifest.json"}
+    kinds: dict[str, int] = {}
 
-    listed: set[str] = {"source-manifest.json"}
     for entry in manifest["files"]:
         rel = entry["file"]
-        listed.add(rel)
         path = ROOT / rel
-        status = entry["status"]
-        if status in counts:
-            counts[status] += 1
-        if status == "copied":
-            if not path.is_file():
-                errors.append(f"missing copied file: {rel}")
-            elif sha256(path) != entry["sha256"]:
-                errors.append(f"SHA-256 mismatch vs frozen source: {rel}")
-        elif status == "sampled":
-            if not path.is_file():
-                errors.append(f"missing sampled file: {rel}")
-            elif sha256(path) != entry["sample_sha256"]:
-                errors.append(f"SHA-256 mismatch vs recorded sample: {rel}")
-        elif status == "omitted":
-            if path.exists():
-                errors.append(f"file marked omitted but present: {rel}")
-        elif status == "superseded":
-            pass  # path is owned by another (authored) entry; only the origin SHA is recorded
-        elif status == "authored":
-            if not path.is_file():
-                errors.append(f"missing authored file: {rel}")
-            elif sha256(path) != entry["sha256"]:
-                errors.append(f"SHA-256 mismatch for authored file: {rel}")
-        else:
-            errors.append(f"unknown status {status!r} for {rel}")
+        listed.add(rel)
+        kind = entry["kind"]
+        kinds[kind] = kinds.get(kind, 0) + 1
+        if kind not in {"frozen", "authored"}:
+            errors.append(f"unknown file kind {kind!r}: {rel}")
+        elif not path.is_file():
+            errors.append(f"missing file: {rel}")
+        elif sha256(path) != entry["sha256"]:
+            errors.append(f"SHA-256 mismatch: {rel}")
 
     for path in sorted(ROOT.rglob("*")):
         if path.is_file():
@@ -76,24 +43,26 @@ def main() -> int:
             if rel not in listed and not rel.endswith(".DS_Store"):
                 errors.append(f"unlisted stray file: {rel}")
 
-    release = manifest.get("data_release", {})
-    release_root = (ROOT / release.get("path", "")).resolve() if release else None
-    for item in release.get("files", []):
-        path = release_root / item["file"]
+    release = manifest["data_release"]
+    release_root = (ROOT / release["path"]).resolve()
+    for entry in release["files"]:
+        path = release_root / entry["file"]
         if not path.is_file():
-            errors.append(f"missing release file: {item['file']}")
+            errors.append(f"missing release file: {entry['file']}")
             continue
-        if sha256(path) != item["sha256"]:
-            errors.append(f"release SHA-256 mismatch: {item['file']}")
+        if sha256(path) != entry["sha256"]:
+            errors.append(f"release SHA-256 mismatch: {entry['file']}")
         rows = sum(1 for line in path.open("rb") if line.strip())
-        if rows != item["rows"]:
-            errors.append(f"release row-count mismatch: {item['file']} ({rows} != {item['rows']})")
+        if rows != entry["rows"]:
+            errors.append(f"release row-count mismatch: {entry['file']} ({rows} != {entry['rows']})")
 
     report = {
-        "schema_version": "qwen3_training_subset_verification.v1",
+        "schema_version": "qwen3_training_subset_verification.v2",
         "valid": not errors,
-        "counts": counts,
-        "release_files_checked": len(release.get("files", [])),
+        "files_checked": len(manifest["files"]),
+        "kinds": kinds,
+        "release_files_checked": len(release["files"]),
+        "archive_tag": manifest["full_evidence_archive"]["git_tag"],
         "errors": errors,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))

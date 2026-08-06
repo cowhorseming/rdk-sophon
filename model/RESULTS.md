@@ -29,7 +29,7 @@ python3 ../../recompute_ab.py \
 
 ## 2. 训练:QLoRA-SFT 收敛事实
 
-单卡 AMD Radeon gfx1100(48GB),4-bit base + LoRA(r=8, α=16,67,108,864 可训练参数),1 epoch / 119 optimizer steps / 948 micro-windows,峰值约 26.6GB VRAM:
+单卡 AMD Radeon gfx1100(48GB),4-bit base + LoRA(r=8, α=16,67,108,864 可训练参数),1 epoch / 119 optimizer steps / 948 micro-windows。Phase 2 记录的 PyTorch 峰值为 37,633,069,056 allocated / 38,593,888,256 reserved bytes:
 
 | checkpoint | validation mean CE |
 |---|---:|
@@ -37,7 +37,7 @@ python3 ../../recompute_ab.py \
 | step 119(发布) | **0.5937** |
 
 ```bash
-cd examples/qwen3-32b-training && python3 verify_subset.py   # 43 个冻结文件 + 证据链哈希对账
+cd examples/qwen3-32b-training && python3 verify_subset.py   # 精简训练树 + Test 哈希对账
 ```
 
 边界:CE 下降证明拟合发生,Agent 能力提升由上面第 1 节的 A/B 回答;完整重训可选,因硬件/软件版本差异数值可能不同。
