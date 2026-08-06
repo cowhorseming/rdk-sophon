@@ -33,7 +33,8 @@ RDK Agent 是一个私有化部署的多智能体平台，用于在 RDK X5 上�
 | 3–5 分钟演示视频 | 已完成；3 分 07.2 秒、1080p、H.264/AAC；两个公开地址均已验证 | [B 站主地址](https://www.bilibili.com/video/BV1t3up6iEhy/) · [百度云备用地址](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | 补充 PPT / 海报 | 已完成 | [中文 12 张幻灯片路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm 部署与优化方案 | 已完成 | 客户端配置、受控实验、指标与基准方法见本文第 8–9 节 |
-| AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均可离线重算。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
+| AMD 服务器与性能证明 | 自训练模型侧已完成；**80B Agent 后端侧待补充** | 模型侧：[模型侧索引](submission/zh/MODEL_TRACK.md) —— gfx1100、ROCm 7.2.1、adapter 哈希与基线/优化 A/B，均有保存证据支撑；重新运行 32B 性能基准需要兼容的 Radeon 主机。Agent 后端侧：vLLM 主机、模型 revision 与精度仍待补充 |
+| 自训练 32B 模型运行真实 `rdk-agent` | 已完成一个有记录的任务：4 分 04 秒跑完 5/5 节点与两道真机验收闸门 | [两臂运行记录](model/AGENT_E2E.md)与[对比截图](model/assets/agent-e2e-sft-vs-base.png)；物理动作仍需人类目视确认 |
 | 验证证据 | 已于 2026-08-05 采集 | 本文第 11 节与[原始脱敏日志](submission/zh/evidence/verification-2026-08-05.md) |
 
 正式提交前，参赛者必须提供：
@@ -330,20 +331,35 @@ node submission/zh/scripts/benchmark-openai-compatible.mjs \
 
 ### 9.5 当前证据状态
 
-| 项目 | 状态 |
-| --- | --- |
-| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏。 |
-| AMD Radeon GPU 型号 | 证据待补（Evidence pending）。 |
-| ROCm/HIP 版本 | 证据待补（Evidence pending）。 |
-| 专用 vLLM 服务器版本与配置 | 证据待补（Evidence pending）。 |
-| 模型 revision 与精度/量化 | 证据待补（Evidence pending）。 |
-| 本地 `/v1/models` 响应 | 证据待补（Evidence pending）。 |
-| 基线与优化后 TTFT | 证据待补（Evidence pending）。 |
-| 基线与优化后解码吞吐量 | 证据待补（Evidence pending）。 |
-| 峰值 VRAM 与利用率 | 证据待补（Evidence pending）。 |
-| 智能体工作流端到端延迟 | 证据待补（Evidence pending）。 |
+本团队在 Radeon 上实测了两条推理路径，二者分别取证。**(A)** 是本团队自训练的模型；**(B)** 是在单张 Radeon 卡上部署的现成 80B。两者都在参赛者控制的 `gfx1100` 主机上实测。保存产物均可离线审计；复跑 (A) 需要兼容的 Radeon 主机，而 (B) 保存的聚合指标与 delta 可在无 GPU 环境中验证。
 
-本项目不会编造 AMD 性能数据。任何未经测量的项目都不得从 `Evidence pending` 改为具体数值。评审前应附上脱敏服务器输出、确切的 vLLM 启动命令、模型 revision、精度或量化设置、使用容器时的容器 digest、预热策略，以及不包含凭据且能证明参赛者控制 Radeon Cloud 实例的截图。
+| 项目 | (A) 自训练 32B 基准路径 | (B) 独立 80B 单卡服务案例（llama.cpp；不是 Agent 后端） |
+| --- | --- | --- |
+| 客户端 provider/model 选择 | 已在本地验证；公开材料已脱敏 | 本地 loopback 端点 |
+| AMD Radeon GPU 型号 | `gfx1100`，Card Model `0x744b`，显存 51,522,830,336 B | `gfx1100`，显存 51,522,830,336 B，系统内存 503 GiB |
+| ROCm/HIP 版本 | ROCm 7.2.1，HIP `7.2.26015-fc0010cf6a`，torch `2.9.1+rocm7.2.0` | 未封存确切 ROCm/HIP 版本；`llama.cpp` HIP 二进制 SHA-256 `ba13e01f…` |
+| 服务器版本与配置 | 服务端原件 `qwen3_agentic_openai_server.py`（SHA-256 `95d5c139…`），SDPA attention、fp32 RMSNorm、贪心解码 | `llama-server`，开启 Flash Attention，32 推理/批处理线程，1 个并行槽，262,144-token 上下文 |
+| 模型 revision 与精度/量化 | `unsloth/Qwen3-32B-bnb-4bit@7f721e74…f9083`，bnb NF4 4-bit 双重量化，bf16 计算；adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`，79,674,391,296 参数，48,410,988,384 B，SHA-256 `d103b273…` |
+| API 身份与兼容性证据 | 已实测 `/v1/models`；返回的 `id` 与 `/health` 如实反映当前加载的是哪一臂，这也是 A/B 的身份对照手段 | 未封存 `/v1/models` 响应；OpenAI 兼容接口另由三个 canary 验证：结构化 `tool_calls`、`role=tool` 续写、42,028-token needle 检索 |
+| 基线与优化后 TTFT | 用户可见 p50 17.41 s → **8.26 s**；p95 83.97 s → **12.89 s** | 中位 2,021.26 ms → **1,808.76 ms**（−10.5%） |
+| 基线与优化后解码吞吐量 | 6.54 → **6.72** tok/s，88/88 输出逐字节一致 | 37.19 → **49.82** tok/s（+34.0%）；prefill 1,271.45 → 1,397.39 tok/s（+9.9%） |
+| 峰值 VRAM 与利用率 | 加载后约 19.3 GB；基准峰值 27.99 → 28.06 GB；解码期间采样到 GPU 利用率 99% | 48,843,468,800 → 49,523,740,672 B —— **占 51.5 GB 单卡的 96.1%**，承载 80B 级模型 |
+| 智能体工作流端到端延迟 | RDK X5 实机上的五节点 `rdk-agent` 工作流：SFT **4 分 04 秒**验收通过（5/5 节点）；Base 停在 3/5，14 分 25 秒后被终止 —— [`model/AGENT_E2E.md`](model/AGENT_E2E.md) | 不适用 —— 该案例衡量的是服务性能，不是 Agent 工作流 |
+| 测量方法 | 每臂 88 次试验，temperature 0，2 条预热记录 | 每臂 1 次预热 + 5 次正式运行，2,332-token prompt，temperature 0 |
+
+#### 9.5.1 自训练 32B SFT 模型跑通真实 RDK Agent 工作流
+
+本团队训练的 32B SFT 模型（`d-robotics-glm/Qwen3-32B-Agentic-SFT-r1-v3`，模型回退为“无”）已面对真实 RDK X5，完成一次有记录的端到端 `rdk-agent` 运行。它在 **4 分 04 秒**内跑完全部五个工作流节点，包括 CLI 与自然语言 Skill 两道真机验收。保持 agent、开发板、任务、工具和命令不变，仅切换模型时，Base 到达 3/5 节点，并因 CLI 验收无法解析其结构化结果，在 14 分 25 秒后被终止。
+
+![RDK Agent 有记录的实机运行：Base 停在 3/5；自训练 32B SFT 完成 5/5](model/assets/agent-e2e-sft-vs-base.png)
+
+左侧：Base 停在 CLI 真机验收节点。右侧：自训练 32B SFT 模型跑完五个节点与两道真机验收闸门。完整记录与复现边界见[端到端运行说明](model/AGENT_E2E.md)。
+
+这是每臂一个任务、一次运行。它证明 SFT 这次运行完成了“模型 → Agent → 开发板”的命令链路；命令退出码 0 与截图本身不能独立证明物理动作的视觉效果正确。
+
+本项目不会编造 AMD 性能数据。对于 (A)，`model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` 只有在具备冻结模型、adapter、测试数据及兼容 Radeon GPU 的主机上，才能重新运行每臂 88 次试验并生成 `results.json`。对于 (B)，`model/radeon-optimization/qwen3-next-80b/verify_results.py` 无需 GPU，可从十条保存的测量记录重算墙钟时间、prefill、decode 聚合指标及所有公开 delta。TTFT 只封存了两臂各自的中位数，因此脚本依据保存的中位数检查 TTFT delta，不能重建其分布。
+
+有一项不在上表两列之内：`rdk-agent` 客户端所路由到的私有 vLLM 端点仅在客户端层面得到验证——请求路径中观察到 provider `amd` 与模型 `Qwen3-Next-80B-A3B-Instruct`，但该服务器的 GPU、ROCm 版本、vLLM 版本与启动命令、模型 revision 与精度均未在此独立佐证，本提交任何位置也未就其给出性能数字。
 
 ## 10. 安装、部署与复现
 

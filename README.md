@@ -33,7 +33,8 @@ Current delivery status:
 | Demo video, 3-5 minutes | Complete; 3:07.2, 1080p, H.264/AAC; two public links verified | [Bilibili primary](https://www.bilibili.com/video/BV1t3up6iEhy/) · [Baidu Cloud backup](https://dagent-platform.bj.bcebos.com/amd-hackathon/amd-hackathon-2026-07.mp4?authorization=bce-auth-v1/ALTAKYR0nFJFHMGlFjuontyVVP/2026-08-06T12%3A43%3A01Z/-1/host/1a12970cc4c9439caa28199256b028f90e82ba41ac92c68fb921b271be0b0acd) |
 | Supplementary presentation | Complete | [12-slide PowerPoint deck](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) |
 | AMD Radeon/ROCm deployment and optimization plan | Complete | Configuration, controlled experiments, metrics, and benchmark procedure are included in Sections 8–9 |
-| AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all recomputable offline. Agent backend side: vLLM host, model revision, and precision still to be attached |
+| AMD server and performance proof | Complete for the trained model; **pending for the 80B agent backend** | Model side: [model track index](submission/en/MODEL_TRACK.md) — gfx1100, ROCm 7.2.1, adapter hash, and baseline-versus-optimized A/B, all backed by saved evidence. Reproducing the 32B performance run requires a compatible Radeon host. Agent backend side: vLLM host, model revision, and precision still to be attached |
+| Trained 32B model in live `rdk-agent` | Complete for one recorded task: 5/5 workflow nodes and both live-acceptance gates in 4 min 04 s | [Side-by-side run record](model/AGENT_E2E.en.md) and [screenshot](model/assets/agent-e2e-sft-vs-base.png); physical motion still requires human visual confirmation |
 | Verification evidence | Captured on 2026-08-05 | [Raw verification record](submission/en/evidence/verification-2026-08-05.md) |
 
 Before final submission, the participant must provide:
@@ -330,20 +331,35 @@ The report contains the endpoint host for traceability but no scheme, path, or k
 
 ### 9.5 Current Evidence Status
 
-| Item | Status |
-| --- | --- |
-| Client provider/model selection | Verified locally; sanitized in this repository |
-| AMD Radeon GPU model | Evidence pending |
-| ROCm/HIP version | Evidence pending |
-| Dedicated vLLM server version and configuration | Evidence pending |
-| Model repository/revision and precision/quantization | Evidence pending |
-| Local `/v1/models` response | Evidence pending |
-| Baseline and tuned TTFT | Evidence pending |
-| Baseline and tuned decode throughput | Evidence pending |
-| Peak VRAM/utilization | Evidence pending |
-| End-to-end agent workflow latency | Evidence pending |
+Two Radeon inference paths were measured by this team, and they are evidenced separately. **(A)** is the model this team trained. **(B)** is an off-the-shelf 80B deployed on a single Radeon card. Both were measured on participant-controlled `gfx1100` hosts. Their saved artifacts can be audited offline; reproducing (A) requires a compatible Radeon host, while (B)'s saved aggregates and deltas can be verified without a GPU.
 
-This project does not fabricate AMD performance data. No unmeasured value should be changed from `Evidence pending` to a number. Before judging, attach redacted server output, the exact vLLM launch command, model revision, precision or quantization setting, container digest if used, warm-up policy, and a screenshot of the participant-controlled Radeon Cloud instance without credentials.
+| Item | (A) Our trained 32B benchmark path | (B) Independent 80B single-GPU serving case (llama.cpp; not the Agent backend) |
+| --- | --- | --- |
+| Client provider/model selection | Verified locally; sanitized in this repository | Local loopback endpoint |
+| AMD Radeon GPU model | `gfx1100`, Card Model `0x744b`, 51,522,830,336 B VRAM | `gfx1100`, 51,522,830,336 B VRAM, 503 GiB system RAM |
+| ROCm/HIP version | ROCm 7.2.1, HIP `7.2.26015-fc0010cf6a`, torch `2.9.1+rocm7.2.0` | Exact ROCm/HIP version not archived; `llama.cpp` HIP binary SHA-256 `ba13e01f…` |
+| Server version and configuration | Original artifact `qwen3_agentic_openai_server.py` (SHA-256 `95d5c139…`), SDPA attention, fp32 RMSNorm, greedy decoding | `llama-server`, Flash Attention on, 32 inference/batch threads, 1 parallel slot, 262,144-token context |
+| Model repository/revision and precision/quantization | `unsloth/Qwen3-32B-bnb-4bit@7f721e74…f9083`, bnb NF4 4-bit double-quant, bf16 compute; adapter `checkpoint-000119` SHA-256 `4dcee691…f20bf` | `Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf`, 79,674,391,296 parameters, 48,410,988,384 B, SHA-256 `d103b273…` |
+| API identity and compatibility evidence | `/v1/models` verified live; the returned `id` and `/health` report which arm is loaded, which is the A/B identity control | No `/v1/models` capture was archived; the OpenAI-compatible surface was checked with three canaries: structured `tool_calls`, `role=tool` continuation, 42,028-token needle retrieval |
+| Baseline and tuned TTFT | User-visible p50 17.41 s → **8.26 s**; p95 83.97 s → **12.89 s** | Median 2,021.26 ms → **1,808.76 ms** (−10.5%) |
+| Baseline and tuned decode throughput | 6.54 → **6.72** tok/s, 88/88 outputs byte-identical | 37.19 → **49.82** tok/s (+34.0%); prefill 1,271.45 → 1,397.39 tok/s (+9.9%) |
+| Peak VRAM/utilization | ~19.3 GB after load; benchmark peak 27.99 → 28.06 GB; 99% GPU utilization sampled during decode | 48,843,468,800 → 49,523,740,672 B — **96.1% of a 51.5 GB card**, holding an 80B-class model |
+| End-to-end agent workflow latency | Five-node `rdk-agent` workflow on a live RDK X5: SFT accepted in **4 min 04 s** (5/5 nodes); Base stalled at 3/5 and was terminated after 14 min 25 s — [`model/AGENT_E2E.en.md`](model/AGENT_E2E.en.md) | Not applicable — this case study measures serving, not the agent workflow |
+| Measurement protocol | 88 trials per arm, temperature 0, 2 warm-up records | 1 warm-up + 5 measured runs per arm, 2,332-token prompt, temperature 0 |
+
+#### 9.5.1 Trained 32B SFT model completed the live RDK Agent workflow
+
+The trained 32B SFT model (`d-robotics-glm/Qwen3-32B-Agentic-SFT-r1-v3`, with no model fallback) completed one recorded end-to-end `rdk-agent` run against a live RDK X5. It finished all five workflow nodes, including CLI and natural-language Skill live acceptance, in **4 min 04 s**. Under the same agent, board, task, tools, and commands, with only the model changed, Base reached 3/5 and was terminated after 14 min 25 s when CLI acceptance could not parse its structured result.
+
+![Recorded RDK Agent run: Base stops at 3/5; the trained 32B SFT model completes 5/5](model/assets/agent-e2e-sft-vs-base.png)
+
+Left: Base stops at the CLI live-acceptance node. Right: the trained 32B SFT model completes all five nodes and both live-acceptance gates. See the [full run record and reproduction boundary](model/AGENT_E2E.en.md).
+
+This is one task and one run per arm. It proves that the SFT run completed the model-to-Agent-to-board command path; command exit code 0 and the screenshot do not independently prove that the physical motion was visually correct.
+
+This project does not fabricate AMD performance data. For (A), `model/radeon-optimization/qwen3-32b-agentic-sft/benchmark.py` reruns the 88-trial-per-arm benchmark and regenerates `results.json` only on a compatible Radeon host with the frozen model, adapter, and test data. For (B), `model/radeon-optimization/qwen3-next-80b/verify_results.py` runs without a GPU and recomputes the wall-time, prefill, and decode aggregates plus every published delta from the ten saved measurement records. Only per-arm TTFT medians were archived, so the script checks the TTFT delta from those stored medians rather than reconstructing its distribution.
+
+One item remains outside both columns: the private vLLM endpoint that the `rdk-agent` client routes to is verified only at the client level — provider `amd` and model `Qwen3-Next-80B-A3B-Instruct` were observed in the request path, but that server's GPU, ROCm version, vLLM version and launch command, model revision and precision have not been independently attested here, and no figure for it is stated anywhere in this submission.
 
 ## 10. Installation, deployment, and reproduction
 

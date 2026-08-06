@@ -2,7 +2,7 @@
 
 # Model Track — Trained, Deployed, and Optimized on AMD Radeon
 
-This page is the index for the model-side contribution. Every number below is recomputable offline from the evidence in [`model/`](../../model/README.en.md); nothing here is a projection.
+This page is the index for the model-side contribution. Every number below is tied to saved evidence in [`model/`](../../model/README.en.md); nothing here is a projection. The reproduction notes distinguish GPU-required reruns from offline verification of saved results.
 
 ## What was done on Radeon
 
@@ -11,6 +11,7 @@ This page is the index for the model-side contribution. Every number below is re
 | SFT training | LoRA `checkpoint-000119` on `unsloth/Qwen3-32B-bnb-4bit@7f721e74` | AMD Radeon gfx1100, ROCm, 119 optimizer steps |
 | Deployment | OpenAI-compatible service, identity hash-bound to the trained adapter | same GPU |
 | Inference optimization | Streaming/TTFT + lean LoRA decode path, on-device A/B | same GPU |
+| Second optimization case | Off-the-shelf 80B on one card: KV precision + offload depth | separate gfx1100 host |
 
 Adapter identity `4dcee6914e3f9c61aeb33529208bf7e63f37c4c5ae5e0e37e7f7c6b3bfff20bf` is identical across four independent sources (frozen training manifest, training host, local backup, ModelScope platform hash).
 
@@ -52,6 +53,33 @@ Two higher-ceiling candidates (merging LoRA into the NF4 base; `torch.compile` +
 
 Environment: gfx1100, ROCm 7.2.1, torch 2.9.1+rocm7.2.0, transformers 5.5.0, peft 0.19.1, bitsandbytes 0.50.0.
 
+## Result 4 — the same GPU architecture, the other optimization layer
+
+The optimization above deliberately changed no numerics: the 32B model is the one whose output quality is the entire claim, so the acceptance bar was byte-identical outputs — which caps how much can be won. To show the other end of the range, a separate host with the same `gfx1100` GPU architecture was used to serve an off-the-shelf `Qwen3-Next-80B-A3B-Instruct` (official Q4_K_M GGUF, ROCm/HIP `llama.cpp`) — **48.4 GB of weights on a 48 GiB (51.5 GB) card** — where trading KV-cache precision is permitted:
+
+| Metric | Q8 KV / 45 layers | Q4 KV / 47 layers | Change |
+| --- | ---: | ---: | ---: |
+| Prefill (2,332 tok) | 1,271.45 tok/s | 1,397.39 tok/s | +9.9% |
+| Decode (64 tok) | 37.19 tok/s | **49.82 tok/s** | **+34.0%** |
+| TTFT median | 2,021.26 ms | 1,808.76 ms | −10.5% |
+| Mean wall latency | 3,727.88 ms | 3,084.19 ms | −17.3% |
+
+Same weights, same 262,144-token configured context, same request shape, Flash Attention on both arms; one warm-up plus five measured runs each. The tuned configuration still passes structured `tool_calls`, `role=tool` continuation, and a 42,028-token needle retrieval.
+
+The two cases together cover both layers at which a ROCm deployment can be tuned:
+
+| | Our own 32B SFT model | Off-the-shelf 80B |
+| --- | --- | --- |
+| Layer | serving — streaming, LoRA execution | runtime — KV precision, offload depth |
+| Constraint | outputs must stay byte-identical | KV precision may be traded |
+| Headline | user-visible TTFT **2.11×** | decode **+34.0%** |
+
+```bash
+cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # recomputes saved aggregates and deltas from ten records; no GPU needed
+```
+
+This 80B is off-the-shelf: it is not the model this team trained, and not the teacher that produced the training data. Model artifact pinned at 48,410,988,384 B, SHA-256 `d103b273…`.
+
 ## Reproduce
 
 Without a GPU (about 5 minutes) — recompute the A/B table from the sealed raw records:
@@ -84,7 +112,9 @@ python3 benchmark.py --run-dir run-full       # regenerates results.json
 | Model-side overview | [`model/README.en.md`](../../model/README.en.md) |
 | All results on one page | [`model/RESULTS.en.md`](../../model/RESULTS.en.md) |
 | Claim → evidence → hash map | [`model/EVIDENCE_MAP.en.md`](../../model/EVIDENCE_MAP.en.md) |
+| End-to-end agent run, SFT vs Base | [`model/AGENT_E2E.en.md`](../../model/AGENT_E2E.en.md) |
 | Inference optimization code and A/B | [`model/radeon-optimization/qwen3-32b-agentic-sft/`](../../model/radeon-optimization/qwen3-32b-agentic-sft/README.md) |
+| 80B single-GPU case study | [`model/radeon-optimization/qwen3-next-80b/`](../../model/radeon-optimization/qwen3-next-80b/README.en.md) |
 | Deployment and identity verification | [`model/model/serving/README.en.md`](../../model/model/serving/README.en.md) |
 
 ## Boundaries
