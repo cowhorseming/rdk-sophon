@@ -650,12 +650,12 @@ The governing rules score 100 base points plus 20 optional points. The submissio
 
 ## Deliverables and validation
 
-Primary attachments were validated on 2026-08-05:
+Primary attachments were validated on 2026-08-06:
 
 | Deliverable | File | SHA-256 |
 | --- | --- | --- |
-| Project specification | [RDK_Agent_Project_Specification.pdf](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) | `02cf3e7175523842083ba5ba001de61d5fc507c563dde36de863467383fa1754` |
-| Pitch deck | [RDK_Agent_Track2_Pitch_Deck.pptx](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `76350d3350468f001e40ea7ef191ea3be48617c3a3821fa777adbc916e359705` |
+| Project specification | [RDK_Agent_Project_Specification.pdf](submission/en/deliverables/RDK_Agent_Project_Specification.pdf) | `6f0b324449f1216c0e6256f615ed9b42f7b2f276cc4fb0cb94fd8c0259850efc` |
+| Pitch deck | [RDK_Agent_Track2_Pitch_Deck.pptx](submission/en/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `807e1711d3e14d536b5704f8510120a1c1a614cebb9902e945d4026b570461ce` |
 
 The delivery also includes:
 

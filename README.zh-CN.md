@@ -645,8 +645,8 @@ Wave the left side once.
 
 | 交付物 | 状态 | SHA-256 |
 | --- | --- | --- |
-| [中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | 已完成；12 页 A4、可读、未加密，不包含表单或 JavaScript | `4ea9406e9ce16533033f69f26b4095c817ef9b8d6cef85375a5dbe6d50669f17` |
-| [中文路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | 已完成；12 张幻灯片，结构有效，含演讲者备注并通过渲染溢出检查 | `4dbe6bc0445c581227422f6a005b5dbd5f8104a84a172b71c782e87b6d3a4fa2` |
+| [中文项目说明书 PDF](submission/zh/deliverables/RDK_Agent_Project_Specification.pdf) | 已完成；12 页 A4、可读、未加密，不包含表单或 JavaScript | `efcc98e92be2ab7b80a8a8974a236377249a0eba0f22f3dd31bab0aa99e6f505` |
+| [中文路演 PPTX](submission/zh/deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | 已完成；12 张幻灯片，结构有效，含演讲者备注并通过渲染溢出检查 | `b67ce13cc099480ea9c6a47f882380e81f209005d80fd2f79cf538edcc2ac976` |
 | 完整 TypeScript 与 Rust 源代码 | 已完成；包含 lockfile | 以最终提交 revision 为准 |
 | 架构、工作流、开发板和测试证据图 | 已完成 | 包含 PNG 与可编辑 SVG |
 | AMD 脱敏配置与基准脚本 | 已完成 | 服务器侧实测证据待补 |

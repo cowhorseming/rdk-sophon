@@ -6,8 +6,8 @@
 
 | 交付物 | 文件 | SHA-256 |
 | --- | --- | --- |
-| 项目说明书 | [RDK_Agent_Project_Specification.pdf](deliverables/RDK_Agent_Project_Specification.pdf) | `4ea9406e9ce16533033f69f26b4095c817ef9b8d6cef85375a5dbe6d50669f17` |
-| 路演演示文稿 | [RDK_Agent_Track2_Pitch_Deck.pptx](deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `4dbe6bc0445c581227422f6a005b5dbd5f8104a84a172b71c782e87b6d3a4fa2` |
+| 项目说明书 | [RDK_Agent_Project_Specification.pdf](deliverables/RDK_Agent_Project_Specification.pdf) | `efcc98e92be2ab7b80a8a8974a236377249a0eba0f22f3dd31bab0aa99e6f505` |
+| 路演演示文稿 | [RDK_Agent_Track2_Pitch_Deck.pptx](deliverables/RDK_Agent_Track2_Pitch_Deck.pptx) | `b67ce13cc099480ea9c6a47f882380e81f209005d80fd2f79cf538edcc2ac976` |
 
 ## 提交材料源文件
 

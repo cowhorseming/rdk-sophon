@@ -24,7 +24,7 @@
 
   <text x="145" y="338" fill="#62e6f1" font-family="Menlo, Consolas, monospace" font-size="24">$ sophonctl --board x5 ping</text>
   <text x="145" y="382" fill="#79df91" font-family="Menlo, Consolas, monospace" font-size="24">pong: true</text>
-  <text x="470" y="382" fill="#8290a6" font-family="Menlo, Consolas, monospace" font-size="22">timestamp: 2026-08-05T11:02:22Z</text>
+  <text x="470" y="382" fill="#8290a6" font-family="Menlo, Consolas, monospace" font-size="22">timestamp: 2026-08-05T11:02:17Z</text>
 
   <line x1="145" y1="424" x2="1775" y2="424" stroke="#222b3a" stroke-width="2"/>
 
