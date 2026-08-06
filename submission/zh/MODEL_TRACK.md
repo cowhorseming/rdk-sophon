@@ -11,6 +11,7 @@
 | SFT 训练 | 基于 `unsloth/Qwen3-32B-bnb-4bit@7f721e74` 的 LoRA `checkpoint-000119` | AMD Radeon gfx1100、ROCm、119 optimizer steps |
 | 部署 | OpenAI 兼容服务，服务身份与训练产物哈希绑定 | 同一张卡 |
 | 推理优化 | 真流式 / TTFT + lean LoRA 解码路径，实机 A/B | 同一张卡 |
+| 第二个优化案例 | 现成 80B 单卡部署：KV 精度 + offload 深度 | 同一张卡 |
 
 adapter 身份 `4dcee6914e3f9c61aeb33529208bf7e63f37c4c5ae5e0e37e7f7c6b3bfff20bf` 在四个独立来源上一致：训练冻结清单、训练机原件、本地备份、ModelScope 平台侧哈希。
 
@@ -52,6 +53,33 @@ Base 不是崩溃。它返回了验收节点无法解析的结果——`Agent �
 
 环境：gfx1100、ROCm 7.2.1、torch 2.9.1+rocm7.2.0、transformers 5.5.0、peft 0.19.1、bitsandbytes 0.50.0。
 
+## 结果四 —— 同一张卡，另一个优化层
+
+上面那个优化刻意不动数值：32B 是全部质量主张的载体，验收门槛设成了"输出逐字节一致"，这决定了它的天花板。为了展示能力区间的另一端，同一张 `gfx1100` 上部署了现成的 `Qwen3-Next-80B-A3B-Instruct`（官方 Q4_K_M GGUF，ROCm/HIP `llama.cpp`）——**48.4 GB 权重跑在 48 GB 显存的单卡上**——这里允许拿 KV 精度做交换：
+
+| 指标 | Q8 KV / 45 层 | Q4 KV / 47 层 | 变化 |
+| --- | ---: | ---: | ---: |
+| Prefill（2,332 tok） | 1,271.45 tok/s | 1,397.39 tok/s | +9.9% |
+| Decode（64 tok） | 37.19 tok/s | **49.82 tok/s** | **+34.0%** |
+| TTFT 中位 | 2,021.26 ms | 1,808.76 ms | −10.5% |
+| 平均墙钟延迟 | 3,727.88 ms | 3,084.19 ms | −17.3% |
+
+同一份权重、同样 262,144-token 配置上下文、同样请求形态、两臂均开 Flash Attention；每臂 1 次预热 + 5 次正式测量。优化后的配置仍然通过结构化 `tool_calls`、`role=tool` 续写与 42,028-token needle 检索三个 canary。
+
+两个案例合起来覆盖了 ROCm 部署可调优的两个层：
+
+| | 自训练 32B SFT | 现成 80B |
+| --- | --- | --- |
+| 优化层 | serving —— 流式、LoRA 执行 | runtime —— KV 精度、offload 深度 |
+| 约束 | 输出必须逐字节不变 | KV 精度可以交换 |
+| 头条数字 | 用户可见 TTFT **2.11×** | decode **+34.0%** |
+
+```bash
+cd model/radeon-optimization/qwen3-next-80b && python3 verify_results.py   # 重算全部十次测量，无需 GPU
+```
+
+这个 80B 是现成模型：既不是本团队训练的模型，也不是产出训练数据的教师。模型产物固定为 48,410,988,384 B，SHA-256 `d103b273…`。
+
 ## 复现
 
 无 GPU（约 5 分钟）—— 从封存的原始记录重算 A/B 全表：
@@ -84,7 +112,9 @@ python3 benchmark.py --run-dir run-full       # 重新生成 results.json
 | 模型侧总览 | [`model/README.md`](../../model/README.md) |
 | 全部结果一页 | [`model/RESULTS.md`](../../model/RESULTS.md) |
 | claim → 证据 → 哈希 地图 | [`model/EVIDENCE_MAP.md`](../../model/EVIDENCE_MAP.md) |
+| 端到端 Agent 运行，SFT vs Base | [`model/AGENT_E2E.md`](../../model/AGENT_E2E.md) |
 | 推理优化代码与 A/B | [`model/radeon-optimization/qwen3-32b-agentic-sft/`](../../model/radeon-optimization/qwen3-32b-agentic-sft/README.md) |
+| 80B 单卡案例 | [`model/radeon-optimization/qwen3-next-80b/`](../../model/radeon-optimization/qwen3-next-80b/README.md) |
 | 部署与身份校验 | [`model/model/serving/README.md`](../../model/model/serving/README.md) |
 
 ## 边界
